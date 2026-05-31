@@ -1,21 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
 import {
   ClipboardList,
   Clock,
   CheckCircle2,
-  ListChecks,
-  ArrowRight,
-  MapPin,
   TrendingUp,
+  Activity,
 } from "lucide-react";
 import { useAssignedReports } from "@/hooks/useReports";
 import { useUnreadCount } from "@/hooks/useNotifications";
 import { StatusBadge } from "@/components/reports/StatusBadge";
-import { Button } from "@/components/ui/button";
-import { WASTE_CATEGORY_LABELS, Report } from "@/types";
 import { timeAgo } from "@/lib/utils";
 import {
   ListCardsSkeleton,
@@ -38,13 +33,6 @@ export default function FieldWorkerDashboard() {
     (r) => r.status === "CLEANED",
   ).length;
 
-  // Active tasks: not yet cleaned or rejected
-  const activeTaskReports = allReports.filter(
-    (r) => r.status !== "CLEANED" && r.status !== "REJECTED",
-  );
-  const activeTaskCount = activeTaskReports.length;
-  const activeTasks = activeTaskReports.slice(0, 5);
-
   const statusCounts = useMemo(() => {
     return allReports.reduce(
       (acc, report) => {
@@ -58,65 +46,41 @@ export default function FieldWorkerDashboard() {
         CLEANUP_SCHEDULED: 0,
         IN_PROGRESS: 0,
         CLEANED: 0,
+        REJECTED: 0,
       },
     );
   }, [allReports]);
 
-  const statusSegments = useMemo(
-    () => [
-      {
-        label: "Verified",
-        value: statusCounts.VERIFIED,
-        color: "#3b82f6",
-        dot: "bg-blue-500",
-      },
-      {
-        label: "Scheduled",
-        value: statusCounts.CLEANUP_SCHEDULED,
-        color: "#8b5cf6",
-        dot: "bg-violet-500",
-      },
-      {
-        label: "In Progress",
-        value: statusCounts.IN_PROGRESS,
-        color: "#f97316",
-        dot: "bg-orange-500",
-      },
-      {
-        label: "Cleaned",
-        value: statusCounts.CLEANED,
-        color: "#22c55e",
-        dot: "bg-emerald-500",
-      },
-    ],
-    [statusCounts],
-  );
+  const statusSegments = [
+    {
+      label: "Verified",
+      value: statusCounts.VERIFIED,
+      dot: "bg-blue-500",
+    },
+    {
+      label: "Scheduled",
+      value: statusCounts.CLEANUP_SCHEDULED,
+      dot: "bg-violet-500",
+    },
+    {
+      label: "In Progress",
+      value: statusCounts.IN_PROGRESS,
+      dot: "bg-orange-500",
+    },
+    {
+      label: "Cleaned",
+      value: statusCounts.CLEANED,
+      dot: "bg-emerald-500",
+    },
+    {
+      label: "Rejected",
+      value: statusCounts.REJECTED,
+      dot: "bg-rose-500",
+    },
+  ];
 
-  const statusTotal = statusSegments.reduce(
-    (sum, segment) => sum + segment.value,
-    0,
-  );
-
-  const statusGradient = useMemo(() => {
-    if (statusTotal === 0) {
-      return "conic-gradient(#e2e8f0 0deg 360deg)";
-    }
-
-    let start = 0;
-    const slices = statusSegments.map((segment) => {
-      const angle = (segment.value / statusTotal) * 360;
-      const end = start + angle;
-      const slice = `${segment.color} ${start}deg ${end}deg`;
-      start = end;
-      return slice;
-    });
-
-    if (start < 360) {
-      slices.push(`#e2e8f0 ${start}deg 360deg`);
-    }
-
-    return `conic-gradient(${slices.join(",")})`;
-  }, [statusSegments, statusTotal]);
+  const statusTotal = statusSegments.reduce((sum, item) => sum + item.value, 0);
+  const statusGradient = `conic-gradient(#3b82f6 0deg ${statusTotal > 0 ? (statusCounts.VERIFIED / statusTotal) * 360 : 0}deg, #8b5cf6 ${statusTotal > 0 ? (statusCounts.VERIFIED / statusTotal) * 360 : 0}deg ${statusTotal > 0 ? ((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED) / statusTotal) * 360 : 0}deg, #f97316 ${statusTotal > 0 ? ((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED) / statusTotal) * 360 : 0}deg ${statusTotal > 0 ? ((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED + statusCounts.IN_PROGRESS) / statusTotal) * 360 : 0}deg, #10b981 ${statusTotal > 0 ? ((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED + statusCounts.IN_PROGRESS) / statusTotal) * 360 : 0}deg ${statusTotal > 0 ? ((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED + statusCounts.IN_PROGRESS + statusCounts.CLEANED) / statusTotal) * 360 : 0}deg, #f43f5e ${statusTotal > 0 ? ((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED + statusCounts.IN_PROGRESS + statusCounts.CLEANED) / statusTotal) * 360 : 0}deg 360deg)`;
 
   const trendBuckets = useMemo(() => {
     const buckets = Array.from({ length: 12 }, () => 0);
@@ -148,10 +112,10 @@ export default function FieldWorkerDashboard() {
     },
     {
       label: "Active Tasks",
-      value: activeTaskCount,
-      caption: "Pending and in progress",
-      icon: ListChecks,
-      gradient: "from-violet-500 via-purple-500 to-fuchsia-500",
+      value: Math.max(0, totalAssigned - completedCount),
+      caption: "Open tasks assigned to you",
+      icon: Activity,
+      gradient: "from-indigo-500 via-purple-500 to-pink-500",
     },
     {
       label: "In Progress",
@@ -175,12 +139,6 @@ export default function FieldWorkerDashboard() {
       value: totalAssigned,
       icon: ClipboardList,
       color: "text-blue-600 bg-blue-50",
-    },
-    {
-      label: "Active Tasks",
-      value: activeTaskCount,
-      icon: ListChecks,
-      color: "text-teal-600 bg-teal-50",
     },
     {
       label: "In Progress",
@@ -372,76 +330,6 @@ export default function FieldWorkerDashboard() {
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Active Tasks
-              </h2>
-              <p className="text-xs text-slate-500">
-                Latest assignments requiring attention
-              </p>
-            </div>
-            <Link href="/field-worker/tasks">
-              <Button size="sm">View All Tasks</Button>
-            </Link>
-          </div>
-
-          {activeTasks.length === 0 ? (
-            <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-10 text-center">
-              <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400" />
-              <p className="mt-3 text-sm font-medium text-slate-600">
-                No active tasks right now
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Check back later for new assignments
-              </p>
-            </div>
-          ) : (
-            <div className="mt-6">
-              <div className="hidden border-b border-slate-200 pb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400 md:grid md:grid-cols-[2fr_1.2fr_1.4fr_0.8fr]">
-                <span>Task</span>
-                <span>Status</span>
-                <span>Location</span>
-                <span className="text-right">Updated</span>
-              </div>
-              <div className="divide-y">
-                {activeTasks.map((report: Report) => (
-                  <Link
-                    key={report.id}
-                    href={`/field-worker/tasks/${report.id}`}
-                    className="block py-4 transition-colors hover:bg-slate-50"
-                  >
-                    <div className="flex flex-col gap-3 md:grid md:grid-cols-[2fr_1.2fr_1.4fr_0.8fr] md:items-center">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">
-                          {report.title}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {WASTE_CATEGORY_LABELS[report.category]}
-                        </p>
-                      </div>
-                      <div>
-                        <StatusBadge status={report.status} />
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <MapPin className="h-3.5 w-3.5" />
-                        <span className="truncate">
-                          {report.address || "No address"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 text-xs text-slate-500 md:justify-end">
-                        <span>{timeAgo(report.createdAt)}</span>
-                        <ArrowRight className="h-4 w-4 text-slate-400" />
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

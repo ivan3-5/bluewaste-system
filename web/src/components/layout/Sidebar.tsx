@@ -25,7 +25,7 @@ const adminLinks = [
     label: "Report Management",
     icon: ClipboardList,
   },
-  { href: "/dashboard/spam", label: "Spam Queue", icon: AlertTriangle },
+  { href: "/dashboard/spam", label: "Spam", icon: AlertTriangle },
   { href: "/dashboard/map", label: "Waste Map", icon: Map },
   { href: "/dashboard/users", label: "User Management", icon: Users },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },

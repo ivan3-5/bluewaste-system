@@ -1,0 +1,291 @@
+import prisma from "@/lib/prisma";
+import { randomUUID } from "crypto";
+import {
+  ADMIN_REPORT_STATUS_LABELS,
+  type AdminReport,
+} from "@/lib/admin-report";
+import type { ReportStatus } from "@/types";
+
+const PLACEHOLDER_IMAGE_URL =
+  "https://placehold.co/800x600?text=No+Image+Available";
+
+type DashboardReportRow = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  latitude: number;
+  longitude: number;
+  address: string | null;
+  analysisConfidence: number | null;
+  analysisStatus: string | null;
+  reportedAt: Date;
+  updatedAt: Date;
+  imageUrl: string | null;
+  reporterId?: string | null;
+  reporterName?: string | null;
+  reporterEmail?: string | null;
+  assignedToId?: string | null;
+  assignedToName?: string | null;
+};
+
+type DashboardStatsRow = {
+  totalReports: bigint | number;
+  pendingCount: bigint | number;
+  inProgressCount: bigint | number;
+  cleanedCount: bigint | number;
+};
+
+type DashboardTrendRow = {
+  day: Date;
+  count: bigint | number;
+};
+
+type DashboardCategoryRow = {
+  bucket: string;
+  count: bigint | number;
+};
+
+const WASTE_BUCKET_LABELS: Record<string, string> = {
+  with_waste: "With Waste",
+  no_waste: "No Waste",
+};
+
+function toNumber(value: bigint | number | null | undefined) {
+  return Number(value ?? 0);
+}
+
+function mapDashboardStatus(status: string) {
+  if (status in ADMIN_REPORT_STATUS_LABELS) {
+    return status as ReportStatus;
+  }
+
+  return "PENDING" as ReportStatus;
+}
+
+function mapDashboardCategory(analysisStatus: string | null) {
+  return analysisStatus === "CLEAN" ? "no_waste" : "with_waste";
+}
+
+function mapDashboardReport(row: DashboardReportRow): AdminReport {
+  return {
+    id: row.id,
+    imageUrl: row.imageUrl || PLACEHOLDER_IMAGE_URL,
+    category: mapDashboardCategory(
+      row.analysisStatus,
+    ) as AdminReport["category"],
+    confidence: Number(row.analysisConfidence ?? 0),
+    latitude: Number(row.latitude),
+    longitude: Number(row.longitude),
+    locationName: row.address?.trim() || row.title || "Unknown location",
+    description: row.description?.trim() || null,
+    status: mapDashboardStatus(row.status) as AdminReport["status"],
+    reporterName: row.reporterName ?? null,
+    reporterEmail: row.reporterEmail ?? null,
+    assignedToId: row.assignedToId ?? null,
+    assignedToName: row.assignedToName ?? null,
+    reportedAt: row.reportedAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export async function getDashboardReports(limit: number) {
+  const reports = await prisma.$queryRaw<DashboardReportRow[]>`
+    SELECT
+      r.id,
+      r.title,
+      r.description,
+      r.category,
+      r.status,
+      r.latitude,
+      r.longitude,
+      r.address,
+      r."analysisConfidence",
+      r."analysisStatus",
+      r."createdAt" AS "reportedAt",
+      r."updatedAt",
+      COALESCE(image."imageUrl", null) AS "imageUrl",
+      r."reporterId",
+      COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous') AS "reporterName",
+      rep.email AS "reporterEmail",
+      r."assignedToId",
+      COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName"
+    FROM "Report" r
+    LEFT JOIN "User" rep ON rep.id = r."reporterId"
+    LEFT JOIN "User" u ON u.id = r."assignedToId"
+    LEFT JOIN LATERAL (
+      SELECT ri."imageUrl"
+      FROM "ReportImage" ri
+      WHERE ri."reportId" = r.id
+      ORDER BY ri."createdAt" ASC
+      LIMIT 1
+    ) image ON TRUE
+    WHERE r."isDeleted" = false
+      AND r."isSpam" = false
+    ORDER BY r."createdAt" DESC
+    LIMIT ${limit}
+  `;
+
+  return reports.map(mapDashboardReport);
+}
+
+export async function getDashboardReportById(id: string) {
+  const reports = await prisma.$queryRaw<DashboardReportRow[]>`
+    SELECT
+      r.id,
+      r.title,
+      r.description,
+      r.category,
+      r.status,
+      r.latitude,
+      r.longitude,
+      r.address,
+      r."analysisConfidence",
+      r."analysisStatus",
+      r."createdAt" AS "reportedAt",
+      r."updatedAt",
+      COALESCE(image."imageUrl", null) AS "imageUrl",
+      r."reporterId",
+      COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous') AS "reporterName",
+      rep.email AS "reporterEmail",
+      r."assignedToId",
+      COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName"
+    FROM "Report" r
+    LEFT JOIN "User" rep ON rep.id = r."reporterId"
+    LEFT JOIN "User" u ON u.id = r."assignedToId"
+    LEFT JOIN LATERAL (
+      SELECT ri."imageUrl"
+      FROM "ReportImage" ri
+      WHERE ri."reportId" = r.id
+      ORDER BY ri."createdAt" ASC
+      LIMIT 1
+    ) image ON TRUE
+    WHERE r.id = ${id}
+    LIMIT 1
+  `;
+
+  return reports[0] ? mapDashboardReport(reports[0]) : null;
+}
+
+export async function getDashboardStats() {
+  const rows = await prisma.$queryRaw<DashboardStatsRow[]>`
+    SELECT
+      COUNT(*)::bigint AS "totalReports",
+      COUNT(*) FILTER (WHERE r."status" = 'PENDING')::bigint AS "pendingCount",
+      COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
+      COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount"
+    FROM "Report" r
+  `;
+
+  const stats = rows[0];
+
+  return {
+    totalReports: toNumber(stats?.totalReports),
+    pendingCount: toNumber(stats?.pendingCount),
+    inProgressCount: toNumber(stats?.inProgressCount),
+    cleanedCount: toNumber(stats?.cleanedCount),
+  };
+}
+
+export async function getDashboardTrend(days = 30) {
+  const rows = await prisma.$queryRaw<DashboardTrendRow[]>`
+    WITH day_series AS (
+      SELECT generate_series(
+        CURRENT_DATE - (${days}::int - 1) * interval '1 day',
+        CURRENT_DATE,
+        interval '1 day'
+      )::date AS day
+    ),
+    report_counts AS (
+      SELECT
+        DATE_TRUNC('day', r."createdAt")::date AS day,
+        COUNT(*)::bigint AS count
+      FROM "Report" r
+      GROUP BY 1
+    )
+    SELECT
+      day_series.day,
+      COALESCE(report_counts.count, 0)::bigint AS count
+    FROM day_series
+    LEFT JOIN report_counts ON report_counts.day = day_series.day
+    ORDER BY day_series.day ASC
+  `;
+
+  return rows.map((row) => ({
+    day: row.day,
+    count: toNumber(row.count),
+  }));
+}
+
+export async function getDashboardCategoryDistribution() {
+  const rows = await prisma.$queryRaw<DashboardCategoryRow[]>`
+    WITH bucketed AS (
+      SELECT
+        CASE
+          WHEN COALESCE(r."analysisStatus", 'DIRTY') = 'CLEAN' THEN 'no_waste'
+          ELSE 'with_waste'
+        END AS bucket,
+        COUNT(*)::bigint AS count
+      FROM "Report" r
+      GROUP BY 1
+    )
+    SELECT
+      base.bucket,
+      COALESCE(bucketed.count, 0)::bigint AS count
+    FROM (VALUES ('with_waste'), ('no_waste')) AS base(bucket)
+    LEFT JOIN bucketed ON bucketed.bucket = base.bucket
+    ORDER BY CASE WHEN base.bucket = 'with_waste' THEN 1 ELSE 2 END
+  `;
+
+  return rows.map((row) => ({
+    key: row.bucket,
+    label: WASTE_BUCKET_LABELS[row.bucket] ?? row.bucket,
+    count: toNumber(row.count),
+  }));
+}
+
+export async function updateDashboardReportStatus(
+  id: string,
+  status: AdminReport["status"],
+) {
+  // Read reporter id and title first (avoid Prisma model mismatches)
+  const rows = await prisma.$queryRaw<
+    { reporterId: string | null; title: string }[]
+  >`
+    SELECT r."reporterId", r.title
+    FROM "Report" r
+    WHERE r.id = ${id}
+    LIMIT 1
+  `;
+
+  const reporterId = rows?.[0]?.reporterId ?? null;
+  const title = rows?.[0]?.title ?? "";
+
+  // Update status (cast to DB enum)
+  await prisma.$executeRaw`
+    UPDATE "Report"
+    SET status = ${status}::"ReportStatus"
+    WHERE id = ${id}
+  `;
+
+  // Create a notification for the reporter if they exist
+  if (reporterId) {
+    const message = `Your report "${title}" status changed to ${status.replace(/_/g, " ")}`;
+    const nid = randomUUID();
+
+    await prisma.$executeRaw`
+      INSERT INTO "Notification" (id, "userId", title, message, type, "reportId")
+      VALUES (
+        ${nid},
+        ${reporterId},
+        ${"Report Status Updated"},
+        ${message},
+        ${"STATUS_CHANGE"}::"NotificationType",
+        ${id}
+      )
+    `;
+  }
+
+  return getDashboardReportById(id);
+}

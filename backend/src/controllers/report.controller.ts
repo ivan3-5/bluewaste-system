@@ -188,6 +188,12 @@ export class ReportController {
       });
 
       const images = await Promise.all(uploadPromises);
+      // Auto-run analysis on the report after images are uploaded
+      try {
+        await ReportService.analyzeReport(id);
+      } catch (err) {
+        console.warn("Auto analysis failed for report", id, err);
+      }
       res.status(201).json(images);
     } catch (error: any) {
       sendError(res, 500, "Failed to upload images", "IMAGE_UPLOAD_FAILED");

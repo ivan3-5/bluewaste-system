@@ -36,7 +36,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
   bool get _hasLocation => _latitude != null && _longitude != null;
 
-  int get _remainingImageSlots => 5 - _images.length;
+  int get _remainingImageSlots => 1 - _images.length;
 
   @override
   void dispose() {
@@ -52,38 +52,39 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       return;
     }
 
-    if (_remainingImageSlots <= 0) {
-      _showMessage("Maximum of 5 images allowed.");
-      return;
-    }
-
+    // Replace any existing image — only one image is required/allowed.
     setState(() {
+      _images.clear();
       _images.add(picked);
     });
   }
 
   Future<void> _pickFromGallery() async {
-    final remaining = _remainingImageSlots;
-    if (remaining <= 0) {
-      _showMessage("Maximum of 5 images allowed.");
-      return;
-    }
-
+    // Pick a single image from gallery and replace any existing image.
     final picked =
-        await _picker.pickMultiImage(imageQuality: 75, limit: remaining);
-    if (picked.isEmpty) {
-      return;
-    }
+        await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75);
+    if (picked == null) return;
 
     setState(() {
-      _images.addAll(picked.take(remaining));
+      _images.clear();
+      _images.add(picked);
     });
   }
 
   Future<void> _getCurrentLocation() async {
     final enabled = await Geolocator.isLocationServiceEnabled();
     if (!enabled) {
-      _showMessage("Location services are disabled.");
+      // Offer to open location settings so the user can enable services.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Location services are disabled."),
+          action: SnackBarAction(
+            label: "Open settings",
+            onPressed: () => Geolocator.openLocationSettings(),
+          ),
+        ),
+      );
       return;
     }
 
@@ -92,9 +93,23 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       permission = await Geolocator.requestPermission();
     }
 
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.denied) {
       _showMessage("Location permission is required.");
+      return;
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      // Permission permanently denied — guide user to app settings.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Location permission permanently denied."),
+          action: SnackBarAction(
+            label: "Open settings",
+            onPressed: () => Geolocator.openAppSettings(),
+          ),
+        ),
+      );
       return;
     }
 
@@ -192,6 +207,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       return;
     }
 
+    if (_images.isEmpty) {
+      _showMessage("Please attach one clear image before submitting.");
+      return;
+    }
+
     // Hard zone guard — catches any state mismatch
     if (_isOutsideZone) {
       _showMessage(
@@ -258,9 +278,13 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       if (_descriptionController.text.trim().length < 20) "Description",
       if (!_hasLocation) "Location",
     ];
-    final canSubmit =
-        !_isSubmitting && missingRequirements.isEmpty && !_isOutsideZone;
-    final hasPhotoSlots = _remainingImageSlots > 0;
+    if (_images.isEmpty) missingRequirements.add("Photo");
+    final canSubmit = !_isSubmitting &&
+        missingRequirements.isEmpty &&
+        !_isOutsideZone &&
+        _images.isNotEmpty;
+    // Allow camera/gallery buttons to be used to add or replace the single image.
+    final hasPhotoSlots = true;
 
     return ListView(
       padding: AppSpacing.screen,
@@ -443,22 +467,22 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               _FormSectionHeader(
                 icon: Icons.photo_library_outlined,
                 title: "Photos",
-                subtitle: "Attach up to 5 clear images.",
+                subtitle: "Attach one clear photo (required).",
               ),
               const SizedBox(height: AppSpacing.xs),
               Row(
                 children: [
                   AppStatusPill(
-                    label: "${_images.length}/5 selected",
+                    label: "${_images.length}/1 selected",
                     color: _images.isEmpty
                         ? AppColors.mutedForeground
                         : AppColors.info,
                   ),
                   const SizedBox(width: AppSpacing.xs),
                   Text(
-                    hasPhotoSlots
+                    _images.isEmpty
                         ? "$_remainingImageSlots slot(s) left"
-                        : "Maximum reached",
+                        : "1 attached — tap to replace or remove",
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.mutedForeground,
                         ),
@@ -480,7 +504,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                     child: OutlinedButton.icon(
                       onPressed: hasPhotoSlots ? _pickFromGallery : null,
                       icon: const Icon(Icons.image_outlined),
-                      label: const Text("Gallery"),
+                      label: const Text("Gallery (single)"),
                     ),
                   ),
                 ],

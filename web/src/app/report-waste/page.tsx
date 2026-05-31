@@ -248,9 +248,7 @@ export default function ReportWastePage() {
       <div className="mx-auto max-w-4xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              AI Waste Detection
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-900">Waste Analysis</h1>
             <p className="text-sm text-gray-600">
               Upload a waste photo and let AI classify it for faster
               environmental response.
@@ -347,24 +345,7 @@ export default function ReportWastePage() {
               </p>
             )}
 
-            <Button
-              type="button"
-              className="w-full md:w-auto"
-              onClick={handleAnalyzeWaste}
-              disabled={isAnalyzing || !imageFile || outsideZone}
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing image...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Analyze Waste
-                </>
-              )}
-            </Button>
+            {/* Manual Analyze button removed; analysis may be managed automatically elsewhere */}
           </CardContent>
         </Card>
 
@@ -393,22 +374,7 @@ export default function ReportWastePage() {
                   </p>
                 </div>
 
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-500">
-                    Dominant waste
-                  </p>
-                  {result.dominantWaste ? (
-                    <span
-                      className={`mt-1 inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${WASTE_TYPE_STYLES[result.dominantWaste]}`}
-                    >
-                      {WASTE_TYPE_LABELS[result.dominantWaste]}
-                    </span>
-                  ) : (
-                    <span className="mt-1 inline-flex rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm font-semibold text-gray-700">
-                      Unclassified
-                    </span>
-                  )}
-                </div>
+                {/* Dominant waste display removed per request */}
 
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-500">
@@ -425,27 +391,7 @@ export default function ReportWastePage() {
                   )}
                 </div>
 
-                {result.totalItems > 0 && (
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-500">
-                      Detected items
-                    </p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {result.totalItems} object(s) detected
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-500">
-                    Severity
-                  </p>
-                  <span
-                    className={`mt-1 inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${SEVERITY_STYLES[result.severity]}`}
-                  >
-                    {result.severity}
-                  </span>
-                </div>
+                {/* Removed Detected items and Severity display per request */}
 
                 {(latitude !== null ||
                   longitude !== null ||

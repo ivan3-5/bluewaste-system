@@ -58,6 +58,13 @@ type AnalyzeWasteResult = {
   detections: DetectionBox[];
 };
 
+type WasteBucket = "with_waste" | "no_waste";
+
+const WASTE_BUCKET_LABELS: Record<WasteBucket, string> = {
+  with_waste: "With Waste",
+  no_waste: "No Waste",
+};
+
 const WASTE_TYPE_LABELS: Record<WasteType, string> = {
   PLASTIC: "Plastic",
   ORGANIC: "Organic",
@@ -80,16 +87,22 @@ const SEVERITY_STYLES: Record<WasteSeverity, string> = {
   high: "bg-red-100 text-red-700 border-red-200",
 };
 
-function mapAnalysisToCategory(result: AnalyzeWasteResult): WasteCategory {
-  if (result.wasteCategory) {
-    return result.wasteCategory;
-  }
-
-  return inferWasteCategory(result.labels || [], result.dominantWaste);
+function mapAnalysisToBucket(result: AnalyzeWasteResult): WasteBucket {
+  return result.status === "CLEAN" ? "no_waste" : "with_waste";
 }
 
-function buildDefaultDescription(category: WasteCategory) {
-  return `Waste report submitted via mobile capture. Category: ${WASTE_CATEGORY_LABELS[category]}.`;
+function resolveWasteCategoryForSubmission(result: AnalyzeWasteResult | null) {
+  if (result?.wasteCategory) {
+    return result.wasteCategory;
+  }
+  if (result) {
+    return inferWasteCategory(result.labels || [], result.dominantWaste);
+  }
+  return "PLASTIC_WASTE" as WasteCategory;
+}
+
+function buildDefaultDescription(bucket: WasteBucket) {
+  return `Waste report submitted via mobile capture. Category: ${WASTE_BUCKET_LABELS[bucket]}.`;
 }
 
 function geolocationErrorMessage(code: number) {
@@ -156,6 +169,58 @@ async function requestAnalyzeWaste(
   formData: FormData,
   token: string,
 ): Promise<any> {
+  // Demo mode: synthesize response client-side when activated
+  try {
+    if (
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("demo_mode") === "true"
+    ) {
+      const counterRaw = window.localStorage.getItem("demo_counter") ?? "1";
+      let counter = Number(counterRaw) || 1;
+
+      const isOdd = counter % 2 === 1;
+      // confidence ranges per spec
+      const confidence = isOdd
+        ? 0.91 + Math.random() * (0.96 - 0.91)
+        : 0.93 + Math.random() * (0.97 - 0.93);
+
+      const label = isOdd ? "with_waste" : "no_waste";
+      const isWaste = isOdd;
+
+      const payload = {
+        label,
+        confidence: Number(confidence.toFixed(4)),
+        is_waste: isWaste,
+        severity: isWaste ? null : null,
+        message: isWaste ? "Coastal waste detected." : "Area is clean.",
+        // compatibility fields used by the client
+        status: isWaste ? "DIRTY" : "CLEAN",
+        waste_count: isWaste ? 1 : 0,
+        count: isWaste ? 1 : 0,
+        top_confidence: Number(confidence.toFixed(4)),
+        decision: {
+          is_uncertain: false,
+          message: isWaste ? "Coastal waste detected." : "Area is clean.",
+          retake_recommended: false,
+        },
+        labels: [],
+        detections: [],
+        detectedObject: isWaste ? "waste" : "none",
+      };
+
+      // increment and persist counter
+      try {
+        counter += 1;
+        window.localStorage.setItem("demo_counter", String(counter));
+      } catch (e) {
+        // ignore storage errors
+      }
+
+      return payload;
+    }
+  } catch (e) {
+    // fall through to real request on any error
+  }
   const endpoints = ["/web/api/analyze-waste", "/api/analyze-waste"];
   let lastErrorMessage = "Failed to analyze image.";
 
@@ -207,7 +272,7 @@ export default function SubmitReportPage() {
     null,
   );
   const [locationConfirmed, setLocationConfirmed] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<WasteCategory | "">(
+  const [selectedCategory, setSelectedCategory] = useState<WasteBucket | "">(
     "",
   );
   const [description, setDescription] = useState("");
@@ -263,6 +328,26 @@ export default function SubmitReportPage() {
       }
     };
   }, [imagePreview]);
+
+  // Auto-run analysis when a new image is selected and user is authenticated.
+  // Small delay gives the browser time to create the preview and for
+  // `requestCurrentLocation()` to start fetching coordinates.
+  useEffect(() => {
+    if (!imageFile) return;
+    if (!token) return;
+    if (analysisResult) return; // already analyzed
+    if (isAnalyzing) return; // already running
+
+    const timer = setTimeout(() => {
+      // Fire and forget — handleAnalyzeWaste manages its own state and errors
+      handleAnalyzeWaste();
+    }, 300);
+
+    return () => clearTimeout(timer);
+    // Intentionally exclude handleAnalyzeWaste from deps to avoid re-creating
+    // the timeout when the function identity changes; rely on state deps above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageFile, token, analysisResult, isAnalyzing]);
 
   const requestCurrentLocation = () => {
     setIsLocating(true);
@@ -448,7 +533,7 @@ export default function SubmitReportPage() {
       const result = await analyzeWasteImage();
 
       setAnalysisResult(result);
-      setSelectedCategory(mapAnalysisToCategory(result));
+      setSelectedCategory(mapAnalysisToBucket(result));
       if (result.decision.retakeRecommended) {
         setDecisionMessage(
           result.decision.message ||
@@ -507,6 +592,10 @@ export default function SubmitReportPage() {
       return;
     }
 
+    // Allow submitting reports marked as `no_waste` — backend will auto-mark
+    // them as spam after images are uploaded (auto analysis). We no longer
+    // block submission for `no_waste` so spam detection runs server-side.
+
     const trimmedDescription = description.trim();
     if (trimmedDescription.length > 0 && trimmedDescription.length < 10) {
       setSubmitError(
@@ -520,12 +609,16 @@ export default function SubmitReportPage() {
     setDecisionMessage("");
 
     try {
-      const reportTitle = `Waste report - ${WASTE_CATEGORY_LABELS[selectedCategory]}`;
+      const resolvedCategory =
+        resolveWasteCategoryForSubmission(analysisResult);
+      const reportTitle = `Waste report - ${WASTE_BUCKET_LABELS[selectedCategory]}`;
       const reportDescription =
         trimmedDescription.length > 0
           ? trimmedDescription
           : buildDefaultDescription(selectedCategory);
 
+      // Backend expects a simple bucket category: "with_waste" | "no_waste".
+      // Use the selectedCategory (set from analysis or user) to satisfy the API.
       const report = await createReport.mutateAsync({
         title: reportTitle,
         description: reportDescription,
@@ -714,30 +807,14 @@ export default function SubmitReportPage() {
                 <div className="flex items-center gap-2 border-b px-4 py-3">
                   <Sparkles className="h-4 w-4 text-violet-500" />
                   <span className="text-sm font-semibold text-gray-900">
-                    AI Analysis
+                    Waste Analysis
                   </span>
                   <span className="ml-auto text-[11px] text-gray-400">
                     Optional — helps auto-fill waste type
                   </span>
                 </div>
                 <div className="space-y-3 p-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2"
-                    onClick={handleAnalyzeWaste}
-                    disabled={isAnalyzing}
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> Analyzing…
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" /> Analyze Waste
-                      </>
-                    )}
-                  </Button>
+                  {/* Analysis is triggered automatically on image selection; manual button removed */}
 
                   {analysisError && (
                     <p className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -754,38 +831,7 @@ export default function SubmitReportPage() {
                           {analysisResult.detectedObject}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
-                          Dominant waste
-                        </span>
-                        {analysisResult.dominantWaste ? (
-                          <span
-                            className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${DOMINANT_WASTE_STYLES[analysisResult.dominantWaste]}`}
-                          >
-                            {WASTE_TYPE_LABELS[analysisResult.dominantWaste]}
-                          </span>
-                        ) : (
-                          <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-700">
-                            Unclassified
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">Severity</span>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${SEVERITY_STYLES[analysisResult.severity]}`}
-                        >
-                          {analysisResult.severity}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
-                          Total items
-                        </span>
-                        <span className="text-xs font-semibold text-gray-800">
-                          {analysisResult.totalItems}
-                        </span>
-                      </div>
+                      {/* Dominant waste display removed per request */}
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-500">
                           Confidence
@@ -916,14 +962,14 @@ export default function SubmitReportPage() {
                       className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       value={selectedCategory}
                       onChange={(event) =>
-                        setSelectedCategory(event.target.value as WasteCategory)
+                        setSelectedCategory(event.target.value as WasteBucket)
                       }
                     >
                       <option value="">Select waste category…</option>
-                      {Object.entries(WASTE_CATEGORY_LABELS).map(
-                        ([key, label]) => (
+                      {(["with_waste", "no_waste"] as WasteBucket[]).map(
+                        (key) => (
                           <option key={key} value={key}>
-                            {label}
+                            {WASTE_BUCKET_LABELS[key]}
                           </option>
                         ),
                       )}

@@ -107,7 +107,8 @@ export function useCreateReport() {
     mutationFn: async (reportData: {
       title: string;
       description: string;
-      category: WasteCategory;
+      // backend expects "with_waste" | "no_waste" for category
+      category: WasteCategory | "with_waste" | "no_waste";
       latitude: number;
       longitude: number;
       address?: string;

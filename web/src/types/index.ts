@@ -61,6 +61,11 @@ export interface WasteDetection {
   bbox: number[];
 }
 
+/**
+ * DEPRECATED: `WasteReport` model was removed from the backend schema.
+ * This interface is retained for backward compatibility in the frontend
+ * until callers are migrated. Avoid creating new usages.
+ */
 export interface WasteReport {
   id: string;
   imageUrl: string;

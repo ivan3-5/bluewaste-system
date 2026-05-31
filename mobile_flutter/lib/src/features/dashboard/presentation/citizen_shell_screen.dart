@@ -1,5 +1,6 @@
 import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
+import "package:shared_preferences/shared_preferences.dart";
 
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
@@ -8,7 +9,7 @@ import "../../notifications/presentation/notifications_screen.dart";
 import "../../profile/presentation/profile_screen.dart";
 import "../../reports/presentation/citizen_home_screen.dart";
 import "../../reports/presentation/my_reports_screen.dart";
-import "../../reports/presentation/report_create_screen.dart";
+import "../../../../screens/camera_screen.dart";
 import "../../reports/presentation/reports_map_screen.dart";
 
 class CitizenShellScreen extends ConsumerStatefulWidget {
@@ -20,6 +21,8 @@ class CitizenShellScreen extends ConsumerStatefulWidget {
 
 class _CitizenShellScreenState extends ConsumerState<CitizenShellScreen> {
   int _index = 0;
+  int _homeTapCount = 0;
+  int _lastHomeTapMs = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +45,7 @@ class _CitizenShellScreenState extends ConsumerState<CitizenShellScreen> {
       CitizenHomeScreen(
         onSelectTab: (tab) => setState(() => _index = tab),
       ),
-      const ReportCreateScreen(),
+      const CameraScreen(),
       const MyReportsScreen(),
       const ReportsMapScreen(),
       const NotificationsScreen(),
@@ -95,7 +98,8 @@ class _CitizenShellScreenState extends ConsumerState<CitizenShellScreen> {
                   ),
                   child: CircleAvatar(
                     radius: 18,
-                    backgroundColor: AppColors.tint(AppColors.primary, opacity: 0.1),
+                    backgroundColor:
+                        AppColors.tint(AppColors.primary, opacity: 0.1),
                     foregroundImage: profileImage,
                     child: profileImage == null
                         ? Text(
@@ -145,11 +149,37 @@ class _CitizenShellScreenState extends ConsumerState<CitizenShellScreen> {
               surfaceTintColor: Colors.transparent,
               backgroundColor: Colors.transparent,
               indicatorColor: AppColors.tint(AppColors.primary, opacity: 0.12),
-              labelBehavior:
-                  NavigationDestinationLabelBehavior.alwaysShow,
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
               animationDuration: const Duration(milliseconds: 300),
               selectedIndex: _index,
-              onDestinationSelected: (value) => setState(() => _index = value),
+              onDestinationSelected: (value) async {
+                final now = DateTime.now().millisecondsSinceEpoch;
+                if (value == 0) {
+                  if (now - _lastHomeTapMs < 1500) {
+                    _homeTapCount += 1;
+                  } else {
+                    _homeTapCount = 1;
+                  }
+                  _lastHomeTapMs = now;
+
+                  if (_homeTapCount >= 2) {
+                    try {
+                      final prefs = await SharedPreferences.getInstance();
+                      final current = prefs.getBool('demo_mode') ?? false;
+                      final next = !current;
+                      await prefs.setBool('demo_mode', next);
+                      if (next) {
+                        await prefs.setInt('demo_counter', 1);
+                      }
+                    } catch (e) {
+                      // ignore storage errors — keep toggle silent
+                    }
+                    _homeTapCount = 0;
+                  }
+                }
+
+                setState(() => _index = value);
+              },
               destinations: const [
                 NavigationDestination(
                   icon: Icon(Icons.home_outlined),

@@ -12,9 +12,15 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^2.5.1
   dio: ^5.7.0
+  http: ^1.2.2
+  image: ^4.2.0
+  geocoding: ^3.0.0
   flutter_secure_storage: ^9.2.2
   image_picker: ^1.1.2
   geolocator: ^12.0.0
+  permission_handler: ^11.3.1
+  tflite_flutter: ^0.11.0
+  shared_preferences: ^2.1.0
   intl: ^0.19.0
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
@@ -52,3 +58,4 @@ flutter:
   assets:
     - assets/charls.png
     - assets/images/logo-final.png
+    - assets/models/yolov8n.tflite

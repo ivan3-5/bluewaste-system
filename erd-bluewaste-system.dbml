@@ -17,11 +17,8 @@ Enum ReportStatus {
 }
 
 Enum WasteCategory {
-  PLASTIC_WASTE
-  ORGANIC_WASTE
-  GLASS_WASTE
-  METAL_WASTE
-  PAPER_WASTE
+  with_waste
+  no_waste
 }
 
 Enum ImageType {
@@ -50,41 +47,41 @@ Enum AnalysisStatus {
 }
 
 Table User {
-  id        uuid      [pk]
-  email     varchar   [unique]
-  password  varchar
-  firstName varchar
-  lastName  varchar
-  phone     varchar   [null]
-  role      Role      [default: 'CITIZEN']
-  avatarUrl varchar   [null]
-  isActive  boolean   [default: true]
-  createdAt timestamp [default: now()]
-  updatedAt timestamp
+  id         uuid      [pk]
+  email      varchar   [unique]
+  password   varchar
+  firstName  varchar
+  lastName   varchar
+  phone      varchar   [null]
+  role       Role      [default: 'CITIZEN']
+  avatarUrl   varchar  [null]
+  isActive   boolean   [default: true]
+  createdAt  timestamp [default: now()]
+  updatedAt  timestamp
 }
 
 Table Report {
-  id                 uuid           [pk]
+  id                 uuid            [pk]
   title              varchar
   description        text
   category           WasteCategory
-  status             ReportStatus   [default: 'PENDING']
+  status             ReportStatus    [default: 'PENDING']
   latitude           float
   longitude          float
-  address            varchar        [null]
-  isAnonymous        boolean        [default: false]
-  isDeleted          boolean        [default: false]
-  isSpam             boolean        [default: false]
-  spamMarkedAt       timestamp      [null]
-  spamReason         varchar        [null]
-  analysisStatus     AnalysisStatus [null]
-  analysisWasteCount int            [null]
-  analysisConfidence float          [null]
-  analyzedAt         timestamp      [null]
-  createdAt          timestamp      [default: now()]
+  address            varchar         [null]
+  isAnonymous        boolean         [default: false]
+  isDeleted          boolean         [default: false]
+  isSpam             boolean         [default: false]
+  spamMarkedAt       timestamp       [null]
+  spamReason         varchar         [null]
+  analysisStatus     AnalysisStatus  [null]
+  analysisWasteCount int             [null]
+  analysisConfidence float           [null]
+  analyzedAt         timestamp       [null]
+  createdAt          timestamp       [default: now()]
   updatedAt          timestamp
-  reporterId         uuid           [null]
-  assignedToId       uuid           [null]
+  reporterId         uuid            [null]
+  assignedToId       uuid            [null]
 }
 
 Table ReportImage {
@@ -107,42 +104,14 @@ Table StatusHistory {
 }
 
 Table Notification {
-  id        uuid             [pk]
+  id        uuid              [pk]
   title     varchar
   message   text
   type      NotificationType
-  isRead    boolean          [default: false]
-  createdAt timestamp        [default: now()]
+  isRead    boolean           [default: false]
+  createdAt timestamp         [default: now()]
   userId    uuid
-  reportId  uuid             [null]
-}
-
-Table ActivityLog {
-  id         uuid      [pk]
-  action     varchar
-  entityType varchar
-  entityId   varchar
-  metadata   json      [null]
-  createdAt  timestamp [default: now()]
-  userId     uuid
-}
-
-Table WasteReport {
-  id             uuid        [pk]
-  imageUrl       varchar
-  detectedObject varchar
-  detections     json
-  dominantWaste  WasteType   [null]
-  totalItems     int
-  severity       varchar
-  confidence     float
-  latitude       float       [null]
-  longitude      float       [null]
-  address        varchar     [null]
-  labels         text[]      [default: '{}']
-  createdAt      timestamp   [default: now()]
-  updatedAt      timestamp
-  reporterId     uuid        [null]
+  reportId  uuid              [null]
 }
 
 Table ReportingZone {
@@ -162,6 +131,4 @@ Ref: StatusHistory.reportId > Report.id
 Ref: StatusHistory.changedById > User.id
 Ref: Notification.userId > User.id
 Ref: Notification.reportId > Report.id
-Ref: ActivityLog.userId > User.id
-Ref: WasteReport.reporterId > User.id
 Ref: ReportingZone.createdById > User.id

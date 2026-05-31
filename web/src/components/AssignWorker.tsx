@@ -1,0 +1,80 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/providers/AuthProvider";
+import { useUsers } from "@/hooks/useUsers";
+import { useAssignWorker } from "@/hooks/useReports";
+
+export default function AssignWorker({
+  reportId,
+  initialAssignedToId,
+  initialAssignedToName,
+}: {
+  reportId: string;
+  initialAssignedToId?: string | null;
+  initialAssignedToName?: string | null;
+}) {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [assignedTo, setAssignedTo] = useState<string | undefined>(
+    initialAssignedToId ?? undefined,
+  );
+  const [message, setMessage] = useState("");
+
+  const { data } = useUsers({ role: "FIELD_WORKER", limit: 100 });
+  const workers = data?.data || [];
+
+  const assign = useAssignWorker();
+
+  // Only LGU admins can assign
+  if (user?.role !== "LGU_ADMIN") return null;
+
+  const onAssign = async () => {
+    setMessage("");
+    try {
+      await assign.mutateAsync({ reportId, assignedToId: assignedTo ?? "" });
+      setMessage("Assigned successfully.");
+      router.refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to assign.");
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <label className="mb-2 block text-sm font-semibold text-slate-800">
+        Assign Field Worker
+      </label>
+      <div className="flex items-center gap-3">
+        <select
+          value={assignedTo ?? ""}
+          onChange={(e) => setAssignedTo(e.target.value || undefined)}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">Unassigned</option>
+          {workers.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.firstName} {w.lastName}
+            </option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          onClick={onAssign}
+          disabled={!assignedTo || assign.isLoading}
+          className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {assign.isLoading ? "Assigning..." : "Assign"}
+        </button>
+      </div>
+      {initialAssignedToName && (
+        <p className="mt-2 text-sm text-slate-600">
+          Currently assigned: {initialAssignedToName}
+        </p>
+      )}
+      {message && <p className="mt-3 text-sm text-slate-600">{message}</p>}
+    </div>
+  );
+}

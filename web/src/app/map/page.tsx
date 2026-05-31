@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useMapData } from "@/hooks/useReports";
-import { WASTE_CATEGORY_LABELS, WasteCategory } from "@/types";
 import { Filter } from "lucide-react";
 
 const WasteMap = dynamic(() => import("@/components/map/WasteMap"), {
@@ -11,10 +10,18 @@ const WasteMap = dynamic(() => import("@/components/map/WasteMap"), {
 });
 
 export default function PublicMapPage() {
-  const [category, setCategory] = useState<WasteCategory | "">("");
-  const { data: reports = [], isLoading } = useMapData({
-    category: category || undefined,
-  });
+  const [bucket, setBucket] = useState<"" | "with_waste" | "no_waste">("");
+  const { data: reports = [], isLoading } = useMapData();
+
+  const filteredReports = useMemo(() => {
+    if (bucket === "with_waste") {
+      return reports.filter((report) => report.status !== "CLEANED");
+    }
+    if (bucket === "no_waste") {
+      return reports.filter((report) => report.status === "CLEANED");
+    }
+    return reports;
+  }, [reports, bucket]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -29,20 +36,19 @@ export default function PublicMapPage() {
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-gray-400" />
           <select
-            title="Filter by waste category"
+            title="Filter by waste bucket"
             className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as WasteCategory | "")}
+            value={bucket}
+            onChange={(e) =>
+              setBucket(e.target.value as "" | "with_waste" | "no_waste")
+            }
           >
-            <option value="">All Categories</option>
-            {Object.entries(WASTE_CATEGORY_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
+            <option value="">All Reports</option>
+            <option value="with_waste">With Waste</option>
+            <option value="no_waste">No Waste</option>
           </select>
           <span className="rounded-xl bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-500">
-            {reports.length}
+            {filteredReports.length}
           </span>
         </div>
       </div>
@@ -58,7 +64,7 @@ export default function PublicMapPage() {
           </div>
         ) : (
           <div className="h-96 md:h-[600px]">
-            <WasteMap reports={reports} />
+            <WasteMap reports={filteredReports} />
           </div>
         )}
       </div>

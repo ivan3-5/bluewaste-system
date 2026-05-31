@@ -25,11 +25,8 @@ enum ReportStatus {
 }
 
 enum WasteCategory {
-  PLASTIC_WASTE
-  ORGANIC_WASTE
-  GLASS_WASTE
-  METAL_WASTE
-  PAPER_WASTE
+  with_waste
+  no_waste
 }
 
 enum ImageType {
@@ -81,9 +78,10 @@ model User {
   // Notifications for the user
   notifications   Notification[]
   // Activity logs
-  activityLogs    ActivityLog[]
+  // Activity logs
+  // (ActivityLog model removed)
   // AI-assisted waste detections
-  wasteReports    WasteReport[]
+  // (WasteReport model removed)
   // Reporting zones created by admin
   reportingZones  ReportingZone[]
 
@@ -190,46 +188,7 @@ model Notification {
   @@index([createdAt])
 }
 
-model ActivityLog {
-  id         String   @id @default(uuid())
-  action     String
-  entityType String
-  entityId   String
-  metadata   Json?
-  createdAt  DateTime @default(now())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([entityType, entityId])
-  @@index([createdAt])
-}
-
-model WasteReport {
-  id             String      @id @default(uuid())
-  imageUrl       String
-  detectedObject String
-  detections     Json        @default("[]")
-  dominantWaste  WasteType?
-  totalItems     Int         @default(0)
-  severity       String      @default("low")
-  confidence     Float
-  latitude       Float?
-  longitude      Float?
-  address        String?
-  labels         String[]      @default([])
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-
-  reporterId String?
-  reporter   User?   @relation(fields: [reporterId], references: [id], onDelete: SetNull)
-
-  @@index([dominantWaste])
-  @@index([createdAt])
-  @@index([reporterId])
-  @@index([reporterId, createdAt])
-}
+// ActivityLog and WasteReport models removed via migration.
 
 model ReportingZone {
   id          String   @id @default(uuid())

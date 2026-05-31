@@ -5,6 +5,7 @@ import {
   Prisma,
   NotificationType,
   Role,
+  AnalysisStatus,
 } from "@prisma/client";
 import {
   getPaginationParams,
@@ -287,6 +288,102 @@ export class ReportService {
     };
   }
 
+  static async analyzeReport(reportId: string) {
+    const report = await prisma.report.findUnique({
+      where: { id: reportId },
+      include: { images: { orderBy: { createdAt: "asc" }, take: 1 } },
+    });
+
+    if (!report) throw new Error("Report not found");
+
+    const firstImage =
+      report.images && report.images.length > 0 ? report.images[0] : null;
+    if (!firstImage) return report;
+
+    let analysis;
+    try {
+      analysis = await this.requestYoloAnalysis(firstImage.imageUrl);
+    } catch (error) {
+      console.warn("Analysis failed for report", reportId, error);
+      return report;
+    }
+
+    const labels = Array.isArray(analysis.labels) ? analysis.labels : [];
+
+    // Decide category / spam based on labels or analysis status
+    const isNoWasteLabel = labels.includes("no_waste");
+    const hasWaste =
+      labels.includes("with_waste") ||
+      (analysis.wasteCount || 0) > 0 ||
+      analysis.status === "DIRTY";
+
+    const newCategory: WasteCategory =
+      isNoWasteLabel || !hasWaste ? "no_waste" : "with_waste";
+    const shouldMarkSpam = newCategory === "no_waste";
+    const spamReason = shouldMarkSpam
+      ? "No visible waste or pollution detected in the submitted image."
+      : null;
+
+    const now = new Date();
+
+    const updated = await prisma
+      .$transaction([
+        prisma.report.update({
+          where: { id: reportId },
+          data: {
+            category: newCategory,
+            isSpam: shouldMarkSpam,
+            spamMarkedAt: shouldMarkSpam ? now : null,
+            spamReason,
+            analysisStatus:
+              analysis.status === "DIRTY"
+                ? ("DIRTY" as AnalysisStatus)
+                : ("CLEAN" as AnalysisStatus),
+            analysisWasteCount: analysis.wasteCount ?? null,
+            analysisConfidence: analysis.confidence ?? null,
+            analyzedAt: now,
+          },
+        }),
+        prisma.statusHistory.create({
+          data: {
+            reportId,
+            previousStatus: report.status,
+            newStatus: report.status,
+            changedById: report.reporterId || "system",
+            notes: `Auto analysis: ${shouldMarkSpam ? "marked as spam" : "detected waste"}`,
+          },
+        }),
+      ])
+      .then((r) => r[0]);
+
+    // Notify reporter about auto analysis result
+    if (report.reporterId) {
+      try {
+        await NotificationService.create({
+          userId: report.reporterId,
+          title: shouldMarkSpam
+            ? "Report Marked as Spam"
+            : "Report Analysis Completed",
+          message: shouldMarkSpam
+            ? `Your report \"${report.title}\" was automatically marked as spam by the system.`
+            : `Your report \"${report.title}\" was analyzed and appears to contain waste.`,
+          type: shouldMarkSpam ? "SYSTEM" : "SYSTEM",
+          reportId,
+        });
+      } catch (error) {
+        console.warn(
+          "Failed to notify reporter after analysis",
+          reportId,
+          error,
+        );
+      }
+    }
+
+    this.invalidateGeoCaches();
+
+    return updated;
+  }
+
   private static getSpamAutoDeleteAt(spamMarkedAt: Date) {
     return new Date(spamMarkedAt.getTime() + this.SPAM_RETENTION_MS);
   }
@@ -327,6 +424,12 @@ export class ReportService {
           longitude: data.longitude,
           address: data.address,
           isAnonymous: data.isAnonymous || false,
+          isSpam: data.category === "no_waste",
+          spamMarkedAt: data.category === "no_waste" ? new Date() : null,
+          spamReason:
+            data.category === "no_waste"
+              ? "No visible waste or pollution detected in the submitted image."
+              : null,
           reporterId: data.isAnonymous ? null : data.reporterId,
         },
         include: {

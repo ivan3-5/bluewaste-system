@@ -14,7 +14,6 @@ import userRoutes from "./routes/user.routes";
 import reportRoutes from "./routes/report.routes";
 import notificationRoutes from "./routes/notification.routes";
 import uploadRoutes from "./routes/upload.routes";
-import wasteReportRoutes from "./routes/wasteReport.routes";
 import reportingZoneRoutes from "./routes/reportingZone.routes";
 import analyticsRoutes from "./routes/analytics.routes";
 
@@ -129,7 +128,6 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/upload", uploadRoutes);
-app.use("/api/waste-reports", wasteReportRoutes);
 app.use("/api/reporting-zones", reportingZoneRoutes);
 app.use("/api/analytics", analyticsRoutes);
 

@@ -8,6 +8,7 @@ import {
   useCallback,
 } from "react";
 import api from "@/lib/api";
+import { useDemoMode } from "@/hooks/useDemoMode";
 import { User } from "@/types";
 
 interface AuthContextType {
@@ -31,6 +32,7 @@ interface RegisterData {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  useDemoMode();
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);

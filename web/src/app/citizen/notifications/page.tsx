@@ -45,27 +45,35 @@ export default function CitizenNotificationsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {unreadCount} unread notification{unreadCount !== 1 ? "s" : ""}
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Notifications
+          </h1>
+          <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+              {unreadCount} unread
+            </span>
+            <span className="text-xs text-gray-400">showing recent alerts</span>
           </p>
         </div>
-        {unreadCount > 0 && (
+        <div className="flex items-center gap-2">
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             onClick={() => markAllAsRead.mutate()}
-            disabled={markAllAsRead.isPending}
+            disabled={unreadCount === 0 || markAllAsRead.isPending}
+            aria-label="Mark all notifications as read"
           >
             Mark All as Read
           </Button>
-        )}
+        </div>
       </div>
 
       {notifications.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl border">
-          <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm font-medium">
+        <div className="text-center py-12 bg-white rounded-xl border">
+          <div className="mx-auto mb-3 h-16 w-16 flex items-center justify-center rounded-lg bg-gray-100">
+            <Bell className="w-8 h-8 text-gray-400" />
+          </div>
+          <p className="text-gray-700 text-sm font-medium">
             No notifications yet
           </p>
           <p className="text-gray-400 text-xs mt-1">
@@ -77,19 +85,20 @@ export default function CitizenNotificationsPage() {
           {notifications.map((n) => (
             <div
               key={n.id}
-              className={`flex items-start gap-4 px-5 py-4 transition-colors ${
-                n.isRead ? "" : "bg-blue-50/50"
+              className={`flex items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50 ${
+                n.isRead ? "bg-white" : "bg-blue-50 shadow-sm"
               }`}
             >
-              <span className="text-lg mt-0.5 flex-shrink-0">
-                {typeIcons[n.type] || "🔔"}
-              </span>
+              <div
+                className={`h-10 w-10 rounded-md flex items-center justify-center flex-shrink-0 ${n.isRead ? "bg-gray-100" : "bg-blue-100"}`}
+              >
+                <span className="text-lg">{typeIcons[n.type] || "🔔"}</span>
+              </div>
+
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <h3
-                    className={`text-sm ${
-                      n.isRead ? "text-gray-700" : "font-semibold text-gray-900"
-                    }`}
+                    className={`text-sm ${n.isRead ? "text-gray-700" : "font-semibold text-gray-900"}`}
                   >
                     {n.title}
                   </h3>
@@ -97,24 +106,29 @@ export default function CitizenNotificationsPage() {
                     {timeAgo(n.createdAt)}
                   </span>
                 </div>
-                <p className="mt-0.5 text-sm text-gray-500">{n.message}</p>
+
+                <p className="mt-1 text-sm text-gray-600 truncate">
+                  {n.message}
+                </p>
+
                 <div className="mt-3 flex items-center gap-2">
                   {n.reportId && (
                     <Link href="/citizen/my-reports">
                       <Button
                         size="sm"
                         variant="default"
-                        className="h-7 text-xs"
+                        className="h-8 text-sm"
                       >
                         View Report
                       </Button>
                     </Link>
                   )}
+
                   {!n.isRead && (
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 text-xs"
+                      className="h-8 text-sm"
                       onClick={() => markAsRead.mutate(n.id)}
                       disabled={markAsRead.isPending}
                     >
