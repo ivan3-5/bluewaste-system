@@ -8,6 +8,7 @@
     "web"
   ],
   "scripts": {
+    "build": "npm run web:build",
     "backend:dev": "npm run dev --workspace=backend",
     "web:dev": "npm run dev --workspace=web",
     "backend:typecheck": "npm run typecheck --workspace=backend",

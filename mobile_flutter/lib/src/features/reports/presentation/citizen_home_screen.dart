@@ -4,6 +4,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
+import "../../dashboard/data/dashboard_service.dart";
 import "../../auth/presentation/auth_controller.dart";
 
 class CitizenHomeScreen extends ConsumerWidget {
@@ -28,6 +29,9 @@ class CitizenHomeScreen extends ConsumerWidget {
           onCreateReport: () => onSelectTab(1),
           onOpenMap: () => onSelectTab(3),
         ),
+        const SizedBox(height: AppSpacing.lg),
+        _DashboardStatsSection(),
+        const SizedBox(height: AppSpacing.lg),
         const SizedBox(height: AppSpacing.lg),
         const _SectionHeader(
           title: "Quick Actions",
@@ -55,6 +59,91 @@ class CitizenHomeScreen extends ConsumerWidget {
         const SizedBox(height: AppSpacing.lg),
         const _TipCard(),
       ],
+    );
+  }
+}
+
+class _DashboardStatsSection extends ConsumerWidget {
+  const _DashboardStatsSection({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(dashboardStatsProvider);
+
+    return async.when(
+      data: (stats) {
+        return Row(
+          children: [
+            Expanded(
+                child: _StatCard(
+                    label: 'Total Reports',
+                    value: stats.totalReports.toString(),
+                    color: AppColors.primary)),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+                child: _StatCard(
+                    label: 'Pending',
+                    value: stats.pendingCount.toString(),
+                    color: AppColors.warning)),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+                child: _StatCard(
+                    label: 'Resolved',
+                    value: stats.resolvedCount.toString(),
+                    color: AppColors.success)),
+          ],
+        );
+      },
+      loading: () => const SizedBox(
+          height: 64, child: Center(child: CircularProgressIndicator())),
+      error: (e, st) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard(
+      {required this.label, required this.value, required this.color});
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionCard(
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.tint(color),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.bar_chart, color: color),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: AppColors.mutedForeground)),
+                const SizedBox(height: 6),
+                Text(value,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
