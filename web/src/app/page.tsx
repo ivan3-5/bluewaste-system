@@ -173,7 +173,6 @@ export default function HomePage() {
               type="button"
               className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={mobileMenuOpen}
               aria-controls="mobile-nav"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >

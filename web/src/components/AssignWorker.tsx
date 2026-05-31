@@ -43,11 +43,16 @@ export default function AssignWorker({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <label className="mb-2 block text-sm font-semibold text-slate-800">
+      <label
+        htmlFor="assign-field-worker"
+        className="mb-2 block text-sm font-semibold text-slate-800"
+      >
         Assign Field Worker
       </label>
       <div className="flex items-center gap-3">
         <select
+          id="assign-field-worker"
+          title="Assign Field Worker"
           value={assignedTo ?? ""}
           onChange={(e) => setAssignedTo(e.target.value || undefined)}
           className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
