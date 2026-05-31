@@ -63,10 +63,10 @@ export default function AssignWorker({
         <button
           type="button"
           onClick={onAssign}
-          disabled={!assignedTo || assign.isLoading}
+          disabled={!assignedTo || assign.isPending}
           className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {assign.isLoading ? "Assigning..." : "Assign"}
+          {assign.isPending ? "Assigning..." : "Assign"}
         </button>
       </div>
       {initialAssignedToName && (
