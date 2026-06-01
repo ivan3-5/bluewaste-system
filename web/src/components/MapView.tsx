@@ -93,6 +93,7 @@ export default function MapView({
 }: MapViewProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isEditingZone, setIsEditingZone] = useState(false);
+  const [isDrawingZone, setIsDrawingZone] = useState(false);
   const { user, isAdmin } = useAuth();
   // lazy import hooks to avoid RSC issues from server components
   let reportingZonesHook: any = null;
@@ -104,7 +105,7 @@ export default function MapView({
     reportingZonesHook = null;
   }
 
-  const { useReportingZones, useUpdateReportingZone } =
+  const { useReportingZones, useUpdateReportingZone, useCreateReportingZone } =
     reportingZonesHook || {};
   const zonesQuery = useReportingZones
     ? useReportingZones(false)
@@ -113,11 +114,17 @@ export default function MapView({
   const updateZoneMutation = useUpdateReportingZone
     ? useUpdateReportingZone()
     : null;
+  const createZoneMutation = useCreateReportingZone
+    ? useCreateReportingZone()
+    : null;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const zoneLayersRef = useRef<L.LayerGroup | null>(null);
   const zoneEditableGroupRef = useRef<L.FeatureGroup | null>(null);
   const editControlRef = useRef<any>(null);
+  const drawControlRef = useRef<any>(null);
+  const zoneDrawnGroupRef = useRef<L.FeatureGroup | null>(null);
 
   const icons = useMemo(
     () => ({
@@ -149,11 +156,16 @@ export default function MapView({
     }).addTo(map);
 
     const markersLayer = L.layerGroup().addTo(map);
+    const zoneLayerGroup = L.layerGroup().addTo(map);
     const zoneEditableGroup = new L.FeatureGroup();
     map.addLayer(zoneEditableGroup);
+    const zoneDrawnGroup = new L.FeatureGroup();
+    map.addLayer(zoneDrawnGroup);
     zoneEditableGroupRef.current = zoneEditableGroup;
+    zoneDrawnGroupRef.current = zoneDrawnGroup;
     mapRef.current = map;
     markersLayerRef.current = markersLayer;
+    zoneLayersRef.current = zoneLayerGroup;
     requestAnimationFrame(() => map.invalidateSize({ pan: false }));
 
     return () => {
@@ -164,6 +176,14 @@ export default function MapView({
       if (zoneEditableGroupRef.current) {
         zoneEditableGroupRef.current.clearLayers();
         zoneEditableGroupRef.current = null;
+      }
+      if (zoneLayersRef.current) {
+        zoneLayersRef.current.clearLayers();
+        zoneLayersRef.current = null;
+      }
+      if (zoneDrawnGroupRef.current) {
+        zoneDrawnGroupRef.current.clearLayers();
+        zoneDrawnGroupRef.current = null;
       }
 
       if (container._leaflet_id) {
@@ -239,6 +259,106 @@ export default function MapView({
   }, [isEditingZone, selectedZoneId, updateZoneMutation]);
 
   useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    if (drawControlRef.current) {
+      map.removeControl(drawControlRef.current);
+      drawControlRef.current = null;
+    }
+
+    if (!isDrawingZone) return;
+
+    const DrawControl = (L as any).Control?.Draw;
+    if (!DrawControl) return;
+
+    drawControlRef.current = new DrawControl({
+      position: "topright",
+      draw: {
+        polygon: {
+          allowIntersection: false,
+          showArea: true,
+          shapeOptions: {
+            color: "#0ea5e9",
+            weight: 2,
+            fillColor: "#38bdf8",
+            fillOpacity: 0.12,
+          },
+        },
+        polyline: false,
+        rectangle: false,
+        circle: false,
+        circlemarker: false,
+        marker: false,
+      },
+      edit: false,
+    });
+
+    map.addControl(drawControlRef.current);
+
+    const handleCreated = async (ev: any) => {
+      if (ev.layerType !== "polygon") return;
+
+      const layer = ev.layer as L.Polygon;
+      if (zoneDrawnGroupRef.current) {
+        zoneDrawnGroupRef.current.clearLayers();
+        zoneDrawnGroupRef.current.addLayer(layer);
+      }
+
+      const latlngs = (layer.getLatLngs()[0] as L.LatLng[]).map((ll) => ({
+        lat: ll.lat,
+        lng: ll.lng,
+      }));
+
+      const zoneName = window.prompt("Enter a name for this coastal zone");
+      if (!zoneName || !zoneName.trim()) {
+        zoneDrawnGroupRef.current?.clearLayers();
+        return;
+      }
+
+      try {
+        if (createZoneMutation) {
+          const created = await createZoneMutation.mutateAsync({
+            name: zoneName.trim(),
+            coordinates: latlngs,
+          });
+          if (created?.id) {
+            setSelectedZoneId(created.id);
+          }
+        } else {
+          const response = await fetch("/reporting-zones", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              name: zoneName.trim(),
+              coordinates: latlngs,
+            }),
+          });
+          const created = await response.json();
+          if (created?.id) {
+            setSelectedZoneId(created.id);
+          }
+        }
+
+        setIsDrawingZone(false);
+        zoneDrawnGroupRef.current?.clearLayers();
+      } catch {
+        window.alert("Failed to create coastal zone. Please try again.");
+      }
+    };
+
+    map.on("draw:created", handleCreated);
+
+    return () => {
+      map.off("draw:created", handleCreated);
+      if (drawControlRef.current) {
+        map.removeControl(drawControlRef.current);
+        drawControlRef.current = null;
+      }
+    };
+  }, [isDrawingZone, createZoneMutation]);
+
+  useEffect(() => {
     if (!mapRef.current) {
       return;
     }
@@ -274,22 +394,28 @@ export default function MapView({
     if (zoneEditableGroupRef.current) {
       zoneEditableGroupRef.current.clearLayers();
     }
+    if (zoneLayersRef.current) {
+      zoneLayersRef.current.clearLayers();
+    }
 
     (zones || []).forEach((zone: any) => {
       const latlngs = zone.coordinates.map(
         (p: any) => [p.lat, p.lng] as [number, number],
       );
       const polygon = L.polygon(latlngs, {
-        color: zone.id === selectedZoneId ? "#f97316" : "#2563eb",
+        color: zone.id === selectedZoneId ? "#1d4ed8" : "#2563eb",
         weight: 2,
-        fillColor: zone.id === selectedZoneId ? "#fb923c" : "#3b82f6",
-        fillOpacity: 0.12,
+        fillColor: zone.id === selectedZoneId ? "#3b82f6" : "#3b82f6",
+        fillOpacity: zone.id === selectedZoneId ? 0.2 : 0.12,
       });
       polygon.bindTooltip(zone.name, { permanent: false, direction: "center" });
-      polygon.addTo(map);
 
       if (zone.id === selectedZoneId && zoneEditableGroupRef.current) {
         zoneEditableGroupRef.current.addLayer(polygon);
+      } else if (zoneLayersRef.current) {
+        zoneLayersRef.current.addLayer(polygon);
+      } else {
+        polygon.addTo(map);
       }
     });
   }, [zones, selectedZoneId]);
@@ -319,8 +445,20 @@ export default function MapView({
           </select>
           <div className="flex gap-2">
             <button
+              className="rounded bg-sky-500 px-3 py-1 text-xs text-white"
+              onClick={() => {
+                setIsEditingZone(false);
+                setIsDrawingZone((v) => !v);
+              }}
+            >
+              {isDrawingZone ? "Stop draw" : "Draw zone"}
+            </button>
+            <button
               className="rounded bg-amber-500 px-3 py-1 text-xs text-white"
-              onClick={() => setIsEditingZone((v) => !v)}
+              onClick={() => {
+                setIsDrawingZone(false);
+                setIsEditingZone((v) => !v);
+              }}
             >
               {isEditingZone ? "Stop edit" : "Edit zone"}
             </button>
@@ -329,6 +467,7 @@ export default function MapView({
               onClick={() => {
                 setSelectedZoneId(null);
                 setIsEditingZone(false);
+                setIsDrawingZone(false);
               }}
             >
               Close
