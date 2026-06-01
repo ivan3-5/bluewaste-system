@@ -267,7 +267,7 @@ export async function getDashboardTrend(days = 30) {
     ORDER BY day_series.day ASC
   `;
 
-  return rows.map((row) => ({
+  return rows.map((row: DashboardTrendRow) => ({
     day: row.day,
     count: toNumber(row.count),
   }));
