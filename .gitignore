@@ -54,8 +54,7 @@ coverage/
 *.md
 !/README.md
 
-# Prisma schema and seed files
-**/schema.prisma
+# Prisma seed files
 **/seed.ts
 
 # Please put here any additional files or directories that should be ignored by Git.
