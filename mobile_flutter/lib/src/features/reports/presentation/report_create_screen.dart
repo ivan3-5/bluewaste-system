@@ -283,8 +283,6 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         missingRequirements.isEmpty &&
         !_isOutsideZone &&
         _images.isNotEmpty;
-    // Allow camera/gallery buttons to be used to add or replace the single image.
-    final hasPhotoSlots = true;
 
     return ListView(
       padding: AppSpacing.screen,
@@ -494,7 +492,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: hasPhotoSlots ? _pickFromCamera : null,
+                      onPressed: _pickFromCamera,
                       icon: const Icon(Icons.photo_camera_outlined),
                       label: const Text("Camera"),
                     ),
@@ -502,7 +500,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: hasPhotoSlots ? _pickFromGallery : null,
+                      onPressed: _pickFromGallery,
                       icon: const Icon(Icons.image_outlined),
                       label: const Text("Gallery (single)"),
                     ),

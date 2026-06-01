@@ -80,7 +80,7 @@ class CitizenHomeScreen extends ConsumerWidget {
 }
 
 class _DashboardStatsSection extends ConsumerWidget {
-  const _DashboardStatsSection({super.key});
+  const _DashboardStatsSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -298,10 +298,14 @@ export default function MapView({
     <div className="h-[70vh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       {isAdmin && (
         <div className="absolute z-30 m-4 flex flex-col gap-2 rounded bg-white/90 p-2 shadow">
-          <label className="text-xs font-medium text-slate-600">
+          <label
+            htmlFor="coastal-zone-select"
+            className="text-xs font-medium text-slate-600"
+          >
             Coastal Zone
           </label>
           <select
+            id="coastal-zone-select"
             className="rounded border px-2 py-1 text-sm"
             value={selectedZoneId || ""}
             onChange={(e) => setSelectedZoneId(e.target.value || null)}
