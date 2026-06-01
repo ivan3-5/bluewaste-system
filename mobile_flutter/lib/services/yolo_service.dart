@@ -27,12 +27,14 @@ class YoloDetectionResult {
     required this.confidence,
     required this.boxes,
     required this.imageSize,
+    this.isFallback = false,
   });
 
   final String label;
   final double confidence;
   final List<YoloBoundingBox> boxes;
   final Size imageSize;
+  final bool isFallback;
 
   bool get hasWaste => label == "with_waste";
 }
@@ -47,6 +49,29 @@ class YoloService {
   static const String _assetPath = "assets/models/yolov8n.tflite";
 
   Interpreter? _interpreter;
+
+  Future<YoloDetectionResult> buildFallbackResult(File imageFile) async {
+    final bytes = await imageFile.readAsBytes();
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) {
+      return const YoloDetectionResult(
+        label: "with_waste",
+        confidence: 0,
+        boxes: [],
+        imageSize: Size(1, 1),
+        isFallback: true,
+      );
+    }
+    final size = Size(decoded.width.toDouble(), decoded.height.toDouble());
+
+    return YoloDetectionResult(
+      label: "with_waste",
+      confidence: 0,
+      boxes: const [],
+      imageSize: size,
+      isFallback: true,
+    );
+  }
 
   Future<void> loadModel() async {
     if (_interpreter != null) return;

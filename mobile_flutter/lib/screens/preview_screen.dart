@@ -20,6 +20,8 @@ class PreviewScreen extends StatelessWidget {
 
   String get _badgeLabel => detection.hasWaste ? "With Waste" : "No Waste";
 
+  bool get _isFallback => detection.isFallback;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,19 +102,30 @@ class PreviewScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Text(
-                        "Confidence ${(detection.confidence * 100).toStringAsFixed(1)}%",
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
+                      _isFallback
+                          ? Text(
+                              "AI unavailable",
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            )
+                          : Text(
+                              "Confidence ${(detection.confidence * 100).toStringAsFixed(1)}%",
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    detection.boxes.isEmpty
-                        ? "No waste was detected above the confidence threshold."
-                        : "Waste detected above the confidence threshold.",
+                    _isFallback
+                        ? "AI analysis is unavailable on this device. You can still submit the report manually."
+                        : detection.boxes.isEmpty
+                            ? "No waste was detected above the confidence threshold."
+                            : "Waste detected above the confidence threshold.",
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 16),

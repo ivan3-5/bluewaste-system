@@ -20,6 +20,13 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _isProcessing = false;
   String? _errorMessage;
 
+  bool _isModelError(String message) {
+    final lower = message.toLowerCase();
+    return lower.contains("unable to create model from buffer") ||
+        lower.contains("interpreter") ||
+        lower.contains("model file");
+  }
+
   Future<void> _pickAndAnalyze(ImageSource source) async {
     final picked = await _picker.pickImage(
       source: source,
@@ -48,8 +55,33 @@ class _CameraScreenState extends State<CameraScreen> {
       );
     } catch (error) {
       if (!mounted) return;
+      final message = error.toString();
+
+      if (_isModelError(message)) {
+        final fallback = await _yoloService.buildFallbackResult(imageFile);
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "AI model unavailable on this device. Continuing without detection.",
+            ),
+          ),
+        );
+
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => PreviewScreen(
+              imageFile: imageFile,
+              detection: fallback,
+            ),
+          ),
+        );
+        return;
+      }
+
       setState(() {
-        _errorMessage = error.toString();
+        _errorMessage = message;
       });
     } finally {
       if (mounted) {

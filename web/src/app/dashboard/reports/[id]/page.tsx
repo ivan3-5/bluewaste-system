@@ -5,6 +5,8 @@ import { ReportStatusUpdater } from "@/components/ReportStatusUpdater";
 import AssignWorker from "@/components/AssignWorker";
 import { notFound } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 type PageProps = {
   params: Promise<{ id: string }>;
 };
