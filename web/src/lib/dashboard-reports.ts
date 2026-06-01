@@ -293,7 +293,7 @@ export async function getDashboardCategoryDistribution() {
     ORDER BY CASE WHEN base.bucket = 'with_waste' THEN 1 ELSE 2 END
   `;
 
-  return rows.map((row) => ({
+  return rows.map((row: DashboardCategoryRow) => ({
     key: row.bucket,
     label: WASTE_BUCKET_LABELS[row.bucket] ?? row.bucket,
     count: toNumber(row.count),
