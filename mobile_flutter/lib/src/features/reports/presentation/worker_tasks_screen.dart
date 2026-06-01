@@ -104,6 +104,10 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
       if (!mounted) {
         return;
       }
+      await _loadTasks();
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Cleanup photo uploaded.")),
       );
@@ -126,7 +130,11 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
         ];
       case "IN_PROGRESS":
         return const [
-          _TaskAction(label: "Mark Cleaned", nextStatus: "CLEANED"),
+          _TaskAction(
+            label: "Mark Cleaned",
+            nextStatus: "CLEANED",
+            requiresCleanupPhoto: true,
+          ),
         ];
       default:
         return const [];
@@ -170,6 +178,10 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
           final actions = _actionsForStatus(task.status);
           final statusColor = AppColors.statusColor(task.status);
           final categoryColor = AppColors.categoryColor(task.category);
+          final cleanupCount =
+              task.images.where((image) => image.type == "CLEANUP").length;
+          final needsCleanupPhoto =
+              task.status == "IN_PROGRESS" && cleanupCount == 0;
 
           return Card(
             margin: const EdgeInsets.only(bottom: AppSpacing.xs),
@@ -222,17 +234,43 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
                   if (actions.isNotEmpty)
                     Wrap(
                       spacing: AppSpacing.xs,
-                      children: actions
-                          .map(
-                            (action) => FilledButton.tonal(
-                              onPressed: () =>
-                                  _updateStatus(task, action.nextStatus),
-                              child: Text(action.label),
-                            ),
-                          )
-                          .toList(growable: false),
+                      children: actions.map(
+                        (action) {
+                          final isDisabled =
+                              action.requiresCleanupPhoto && cleanupCount == 0;
+                          return FilledButton.tonal(
+                            onPressed: isDisabled
+                                ? null
+                                : () => _updateStatus(
+                                      task,
+                                      action.nextStatus,
+                                    ),
+                            child: Text(action.label),
+                          );
+                        },
+                      ).toList(growable: false),
                     ),
                   if (task.status == "IN_PROGRESS") ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      cleanupCount == 0
+                          ? "Cleanup photos: none yet"
+                          : "Cleanup photos: $cleanupCount",
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: cleanupCount == 0
+                                ? AppColors.mutedForeground
+                                : AppColors.success,
+                          ),
+                    ),
+                    if (needsCleanupPhoto) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        "Upload a cleanup photo to mark as cleaned.",
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.mutedForeground,
+                            ),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.xs),
                     OutlinedButton.icon(
                       onPressed: () => _uploadCleanupPhoto(task.id),
@@ -251,8 +289,13 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
 }
 
 class _TaskAction {
-  const _TaskAction({required this.label, required this.nextStatus});
+  const _TaskAction({
+    required this.label,
+    required this.nextStatus,
+    this.requiresCleanupPhoto = false,
+  });
 
   final String label;
   final String nextStatus;
+  final bool requiresCleanupPhoto;
 }

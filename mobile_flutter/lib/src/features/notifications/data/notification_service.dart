@@ -48,6 +48,21 @@ class NotificationService {
       throw ApiException.fromDioError(error);
     }
   }
+
+  Future<int> getUnreadCount() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        "/notifications/unread-count",
+      );
+      final rawCount = response.data?["count"];
+      if (rawCount is int) {
+        return rawCount;
+      }
+      return int.tryParse(rawCount?.toString() ?? "") ?? 0;
+    } on DioException catch (error) {
+      throw ApiException.fromDioError(error);
+    }
+  }
 }
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {

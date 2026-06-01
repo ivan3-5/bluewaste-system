@@ -223,7 +223,14 @@ export default function MyReportsPage() {
           </div>
         ) : (
           reports.map((report) => {
-            const imageUrls = report.images.map((img) => img.imageUrl);
+            const reportImages = report.images.filter(
+              (img) => img.type === "REPORT",
+            );
+            const cleanupImages = report.images.filter(
+              (img) => img.type === "CLEANUP",
+            );
+            const reportImageUrls = reportImages.map((img) => img.imageUrl);
+            const cleanupImageUrls = cleanupImages.map((img) => img.imageUrl);
             return (
               <div
                 key={report.id}
@@ -248,30 +255,65 @@ export default function MyReportsPage() {
                     </div>
                   </div>
 
-                  {/* Thumbnail stack — click to open lightbox */}
-                  {imageUrls.length > 0 && (
-                    <div className="relative shrink-0">
-                      <button
-                        aria-label={`View ${imageUrls.length} photo${imageUrls.length > 1 ? "s" : ""} for ${report.title}`}
-                        onClick={() => openLightbox(imageUrls, 0, report.title)}
-                        className="group relative block h-16 w-16 overflow-hidden rounded-lg border border-gray-200 shadow-sm transition-all hover:scale-105 hover:border-blue-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={imageUrls[0]}
-                          alt="Report photo"
-                          className="h-full w-full object-cover"
-                        />
-                        {/* Hover overlay */}
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
-                          <ImageIcon className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" />
+                  {/* Report + Cleanup thumbnails (side-by-side) */}
+                  {(reportImageUrls.length > 0 ||
+                    cleanupImageUrls.length > 0) && (
+                    <div className="flex shrink-0 items-start gap-3">
+                      {reportImageUrls.length > 0 && (
+                        <div className="flex flex-col items-center gap-1">
+                          <button
+                            aria-label={`View ${reportImageUrls.length} report photo${reportImageUrls.length > 1 ? "s" : ""} for ${report.title}`}
+                            onClick={() =>
+                              openLightbox(
+                                reportImageUrls,
+                                0,
+                                `${report.title} (Report)`,
+                              )
+                            }
+                            className="group relative block h-16 w-16 overflow-hidden rounded-lg border border-gray-200 shadow-sm transition-all hover:scale-105 hover:border-blue-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={reportImageUrls[0]}
+                              alt="Report photo"
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
+                              <ImageIcon className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" />
+                            </div>
+                          </button>
+                          <span className="text-[10px] text-gray-500">
+                            Waste Report
+                          </span>
                         </div>
-                      </button>
-                      {/* Badge showing extra image count */}
-                      {imageUrls.length > 1 && (
-                        <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow">
-                          {imageUrls.length}
-                        </span>
+                      )}
+                      {cleanupImageUrls.length > 0 && (
+                        <div className="flex flex-col items-center gap-1">
+                          <button
+                            aria-label={`View ${cleanupImageUrls.length} cleanup photo${cleanupImageUrls.length > 1 ? "s" : ""} for ${report.title}`}
+                            onClick={() =>
+                              openLightbox(
+                                cleanupImageUrls,
+                                0,
+                                `${report.title} (Cleanup)`,
+                              )
+                            }
+                            className="group relative block h-16 w-16 overflow-hidden rounded-lg border border-emerald-200 shadow-sm transition-all hover:scale-105 hover:border-emerald-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={cleanupImageUrls[0]}
+                              alt="Cleanup photo"
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
+                              <ImageIcon className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" />
+                            </div>
+                          </button>
+                          <span className="text-[10px] text-emerald-600">
+                            Cleanup
+                          </span>
+                        </div>
                       )}
                     </div>
                   )}
