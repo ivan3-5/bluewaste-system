@@ -8,6 +8,7 @@ import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../data/report_service.dart";
+import "../../../core/network/api_exception.dart";
 import "../domain/report_models.dart";
 
 class MyReportsScreen extends ConsumerStatefulWidget {
@@ -22,6 +23,7 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
 
   List<ReportRecord> _reports = const [];
   bool _loading = true;
+  String? _errorMessage;
   String _statusFilter = "";
   Timer? _timer;
 
@@ -53,13 +55,25 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
       setState(() {
         _reports = result.data;
         _loading = false;
+        _errorMessage = null;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
+
+      String message;
+      if (error is ApiException) {
+        message = error.statusCode != null
+            ? "${error.message} (HTTP ${error.statusCode})"
+            : error.message;
+      } else {
+        message = error.toString();
+      }
+
       setState(() {
         _loading = false;
+        _errorMessage = message;
       });
     }
   }
@@ -119,94 +133,108 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
             onRefresh: _loadReports,
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _reports.isEmpty
+                : _errorMessage != null
                     ? ListView(
-                        children: const [
-                          SizedBox(height: 140),
+                        children: [
+                          const SizedBox(height: 140),
                           AppEmptyState(
-                            icon: Icons.assignment_outlined,
-                            title: "No reports found",
-                            subtitle:
-                                "Try changing your filter or create your first report.",
+                            icon: Icons.cloud_off_outlined,
+                            title: "Unable to load your reports",
+                            subtitle: _errorMessage!,
                           ),
                         ],
                       )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.md,
-                          0,
-                          AppSpacing.md,
-                          AppSpacing.md,
-                        ),
-                        itemCount: _reports.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: AppSpacing.xs),
-                        itemBuilder: (context, index) {
-                          final report = _reports[index];
-                          final statusColor =
-                              AppColors.statusColor(report.status);
-                          final categoryColor =
-                              AppColors.categoryColor(report.category);
+                    : _reports.isEmpty
+                        ? ListView(
+                            children: const [
+                              SizedBox(height: 140),
+                              AppEmptyState(
+                                icon: Icons.assignment_outlined,
+                                title: "No reports found",
+                                subtitle:
+                                    "Try changing your filter or create your first report.",
+                              ),
+                            ],
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.md,
+                              0,
+                              AppSpacing.md,
+                              AppSpacing.md,
+                            ),
+                            itemCount: _reports.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: AppSpacing.xs),
+                            itemBuilder: (context, index) {
+                              final report = _reports[index];
+                              final statusColor =
+                                  AppColors.statusColor(report.status);
+                              final categoryColor =
+                                  AppColors.categoryColor(report.category);
 
-                          return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.md),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    report.title,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w700),
-                                  ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Text(
-                                    report.description,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: AppColors.mutedForeground,
-                                        ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Wrap(
-                                    spacing: AppSpacing.xs,
-                                    runSpacing: AppSpacing.xs,
+                              return Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.md),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      AppStatusPill(
-                                        label: statusLabels[report.status] ??
-                                            report.status,
-                                        color: statusColor,
+                                      Text(
+                                        report.title,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.w700),
                                       ),
-                                      AppStatusPill(
-                                        label: wasteCategoryLabels[
-                                                report.category] ??
-                                            report.category,
-                                        color: categoryColor,
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Text(
+                                        report.description,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: AppColors.mutedForeground,
+                                            ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.sm),
+                                      Wrap(
+                                        spacing: AppSpacing.xs,
+                                        runSpacing: AppSpacing.xs,
+                                        children: [
+                                          AppStatusPill(
+                                            label:
+                                                statusLabels[report.status] ??
+                                                    report.status,
+                                            color: statusColor,
+                                          ),
+                                          AppStatusPill(
+                                            label: wasteCategoryLabels[
+                                                    report.category] ??
+                                                report.category,
+                                            color: categoryColor,
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: AppSpacing.sm),
+                                      Text(
+                                        "Created ${_dateFormat.format(report.createdAt)}",
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall
+                                            ?.copyWith(
+                                              color: AppColors.mutedForeground,
+                                            ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Text(
-                                    "Created ${_dateFormat.format(report.createdAt)}",
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          color: AppColors.mutedForeground,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                                ),
+                              );
+                            },
+                          ),
           ),
         ),
       ],

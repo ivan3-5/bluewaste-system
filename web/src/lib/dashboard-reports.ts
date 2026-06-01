@@ -23,6 +23,13 @@ type DashboardReportRow = {
   reportedAt: Date;
   updatedAt: Date;
   imageUrl: string | null;
+  images: Array<{
+    id: string;
+    imageUrl: string;
+    publicId: string | null;
+    type: string;
+    createdAt: Date;
+  }>;
   reporterId?: string | null;
   reporterName?: string | null;
   reporterEmail?: string | null;
@@ -69,9 +76,27 @@ function mapDashboardCategory(analysisStatus: string | null) {
 }
 
 function mapDashboardReport(row: DashboardReportRow): AdminReport {
+  const images = Array.isArray(row.images)
+    ? row.images.map((image) => ({
+        id: image.id,
+        imageUrl: image.imageUrl,
+        publicId: image.publicId ?? "",
+        type:
+          image.type === "CLEANUP" ? ("CLEANUP" as const) : ("REPORT" as const),
+        createdAt:
+          image.createdAt instanceof Date
+            ? image.createdAt.toISOString()
+            : String(image.createdAt),
+      }))
+    : [];
+
+  const primaryImage =
+    images.find((image) => image.type === "REPORT") ?? images[0] ?? null;
+
   return {
     id: row.id,
-    imageUrl: row.imageUrl || PLACEHOLDER_IMAGE_URL,
+    imageUrl: primaryImage?.imageUrl || row.imageUrl || PLACEHOLDER_IMAGE_URL,
+    images,
     category: mapDashboardCategory(
       row.analysisStatus,
     ) as AdminReport["category"],
@@ -106,6 +131,7 @@ export async function getDashboardReports(limit: number) {
       r."createdAt" AS "reportedAt",
       r."updatedAt",
       COALESCE(image."imageUrl", null) AS "imageUrl",
+      COALESCE(images.images, '[]'::json) AS images,
       r."reporterId",
       COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous') AS "reporterName",
       rep.email AS "reporterEmail",
@@ -118,9 +144,23 @@ export async function getDashboardReports(limit: number) {
       SELECT ri."imageUrl"
       FROM "ReportImage" ri
       WHERE ri."reportId" = r.id
+        AND ri.type = 'REPORT'
       ORDER BY ri."createdAt" ASC
       LIMIT 1
     ) image ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'id', ri.id,
+          'imageUrl', ri."imageUrl",
+          'publicId', ri."publicId",
+          'type', ri.type,
+          'createdAt', ri."createdAt"
+        ) ORDER BY ri."createdAt" ASC
+      ) AS images
+      FROM "ReportImage" ri
+      WHERE ri."reportId" = r.id
+    ) images ON TRUE
     WHERE r."isDeleted" = false
       AND r."isSpam" = false
     ORDER BY r."createdAt" DESC
@@ -146,6 +186,7 @@ export async function getDashboardReportById(id: string) {
       r."createdAt" AS "reportedAt",
       r."updatedAt",
       COALESCE(image."imageUrl", null) AS "imageUrl",
+      COALESCE(images.images, '[]'::json) AS images,
       r."reporterId",
       COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous') AS "reporterName",
       rep.email AS "reporterEmail",
@@ -158,9 +199,23 @@ export async function getDashboardReportById(id: string) {
       SELECT ri."imageUrl"
       FROM "ReportImage" ri
       WHERE ri."reportId" = r.id
+        AND ri.type = 'REPORT'
       ORDER BY ri."createdAt" ASC
       LIMIT 1
     ) image ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'id', ri.id,
+          'imageUrl', ri."imageUrl",
+          'publicId', ri."publicId",
+          'type', ri.type,
+          'createdAt', ri."createdAt"
+        ) ORDER BY ri."createdAt" ASC
+      ) AS images
+      FROM "ReportImage" ri
+      WHERE ri."reportId" = r.id
+    ) images ON TRUE
     WHERE r.id = ${id}
     LIMIT 1
   `;

@@ -797,19 +797,44 @@ export class ReportService {
     };
     if (filters.status) where.status = filters.status;
 
-    const [reports, total] = await Promise.all([
-      prisma.report.findMany({
-        where,
-        include: {
-          images: { take: 1 },
-          _count: { select: { images: true, statusHistory: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        skip: (pagination.page - 1) * pagination.limit,
-        take: pagination.limit,
-      }),
-      prisma.report.count({ where }),
-    ]);
+    let reports: any[] = [];
+    let total = 0;
+
+    try {
+      [reports, total] = await Promise.all([
+        prisma.report.findMany({
+          where,
+          include: {
+            images: true,
+            _count: { select: { images: true, statusHistory: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          skip: (pagination.page - 1) * pagination.limit,
+          take: pagination.limit,
+        }),
+        prisma.report.count({ where }),
+      ]);
+    } catch (error) {
+      // Backward-compatible fallback for deployments with older DB schema.
+      const legacyWhere: Prisma.ReportWhereInput = { reporterId: userId };
+      if (filters.status) legacyWhere.status = filters.status;
+
+      [reports, total] = await Promise.all([
+        prisma.report.findMany({
+          where: legacyWhere,
+          include: {
+            images: true,
+            _count: { select: { images: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          skip: (pagination.page - 1) * pagination.limit,
+          take: pagination.limit,
+        }),
+        prisma.report.count({ where: legacyWhere }),
+      ]);
+
+      console.warn("getMyReports fallback query used:", error);
+    }
 
     return buildPaginatedResponse(reports, total, pagination);
   }
@@ -836,7 +861,7 @@ export class ReportService {
         where,
         include: {
           reporter: { select: { id: true, firstName: true, lastName: true } },
-          images: { take: 1 },
+          images: true,
           _count: { select: { images: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -874,26 +899,58 @@ export class ReportService {
     const where: Prisma.ReportWhereInput = {
       isDeleted: false,
       isSpam: false,
+      status: { not: ReportStatus.CLEANED },
     };
     if (filters?.status) where.status = filters.status;
     if (filters?.category) where.category = filters.category;
 
-    const reports = await prisma.report.findMany({
-      where,
-      select: {
-        id: true,
-        title: true,
-        category: true,
-        status: true,
-        latitude: true,
-        longitude: true,
-        address: true,
-        createdAt: true,
-        images: { take: 1, select: { imageUrl: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
+    let reports: any[] = [];
+
+    try {
+      reports = await prisma.report.findMany({
+        where,
+        select: {
+          id: true,
+          title: true,
+          category: true,
+          status: true,
+          latitude: true,
+          longitude: true,
+          address: true,
+          createdAt: true,
+          images: { take: 1, select: { imageUrl: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      });
+    } catch (error) {
+      // Backward-compatible fallback for deployments with older DB schema.
+      const legacyWhere: Prisma.ReportWhereInput = {};
+      if (filters?.status) legacyWhere.status = filters.status;
+      if (filters?.category) legacyWhere.category = filters.category;
+
+      if (!filters?.status) {
+        legacyWhere.status = { not: ReportStatus.CLEANED };
+      }
+
+      reports = await prisma.report.findMany({
+        where: legacyWhere,
+        select: {
+          id: true,
+          title: true,
+          category: true,
+          status: true,
+          latitude: true,
+          longitude: true,
+          createdAt: true,
+          images: { take: 1, select: { imageUrl: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      });
+
+      console.warn("getMapData fallback query used:", error);
+    }
 
     this.setCachedMapData(cacheKey, reports);
 

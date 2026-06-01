@@ -11,6 +11,60 @@ class ReportService {
 
   final Dio _dio;
 
+  bool _shouldTryLegacyRoute(DioException error) {
+    final status = error.response?.statusCode;
+    return status == 404 || status == 405;
+  }
+
+  PaginatedData<ReportRecord> _parsePaginatedReports(dynamic payload) {
+    if (payload is Map<String, dynamic>) {
+      return parsePaginatedData<ReportRecord>(payload, ReportRecord.fromJson);
+    }
+
+    // Some deployments return a bare list for legacy endpoints.
+    if (payload is List) {
+      final rows = payload
+          .whereType<Map<String, dynamic>>()
+          .map(ReportRecord.fromJson)
+          .toList(growable: false);
+      return PaginatedData<ReportRecord>(
+        data: rows,
+        pagination: PaginationMeta(
+          page: 1,
+          limit: rows.length,
+          total: rows.length,
+          totalPages: rows.isEmpty ? 0 : 1,
+        ),
+      );
+    }
+
+    return const PaginatedData<ReportRecord>(
+      data: [],
+      pagination: PaginationMeta(page: 1, limit: 20, total: 0, totalPages: 0),
+    );
+  }
+
+  List<ReportRecord> _parseMapRows(dynamic payload) {
+    if (payload is List) {
+      return payload
+          .whereType<Map<String, dynamic>>()
+          .map(ReportRecord.fromJson)
+          .toList(growable: false);
+    }
+
+    if (payload is Map<String, dynamic>) {
+      final rows = payload["data"];
+      if (rows is List) {
+        return rows
+            .whereType<Map<String, dynamic>>()
+            .map(ReportRecord.fromJson)
+            .toList(growable: false);
+      }
+    }
+
+    return const [];
+  }
+
   Future<ReportRecord> createReport({
     required String title,
     required String description,
@@ -79,21 +133,31 @@ class ReportService {
     int limit = 20,
     String? status,
   }) async {
+    final queryParameters = {
+      "page": page,
+      "limit": limit,
+      if (status != null && status.isNotEmpty) "status": status,
+    };
+
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
+      final response = await _dio.get<dynamic>(
         "/reports/my-reports",
-        queryParameters: {
-          "page": page,
-          "limit": limit,
-          if (status != null && status.isNotEmpty) "status": status,
-        },
+        queryParameters: queryParameters,
       );
 
-      return parsePaginatedData<ReportRecord>(
-        response.data ?? <String, dynamic>{},
-        ReportRecord.fromJson,
-      );
+      return _parsePaginatedReports(response.data);
     } on DioException catch (error) {
+      if (_shouldTryLegacyRoute(error)) {
+        try {
+          final legacy = await _dio.get<dynamic>(
+            "/waste-reports/my-reports",
+            queryParameters: queryParameters,
+          );
+          return _parsePaginatedReports(legacy.data);
+        } on DioException catch (legacyError) {
+          throw ApiException.fromDioError(legacyError);
+        }
+      }
       throw ApiException.fromDioError(error);
     }
   }
@@ -127,22 +191,31 @@ class ReportService {
     String? status,
     String? category,
   }) async {
+    final queryParameters = {
+      "limit": limit,
+      if (status != null && status.isNotEmpty) "status": status,
+      if (category != null && category.isNotEmpty) "category": category,
+    };
+
     try {
-      final response = await _dio.get<List<dynamic>>(
+      final response = await _dio.get<dynamic>(
         "/reports/map",
-        queryParameters: {
-          "limit": limit,
-          if (status != null && status.isNotEmpty) "status": status,
-          if (category != null && category.isNotEmpty) "category": category,
-        },
+        queryParameters: queryParameters,
       );
 
-      final rows = response.data ?? const [];
-      return rows
-          .whereType<Map<String, dynamic>>()
-          .map(ReportRecord.fromJson)
-          .toList(growable: false);
+      return _parseMapRows(response.data);
     } on DioException catch (error) {
+      if (_shouldTryLegacyRoute(error)) {
+        try {
+          final legacy = await _dio.get<dynamic>(
+            "/waste-reports/map",
+            queryParameters: queryParameters,
+          );
+          return _parseMapRows(legacy.data);
+        } on DioException catch (legacyError) {
+          throw ApiException.fromDioError(legacyError);
+        }
+      }
       throw ApiException.fromDioError(error);
     }
   }

@@ -1,4 +1,5 @@
 import type { ReportStatus } from "@/types";
+import type { ReportImage } from "@/types";
 
 export type AdminReportCategory = "with_waste" | "no_waste";
 export type AdminReportStatus = ReportStatus;
@@ -6,6 +7,7 @@ export type AdminReportStatus = ReportStatus;
 export interface AdminReport {
   id: string;
   imageUrl: string;
+  images: ReportImage[];
   category: AdminReportCategory;
   confidence: number;
   latitude: number;

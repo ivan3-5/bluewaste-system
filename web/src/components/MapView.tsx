@@ -80,7 +80,6 @@ function buildPopupHtml(report: AdminReport) {
           ${getStatusPill(report.status)}
         </div>
         <p style="margin:0;font-size:14px;font-weight:700;color:#0f172a">${locationName}</p>
-        <p style="margin:0;font-size:12px;color:#64748b">${(report.confidence * 100).toFixed(1)}% confidence</p>
         <a href="${detailHref}" style="font-size:14px;font-weight:700;color:#0369a1;text-decoration:none">View details</a>
       </div>
     </div>

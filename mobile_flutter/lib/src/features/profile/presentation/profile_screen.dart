@@ -6,6 +6,7 @@ import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../../auth/presentation/auth_controller.dart";
+import "../../reports/presentation/my_reports_screen.dart";
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -245,6 +246,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     labelText: "Phone",
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppSectionCard(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.assignment_turned_in_outlined),
+                  title: const Text("My Reports"),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(title: const Text("My Reports")),
+                          body: const SafeArea(
+                            child: MyReportsScreen(),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

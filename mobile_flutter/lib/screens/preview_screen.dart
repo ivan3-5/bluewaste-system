@@ -112,7 +112,7 @@ class PreviewScreen extends StatelessWidget {
                   Text(
                     detection.boxes.isEmpty
                         ? "No waste was detected above the confidence threshold."
-                        : "${detection.boxes.length} waste box${detection.boxes.length == 1 ? "" : "es"} detected.",
+                        : "Waste detected above the confidence threshold.",
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 16),

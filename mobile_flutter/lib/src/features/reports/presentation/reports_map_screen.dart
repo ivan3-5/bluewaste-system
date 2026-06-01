@@ -10,6 +10,7 @@ import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../data/report_service.dart";
+import "../../../core/network/api_exception.dart";
 import "../domain/report_models.dart";
 
 class ReportsMapScreen extends ConsumerStatefulWidget {
@@ -43,6 +44,7 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
   late final AnimationController _markerPulseController;
   List<ReportRecord> _reports = const [];
   bool _loading = true;
+  String? _errorMessage;
   Timer? _timer;
 
   @override
@@ -88,12 +90,26 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
       setState(() {
         _reports = reports;
         _loading = false;
+        _errorMessage = null;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
-      setState(() => _loading = false);
+
+      String message;
+      if (error is ApiException) {
+        message = error.statusCode != null
+            ? "${error.message} (HTTP ${error.statusCode})"
+            : error.message;
+      } else {
+        message = error.toString();
+      }
+
+      setState(() {
+        _loading = false;
+        _errorMessage = message;
+      });
     }
   }
 
@@ -615,10 +631,14 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 320),
-              child: const AppEmptyState(
-                icon: Icons.location_off_outlined,
-                title: "No reports on map",
-                subtitle:
+              child: AppEmptyState(
+                icon: _errorMessage == null
+                    ? Icons.location_off_outlined
+                    : Icons.cloud_off_outlined,
+                title: _errorMessage == null
+                    ? "No reports on map"
+                    : "Unable to load map reports",
+                subtitle: _errorMessage ??
                     "There are no reports with map coordinates right now.",
               ),
             ),

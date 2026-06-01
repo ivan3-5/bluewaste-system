@@ -174,19 +174,19 @@ export default function TaskDetailPage() {
             </h1>
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={report.status} />
-              <span
-                className={`px-2 py-0.5 rounded text-xs font-semibold border ${
-                  report.priority === "CRITICAL"
-                    ? "text-red-600 bg-red-50 border-red-200"
-                    : report.priority === "HIGH"
-                      ? "text-orange-600 bg-orange-50 border-orange-200"
-                      : report.priority === "MEDIUM"
-                        ? "text-yellow-600 bg-yellow-50 border-yellow-200"
-                        : "text-green-600 bg-green-50 border-green-200"
-                }`}
-              >
-                {PRIORITY_LABELS[report.priority ?? "LOW"]}
-              </span>
+              {report.priority && report.priority !== "LOW" ? (
+                <span
+                  className={`px-2 py-0.5 rounded text-xs font-semibold border ${
+                    report.priority === "CRITICAL"
+                      ? "text-red-600 bg-red-50 border-red-200"
+                      : report.priority === "HIGH"
+                        ? "text-orange-600 bg-orange-50 border-orange-200"
+                        : "text-yellow-600 bg-yellow-50 border-yellow-200"
+                  }`}
+                >
+                  {PRIORITY_LABELS[report.priority]}
+                </span>
+              ) : null}
               <span className="text-xs text-gray-500">
                 {WASTE_CATEGORY_LABELS[report.category]}
               </span>
@@ -199,7 +199,8 @@ export default function TaskDetailPage() {
         <div className="flex flex-wrap gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5" />
-            {report.address || "No address"}
+            Coordinates: {report.latitude.toFixed(5)},{" "}
+            {report.longitude.toFixed(5)}
           </span>
           <span className="flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" />

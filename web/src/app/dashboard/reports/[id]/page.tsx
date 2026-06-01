@@ -33,6 +33,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
     );
   }
 
+  const cleanupImages = report.images.filter(
+    (image) => image.type === "CLEANUP",
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -98,6 +102,33 @@ export default async function ReportDetailPage({ params }: PageProps) {
             </p>
           </div>
 
+          {cleanupImages.length > 0 && (
+            <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-emerald-700">
+                  Cleanup Photos
+                </p>
+                <p className="text-sm text-slate-600">
+                  Uploaded by the field worker after cleanup completion.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {cleanupImages.map((image) => (
+                  <div
+                    key={image.id}
+                    className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm"
+                  >
+                    <img
+                      src={image.imageUrl}
+                      alt="Cleanup proof"
+                      className="h-44 w-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <ReportStatusUpdater
             reportId={report.id}
             initialStatus={report.status}
@@ -119,6 +150,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
             {
               id: report.id,
               imageUrl: report.imageUrl,
+              images: report.images,
               category: report.category,
               confidence: report.confidence,
               latitude: report.latitude,
