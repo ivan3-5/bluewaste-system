@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./backend/tsconfig.json" },
+    { "path": "./web/tsconfig.json" }
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true
+  }
+}

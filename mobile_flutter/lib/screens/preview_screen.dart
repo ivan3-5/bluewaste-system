@@ -123,9 +123,9 @@ class PreviewScreen extends StatelessWidget {
                   Text(
                     _isFallback
                         ? "AI analysis is unavailable on this device. You can still submit the report manually."
-                        : detection.boxes.isEmpty
-                            ? "No waste was detected above the confidence threshold."
-                            : "Waste detected above the confidence threshold.",
+                        : detection.hasWaste
+                            ? "Waste was detected above the confidence threshold."
+                            : "No waste was detected above the confidence threshold.",
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 16),

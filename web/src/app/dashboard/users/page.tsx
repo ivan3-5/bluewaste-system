@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useUsers,
   useCreateUser,
   useUpdateUser,
-  useDeleteUser,
   UserRecord,
 } from "@/hooks/useUsers";
 import { Button } from "@/components/ui/button";
@@ -30,6 +29,7 @@ const ROLE_BADGE_CLASSES: Record<string, string> = {
 };
 
 const ROLES = ["LGU_ADMIN", "FIELD_WORKER", "CITIZEN"] as const;
+const ADD_ROLES = ["LGU_ADMIN", "FIELD_WORKER"] as const;
 
 type Role = (typeof ROLES)[number];
 
@@ -47,7 +47,7 @@ const emptyForm: UserFormData = {
   lastName: "",
   email: "",
   password: "",
-  role: "CITIZEN",
+  role: "FIELD_WORKER",
   phone: "",
 };
 
@@ -59,10 +59,11 @@ export default function UsersPage() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editUser, setEditUser] = useState<UserRecord | null>(null);
-  const [deleteUser, setDeleteUser] = useState<UserRecord | null>(null);
 
   const [form, setForm] = useState<UserFormData>(emptyForm);
   const [formError, setFormError] = useState("");
+
+  const debounceTimerRef = useRef<NodeJS.Timeout>();
 
   const { data, isLoading } = useUsers({
     page,
@@ -73,7 +74,6 @@ export default function UsersPage() {
 
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
-  const deleteUserMutation = useDeleteUser();
 
   const users = data?.data || [];
   const pagination = data?.pagination;
@@ -90,9 +90,19 @@ export default function UsersPage() {
     );
   }
 
-  const handleSearch = () => {
-    setSearch(searchInput);
-    setPage(1);
+  const handleSearch = (value: string) => {
+    setSearchInput(value);
+
+    // Clear previous debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set new debounce timer (300ms delay)
+    debounceTimerRef.current = setTimeout(() => {
+      setSearch(value);
+      setPage(1);
+    }, 300);
   };
 
   const openAdd = () => {
@@ -160,7 +170,7 @@ export default function UsersPage() {
         firstName: form.firstName,
         lastName: form.lastName,
         email: form.email,
-        role: form.role,
+        role: editUser.role,
         phone: form.phone || undefined,
       });
       setEditUser(null);
@@ -168,16 +178,6 @@ export default function UsersPage() {
       setFormError(
         err?.response?.data?.error || "Failed to update user. Try again.",
       );
-    }
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!deleteUser) return;
-    try {
-      await deleteUserMutation.mutateAsync(deleteUser.id);
-      setDeleteUser(null);
-    } catch {
-      // error silently dismissed; toast can be added
     }
   };
 
@@ -200,6 +200,9 @@ export default function UsersPage() {
       />
     </div>
   );
+
+  const isRoleLocked = Boolean(editUser);
+  const editRoles = editUser ? ([editUser.role] as const) : ROLES;
 
   return (
     <div>
@@ -241,21 +244,17 @@ export default function UsersPage() {
         </div>
 
         <div className="flex items-end gap-2">
-          <div>
+          <div className="flex-1">
             <label className="mb-1 block text-xs font-medium text-gray-600">
               Search
             </label>
             <Input
               placeholder="Name or email..."
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              onChange={(e) => handleSearch(e.target.value)}
               className="w-56"
             />
           </div>
-          <Button size="sm" onClick={handleSearch}>
-            Search
-          </Button>
         </div>
 
         {(roleFilter || search) && (
@@ -352,19 +351,8 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(user)}
-                      >
+                      <Button size="sm" onClick={() => openEdit(user)}>
                         Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="bg-red-600 hover:bg-red-700 text-white"
-                        onClick={() => setDeleteUser(user)}
-                      >
-                        Delete
                       </Button>
                     </div>
                   </td>
@@ -436,7 +424,7 @@ export default function UsersPage() {
                       setForm((f) => ({ ...f, role: e.target.value as Role }))
                     }
                   >
-                    {ROLES.map((r) => (
+                    {ADD_ROLES.map((r) => (
                       <option key={r} value={r}>
                         {ROLE_LABELS[r]}
                       </option>
@@ -494,11 +482,12 @@ export default function UsersPage() {
                     title="Select role"
                     className="w-full rounded-md border px-3 py-2 text-sm"
                     value={form.role}
+                    disabled={isRoleLocked}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, role: e.target.value as Role }))
                     }
                   >
-                    {ROLES.map((r) => (
+                    {editRoles.map((r) => (
                       <option key={r} value={r}>
                         {ROLE_LABELS[r]}
                       </option>
@@ -523,42 +512,6 @@ export default function UsersPage() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteUser && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setDeleteUser(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-2 text-lg font-semibold text-gray-800">
-              Delete User
-            </h3>
-            <p className="mb-6 text-sm text-gray-600">
-              Are you sure you want to permanently delete{" "}
-              <span className="font-medium">
-                {deleteUser.firstName} {deleteUser.lastName}
-              </span>
-              ? This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setDeleteUser(null)}>
-                Cancel
-              </Button>
-              <Button
-                className="bg-red-600 hover:bg-red-700 text-white"
-                disabled={deleteUserMutation.isPending}
-                onClick={handleDeleteConfirm}
-              >
-                {deleteUserMutation.isPending ? "Deleting..." : "Delete"}
-              </Button>
-            </div>
           </div>
         </div>
       )}

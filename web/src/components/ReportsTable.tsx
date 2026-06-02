@@ -276,7 +276,15 @@ export function ReportsTable({
                             );
                           }}
                           aria-label={`Assign field worker for report ${report.id}`}
-                          disabled={savingReportId === report.id}
+                          disabled={
+                            savingReportId === report.id ||
+                            [
+                              "VERIFIED",
+                              "CLEANUP_SCHEDULED",
+                              "IN_PROGRESS",
+                              "CLEANED",
+                            ].includes(report.status)
+                          }
                           className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-900"
                         >
                           <option value="">Unassigned</option>
@@ -286,16 +294,6 @@ export function ReportsTable({
                             </option>
                           ))}
                         </select>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-normal text-slate-500">
-                            Current: {report.assignedToName || "Unassigned"}
-                          </span>
-                          {savingReportId === report.id && (
-                            <span className="text-xs font-semibold text-slate-500">
-                              Saving...
-                            </span>
-                          )}
-                        </div>
                       </div>
                     ) : (
                       report.assignedToName || "Unassigned"
@@ -340,14 +338,6 @@ export function ReportsTable({
                             },
                           )}
                         </select>
-                        <div className="flex items-center gap-2">
-                          <StatusBadge status={report.status} />
-                          {savingStatusReportId === report.id && (
-                            <span className="text-xs font-semibold text-slate-500">
-                              Saving...
-                            </span>
-                          )}
-                        </div>
                       </div>
                     ) : (
                       <StatusBadge status={report.status} />

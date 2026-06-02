@@ -3,7 +3,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import MapView from "@/components/MapView";
 import { ReportStatusUpdater } from "@/components/ReportStatusUpdater";
 import AssignWorker from "@/components/AssignWorker";
-import { notFound } from "next/navigation";
+import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
 
 export const dynamic = "force-dynamic";
 
@@ -40,133 +40,177 @@ export default async function ReportDetailPage({ params }: PageProps) {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Report Detail
-          </h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Full submission details and location verification.
-          </p>
+    <div className="space-y-8">
+      <section className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900">
+              Report Detail
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600">
+              Review report context, compare before and after photos, then
+              update cleanup workflow actions.
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+            <p className="mb-1 text-xs uppercase tracking-wide text-slate-500">
+              Current Status
+            </p>
+            <StatusBadge status={report.status} />
+          </div>
         </div>
-        <StatusBadge status={report.status} />
-      </div>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <img
-            src={report.imageUrl}
-            alt={report.locationName}
-            className="h-full w-full max-h-[32rem] object-cover"
-          />
-        </div>
-
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Location Name
-            </p>
-            <p className="text-lg font-semibold text-slate-900">
-              {report.locationName}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Category
-            </p>
-            <p className="text-lg font-semibold text-slate-900">
-              {report.category}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Coordinates
-            </p>
-            <p className="text-lg font-semibold text-slate-900">
-              {report.latitude.toFixed(5)}, {report.longitude.toFixed(5)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Reported At
-            </p>
-            <p className="text-lg font-semibold text-slate-900">
-              {new Date(report.reportedAt).toLocaleString()}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Description
-            </p>
-            <p className="text-sm text-slate-600">
-              {report.description || "No description provided."}
-            </p>
-          </div>
-
-          {cleanupImages.length > 0 && (
-            <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-emerald-700">
-                  Cleanup Photos
-                </p>
-                <p className="text-sm text-slate-600">
-                  Uploaded by the field worker after cleanup completion.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {cleanupImages.map((image) => (
-                  <div
-                    key={image.id}
-                    className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm"
-                  >
-                    <img
-                      src={image.imageUrl}
-                      alt="Cleanup proof"
-                      className="h-44 w-full object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
+      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
+        <section className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-slate-900">
+                Image Comparison
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Compare the citizen-submitted report with cleanup proof photos.
+              </p>
             </div>
-          )}
 
-          <ReportStatusUpdater
-            reportId={report.id}
-            initialStatus={report.status}
-          />
-          <div className="mt-4">
-            <AssignWorker
-              reportId={report.id}
-              initialAssignedToId={report.assignedToId}
-              initialAssignedToName={report.assignedToName}
-            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <figure className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                <figcaption className="border-b border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  Citizen Submission
+                </figcaption>
+                <img
+                  src={report.imageUrl}
+                  alt={report.locationName}
+                  className="h-72 w-full object-cover sm:h-80"
+                />
+              </figure>
+
+              {cleanupImages.length > 0 ? (
+                <figure className="overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50/40">
+                  <figcaption className="border-b border-emerald-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    Cleanup Result
+                  </figcaption>
+                  <CleanupPhotoCarousel
+                    images={cleanupImages.map((image) => ({
+                      id: image.id,
+                      imageUrl: image.imageUrl,
+                    }))}
+                  />
+                </figure>
+              ) : (
+                <div className="flex min-h-[18rem] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center sm:min-h-[20rem]">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">
+                      No Cleanup Photo Yet
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Cleanup photos will appear here once uploaded by the field
+                      worker.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div>
-        <h2 className="mb-3 text-xl font-bold text-slate-900">Location Map</h2>
-        <MapView
-          reports={[
-            {
-              id: report.id,
-              imageUrl: report.imageUrl,
-              images: report.images,
-              category: report.category,
-              confidence: report.confidence,
-              latitude: report.latitude,
-              longitude: report.longitude,
-              locationName: report.locationName,
-              description: report.description,
-              status: report.status,
-              reportedAt: report.reportedAt,
-              updatedAt: report.updatedAt,
-            },
-          ]}
-          center={[report.latitude, report.longitude]}
-          zoom={16}
-        />
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <h2 className="text-xl font-bold text-slate-900">Location Map</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Exact report coordinates for on-ground verification.
+            </p>
+            <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+              <MapView
+                reports={[
+                  {
+                    id: report.id,
+                    imageUrl: report.imageUrl,
+                    images: report.images,
+                    category: report.category,
+                    confidence: report.confidence,
+                    latitude: report.latitude,
+                    longitude: report.longitude,
+                    locationName: report.locationName,
+                    description: report.description,
+                    status: report.status,
+                    reportedAt: report.reportedAt,
+                    updatedAt: report.updatedAt,
+                  },
+                ]}
+                center={[report.latitude, report.longitude]}
+                zoom={16}
+              />
+            </div>
+          </div>
+        </section>
+
+        <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="text-xl font-bold text-slate-900">
+              Report Information
+            </h2>
+            <dl className="mt-4 space-y-3">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs uppercase tracking-wide text-slate-500">
+                  Location Name
+                </dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-900">
+                  {report.locationName}
+                </dd>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs uppercase tracking-wide text-slate-500">
+                  Category
+                </dt>
+                <dd className="mt-1 text-base font-semibold text-slate-900">
+                  {report.category.replace(/_/g, " ")}
+                </dd>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs uppercase tracking-wide text-slate-500">
+                  Coordinates
+                </dt>
+                <dd className="mt-1 text-base font-semibold text-slate-900">
+                  {report.latitude.toFixed(5)}, {report.longitude.toFixed(5)}
+                </dd>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs uppercase tracking-wide text-slate-500">
+                  Reported At
+                </dt>
+                <dd className="mt-1 text-base font-semibold text-slate-900">
+                  {new Date(report.reportedAt).toLocaleString()}
+                </dd>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs uppercase tracking-wide text-slate-500">
+                  Description
+                </dt>
+                <dd className="mt-1 text-sm leading-relaxed text-slate-700">
+                  {report.description || "No description provided."}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="text-xl font-bold text-slate-900">Actions</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Update the report status and assignment as the cleanup progresses.
+            </p>
+            <div className="mt-4 space-y-4">
+              <ReportStatusUpdater
+                reportId={report.id}
+                initialStatus={report.status}
+              />
+              <AssignWorker
+                reportId={report.id}
+                initialAssignedToId={report.assignedToId}
+                initialAssignedToName={report.assignedToName}
+                status={report.status}
+              />
+            </div>
+          </section>
+        </aside>
       </div>
     </div>
   );

@@ -6,101 +6,11 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
-import "../data/notification_service.dart";
-import "../domain/app_notification.dart";
+import "notification_providers.dart";
+import "notification_widgets.dart";
 
-class NotificationsScreen extends ConsumerStatefulWidget {
+class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
-
-  @override
-  ConsumerState<NotificationsScreen> createState() =>
-      _NotificationsScreenState();
-}
-
-class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
-  List<AppNotification> _notifications = const [];
-  bool _loading = true;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadNotifications();
-    _timer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => _loadNotifications(),
-    );
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _loadNotifications() async {
-    try {
-      final result = await ref
-          .read(notificationServiceProvider)
-          .getNotifications(page: 1, limit: 50);
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _notifications = result.data;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _markAsRead(AppNotification item) async {
-    if (item.isRead) {
-      return;
-    }
-
-    try {
-      await ref.read(notificationServiceProvider).markAsRead(item.id);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _notifications = _notifications
-            .map(
-              (n) => n.id == item.id
-                  ? AppNotification(
-                      id: n.id,
-                      title: n.title,
-                      message: n.message,
-                      type: n.type,
-                      isRead: true,
-                      createdAt: n.createdAt,
-                      reportId: n.reportId,
-                      report: n.report,
-                    )
-                  : n,
-            )
-            .toList(growable: false);
-      });
-    } catch (_) {
-      // Ignore transient mark-read failure.
-    }
-  }
-
-  Future<void> _markAllAsRead() async {
-    try {
-      await ref.read(notificationServiceProvider).markAllAsRead();
-      await _loadNotifications();
-    } catch (_) {
-      // Ignore transient mark-all failure.
-    }
-  }
 
   String _timeAgo(DateTime date) {
     final seconds = DateTime.now().difference(date).inSeconds;
@@ -114,110 +24,144 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final unreadCount = _notifications.where((n) => !n.isRead).length;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notificationsAsync = ref.watch(notificationsListProvider);
 
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    return notificationsAsync.when(
+      data: (notifications) {
+        final unreadCount = notifications.where((n) => !n.isRead).length;
 
-    return Column(
-      children: [
-        if (unreadCount > 0)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.xs,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                AppStatusPill(
-                  label: "$unreadCount unread",
-                  color: AppColors.primary,
-                ),
-                TextButton(
-                  onPressed: _markAllAsRead,
-                  child: const Text("Mark all read"),
+        if (notifications.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                AppEmptyState(
+                  icon: Icons.notifications_none,
+                  title: "No notifications",
+                  subtitle: "You are all caught up.",
                 ),
               ],
             ),
-          ),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _loadNotifications,
-            child: _notifications.isEmpty
-                ? ListView(
-                    children: const [
-                      SizedBox(height: 140),
-                      AppEmptyState(
-                        icon: Icons.notifications_none,
-                        title: "No notifications",
-                        subtitle: "You are all caught up.",
-                      ),
-                    ],
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.md,
-                      0,
-                      AppSpacing.md,
-                      AppSpacing.md,
+          );
+        }
+
+        return Column(
+          children: [
+            if (unreadCount > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    AppStatusPill(
+                      label: "$unreadCount unread",
+                      color: AppColors.primary,
                     ),
-                    itemCount: _notifications.length,
-                    itemBuilder: (context, index) {
-                      final item = _notifications[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                        color: item.isRead
-                            ? AppColors.card
-                            : AppColors.tint(AppColors.primary, opacity: 0.1),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: AppSpacing.xs,
-                          ),
-                          onTap: () => _markAsRead(item),
-                          leading: CircleAvatar(
-                            backgroundColor: item.isRead
-                                ? AppColors.secondary
-                                : AppColors.tint(AppColors.primary),
-                            child: Icon(
-                              item.isRead
-                                  ? Icons.notifications_none
-                                  : Icons.notifications_active_outlined,
-                              color: item.isRead
-                                  ? AppColors.mutedForeground
-                                  : AppColors.primary,
-                            ),
-                          ),
-                          title: Text(
-                            item.title,
-                            style: TextStyle(
-                              fontWeight: item.isRead
-                                  ? FontWeight.w500
-                                  : FontWeight.w700,
-                            ),
-                          ),
-                          subtitle: Text(item.message),
-                          trailing: Text(
-                            _timeAgo(item.createdAt),
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: AppColors.mutedForeground,
-                                ),
+                    TextButton(
+                      onPressed: () {
+                        ref.read(markAllAsReadProvider);
+                      },
+                      child: const Text("Mark all read"),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  ref.refresh(notificationsListProvider);
+                },
+                child: ListView.separated(
+                  itemCount: notifications.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final notification = notifications[index];
+                    return Container(
+                      color: notification.isRead
+                          ? Colors.transparent
+                          : AppColors.primary.withOpacity(0.05),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        title: Text(
+                          notification.title,
+                          style: TextStyle(
+                            fontWeight: notification.isRead
+                                ? FontWeight.w500
+                                : FontWeight.w600,
                           ),
                         ),
-                      );
-                    },
-                  ),
-          ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(
+                              notification.message,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _timeAgo(notification.createdAt),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                        trailing: notification.isRead
+                            ? null
+                            : Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                        onTap: () {
+                          if (!notification.isRead) {
+                            ref.read(
+                              markNotificationAsReadProvider(notification.id),
+                            );
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stackTrace) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+            const SizedBox(height: 16),
+            Text("Error loading notifications: $error"),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.refresh(notificationsListProvider),
+              child: const Text("Retry"),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

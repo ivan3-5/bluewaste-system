@@ -43,7 +43,7 @@ export default async function DashboardPage() {
             Dashboard Overview
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Waste management statistics for Panabo City.
+            Waste management for Panabo City coastal areas.
           </p>
         </div>
         <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">

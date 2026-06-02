@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuth } from "@/providers/AuthProvider";
-import { useUnreadCount } from "@/hooks/useNotifications";
 import { Bell, Menu, LogOut } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,19 +10,12 @@ import { useState } from "react";
 
 export function Header() {
   const { user, logout, isAdmin } = useAuth();
-  const { data: unreadData } = useUnreadCount();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const isLGUAdmin = user?.role === "LGU_ADMIN";
   const isFieldWorker = user?.role === "FIELD_WORKER";
-
-  const notifPath = isAdmin
-    ? "/dashboard/notifications"
-    : isFieldWorker
-      ? "/field-worker/notifications"
-      : "/citizen/notifications";
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b">
@@ -65,17 +58,7 @@ export function Header() {
 
         {/* Right side */}
         <div className="flex items-center space-x-4">
-          <Link
-            href={notifPath}
-            className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <Bell className="w-5 h-5 text-gray-600" />
-            {unreadData && unreadData.count > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                {unreadData.count > 9 ? "9+" : unreadData.count}
-              </span>
-            )}
-          </Link>
+          <NotificationBell />
 
           <div className="hidden md:flex items-center space-x-2 relative">
             <button

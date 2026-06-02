@@ -3,13 +3,29 @@
   "builds": [
     {
       "src": "web/package.json",
-      "use": "@vercel/next"
+      "use": "@vercel/next",
+      "config": {
+        "maxDuration": 60
+      }
     },
     {
-      "src": "api/[...path].ts",
-      "use": "@vercel/node"
+      "src": "backend/package.json",
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 60
+      }
     }
   ],
+  "env": {
+    "DATABASE_URL": "@database_url",
+    "DATABASE_URL_UNPOOLED": "@database_url_unpooled",
+    "JWT_SECRET": "@jwt_secret",
+    "CLOUDINARY_CLOUD_NAME": "@cloudinary_cloud_name",
+    "CLOUDINARY_API_KEY": "@cloudinary_api_key",
+    "CLOUDINARY_API_SECRET": "@cloudinary_api_secret",
+    "NODE_ENV": "production"
+  },
+  "buildCommand": "npm run build --workspace=web && npm run build --workspace=backend",
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -26,6 +42,21 @@
     {
       "source": "/:path*",
       "destination": "/web/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        }
+      ]
     }
   ]
 }

@@ -53,7 +53,7 @@ export function StatsCards(props: StatsCardsProps) {
         return (
           <div
             key={card.key}
-            className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.gradient} p-5 text-white shadow-lg`}
+            className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.gradient} p-5 text-white shadow-lg transition-all duration-300 ease-out hover:shadow-2xl hover:scale-105 hover:-translate-y-1 cursor-pointer`}
           >
             <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/20" />
             <div className="pointer-events-none absolute -bottom-16 -right-6 h-36 w-36 rounded-full bg-white/12" />

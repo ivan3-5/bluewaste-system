@@ -10,10 +10,12 @@ export default function AssignWorker({
   reportId,
   initialAssignedToId,
   initialAssignedToName,
+  status,
 }: {
   reportId: string;
   initialAssignedToId?: string | null;
   initialAssignedToName?: string | null;
+  status?: string;
 }) {
   const { user } = useAuth();
   const router = useRouter();
@@ -29,6 +31,9 @@ export default function AssignWorker({
 
   // Only LGU admins can assign
   if (user?.role !== "LGU_ADMIN") return null;
+
+  // Only allow assignment changes if status is PENDING
+  const isDisabled = status ? status !== "PENDING" : false;
 
   const onAssign = async () => {
     setMessage("");
@@ -55,7 +60,8 @@ export default function AssignWorker({
           title="Assign Field Worker"
           value={assignedTo ?? ""}
           onChange={(e) => setAssignedTo(e.target.value || undefined)}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+          disabled={isDisabled}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
           <option value="">Unassigned</option>
           {workers.map((w) => (
@@ -68,17 +74,12 @@ export default function AssignWorker({
         <button
           type="button"
           onClick={onAssign}
-          disabled={!assignedTo || assign.isPending}
-          className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!assignedTo || assign.isPending || isDisabled}
+          className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {assign.isPending ? "Assigning..." : "Assign"}
         </button>
       </div>
-      {initialAssignedToName && (
-        <p className="mt-2 text-sm text-slate-600">
-          Currently assigned: {initialAssignedToName}
-        </p>
-      )}
       {message && <p className="mt-3 text-sm text-slate-600">{message}</p>}
     </div>
   );

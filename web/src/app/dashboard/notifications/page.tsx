@@ -85,8 +85,8 @@ export default function NotificationsPage() {
               No notifications yet
             </h3>
             <p className="mt-2 max-w-sm text-sm text-gray-400">
-              You're all caught up! When new reports are submitted or your waste
-              reports get updates, you'll see them here.
+              You&apos;re all caught up! When new reports are submitted or your
+              waste reports get updates, you&apos;ll see them here.
             </p>
           </div>
         ) : (

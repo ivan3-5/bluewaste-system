@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useMapData, useHeatmapData } from "@/hooks/useReports";
+import { useMapData } from "@/hooks/useReports";
 import { Button } from "@/components/ui/button";
 import {
   ReportStatus,
@@ -14,7 +14,7 @@ import {
   MapReport,
 } from "@/types";
 import { StatusBadge } from "@/components/reports/StatusBadge";
-import { Layers, MapPin, X, ArrowRight } from "lucide-react";
+import { MapPin, X, ArrowRight } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
 import {
   MapPanelSkeleton,
@@ -33,23 +33,12 @@ const STATUS_PILLS: { value: ReportStatus | ""; label: string }[] = [
   { value: "CLEANED", label: "Cleaned" },
 ];
 
-const CATEGORY_PILLS: { value: WasteCategory | ""; label: string }[] = [
-  { value: "", label: "All Types" },
-  ...Object.entries(WASTE_CATEGORY_LABELS).map(([value, label]) => ({
-    value: value as WasteCategory,
-    label,
-  })),
-];
-
 export default function FieldWorkerMapPage() {
   const [statusFilter, setStatusFilter] = useState<ReportStatus | "">("");
-  const [categoryFilter, setCategoryFilter] = useState<WasteCategory | "">("");
-  const [showHeatmap, setShowHeatmap] = useState(false);
   const [selectedReport, setSelectedReport] = useState<MapReport | null>(null);
 
   const { data: reports = [], isLoading } = useMapData({
     status: statusFilter || undefined,
-    category: categoryFilter || undefined,
   });
 
   const statusCounts = useMemo(() => {
@@ -83,7 +72,7 @@ export default function FieldWorkerMapPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border p-4 space-y-3">
+      <div className="bg-white rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Status pills */}
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-medium text-gray-500 mr-1">
@@ -111,48 +100,16 @@ export default function FieldWorkerMapPage() {
           })}
         </div>
 
-        {/* Category + Heatmap toggle */}
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={categoryFilter}
-            onChange={(e) =>
-              setCategoryFilter(e.target.value as WasteCategory | "")
-            }
-            title="Filter by waste category"
-            className="text-xs border rounded-lg px-2.5 py-1.5 text-gray-600 bg-white"
-          >
-            {CATEGORY_PILLS.map(({ value, label }) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-
-          <Button
-            variant={showHeatmap ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowHeatmap(!showHeatmap)}
-            className="text-xs h-7"
-          >
-            <Layers className="w-3.5 h-3.5 mr-1" />
-            Heatmap
-          </Button>
-
-          <span className="text-xs text-gray-400 ml-auto">
-            <MapPin className="w-3 h-3 inline mr-1" />
-            {reports.length} reports
-          </span>
+        <div className="text-xs text-gray-400">
+          <MapPin className="w-3 h-3 inline mr-1" />
+          {reports.length} reports
         </div>
       </div>
 
       {/* Map */}
       <div className="bg-white rounded-xl border overflow-hidden relative">
         <div className="h-[500px] sm:h-[600px]">
-          <WasteMap
-            reports={reports}
-            showHeatmap={showHeatmap}
-            onReportClick={handleReportClick}
-          />
+          <WasteMap reports={reports} onReportClick={handleReportClick} />
         </div>
 
         {/* Selected Report Panel */}

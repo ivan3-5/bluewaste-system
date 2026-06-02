@@ -5,7 +5,10 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
-import type { AdminReport } from "@/lib/admin-report";
+import {
+  ADMIN_REPORT_STATUS_LABELS,
+  type AdminReport,
+} from "@/lib/admin-report";
 import { useAuth } from "@/providers/AuthProvider";
 
 type MapViewProps = {
@@ -68,19 +71,17 @@ function getStatusPill(status: AdminReport["status"]) {
 
 function buildPopupHtml(report: AdminReport) {
   const imageUrl = escapeHtml(report.imageUrl);
-  const locationName = escapeHtml(report.locationName);
   const detailHref = `/dashboard/reports/${encodeURIComponent(report.id)}`;
 
   return `
     <div style="display:flex;flex-direction:column;gap:12px;min-width:220px">
-      <img src="${imageUrl}" alt="${locationName}" style="height:112px;width:100%;border-radius:12px;object-fit:cover" />
+      <img src="${imageUrl}" alt="Report image" style="height:112px;width:100%;border-radius:12px;object-fit:cover" />
       <div style="display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${getCategoryPill(report.category)}
           ${getStatusPill(report.status)}
         </div>
-        <p style="margin:0;font-size:14px;font-weight:700;color:#0f172a">${locationName}</p>
-        <a href="${detailHref}" style="font-size:14px;font-weight:700;color:#0369a1;text-decoration:none">View details</a>
+        <a href="${detailHref}" style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 14px;border-radius:10px;background:hsl(var(--primary));color:#ffffff;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 6px 14px rgba(0,102,204,0.28)">View details</a>
       </div>
     </div>
   `;
@@ -92,9 +93,12 @@ export default function MapView({
   zoom = 12,
 }: MapViewProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<
+    "ALL" | AdminReport["status"]
+  >("ALL");
   const [isEditingZone, setIsEditingZone] = useState(false);
   const [isDrawingZone, setIsDrawingZone] = useState(false);
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   // lazy import hooks to avoid RSC issues from server components
   let reportingZonesHook: any = null;
   try {
@@ -133,6 +137,14 @@ export default function MapView({
     }),
     [],
   );
+
+  const filteredReports = useMemo(() => {
+    if (selectedStatus === "ALL") {
+      return reports;
+    }
+
+    return reports.filter((report) => report.status === selectedStatus);
+  }, [reports, selectedStatus]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -374,7 +386,7 @@ export default function MapView({
     const markersLayer = markersLayerRef.current;
     markersLayer.clearLayers();
 
-    reports.forEach((report) => {
+    filteredReports.forEach((report) => {
       const marker = L.marker([report.latitude, report.longitude], {
         icon:
           report.category === "with_waste" ? icons.withWaste : icons.noWaste,
@@ -383,7 +395,7 @@ export default function MapView({
       marker.bindPopup(buildPopupHtml(report), { maxWidth: 260 });
       marker.addTo(markersLayer);
     });
-  }, [reports, icons]);
+  }, [filteredReports, icons]);
 
   // render reporting zones as polygon layers (and put the selected one into editable group)
   useEffect(() => {
@@ -421,61 +433,122 @@ export default function MapView({
   }, [zones, selectedZoneId]);
 
   return (
-    <div className="h-[70vh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       {isAdmin && (
-        <div className="absolute z-30 m-4 flex flex-col gap-2 rounded bg-white/90 p-2 shadow">
-          <label
-            htmlFor="coastal-zone-select"
-            className="text-xs font-medium text-slate-600"
-          >
-            Coastal Zone
-          </label>
-          <select
-            id="coastal-zone-select"
-            className="rounded border px-2 py-1 text-sm"
-            value={selectedZoneId || ""}
-            onChange={(e) => setSelectedZoneId(e.target.value || null)}
-          >
-            <option value="">(Select zone)</option>
-            {zones.map((z: any) => (
-              <option key={z.id} value={z.id}>
-                {z.name}
-              </option>
-            ))}
-          </select>
-          <div className="flex gap-2">
-            <button
-              className="rounded bg-sky-500 px-3 py-1 text-xs text-white"
-              onClick={() => {
-                setIsEditingZone(false);
-                setIsDrawingZone((v) => !v);
-              }}
-            >
-              {isDrawingZone ? "Stop draw" : "Draw zone"}
-            </button>
-            <button
-              className="rounded bg-amber-500 px-3 py-1 text-xs text-white"
-              onClick={() => {
-                setIsDrawingZone(false);
-                setIsEditingZone((v) => !v);
-              }}
-            >
-              {isEditingZone ? "Stop edit" : "Edit zone"}
-            </button>
-            <button
-              className="rounded border px-3 py-1 text-xs"
-              onClick={() => {
-                setSelectedZoneId(null);
-                setIsEditingZone(false);
-                setIsDrawingZone(false);
-              }}
-            >
-              Close
-            </button>
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap lg:w-auto">
+              <div className="w-full sm:w-56 lg:w-64">
+                <label
+                  htmlFor="coastal-zone-select"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600"
+                >
+                  Coastal Zone
+                </label>
+                <select
+                  id="coastal-zone-select"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  value={selectedZoneId || ""}
+                  onChange={(e) => setSelectedZoneId(e.target.value || null)}
+                >
+                  <option value="">Select a zone</option>
+                  {zones.map((z: any) => (
+                    <option key={z.id} value={z.id}>
+                      {z.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="w-full sm:w-56 lg:w-64">
+                <label
+                  htmlFor="status-filter-select"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600"
+                >
+                  All Status
+                </label>
+                <select
+                  id="status-filter-select"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  value={selectedStatus}
+                  onChange={(e) =>
+                    setSelectedStatus(
+                      e.target.value as "ALL" | AdminReport["status"],
+                    )
+                  }
+                >
+                  <option value="ALL">All Status</option>
+                  {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(
+                    ([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                  isDrawingZone
+                    ? "bg-[hsl(var(--primary))] text-white hover:opacity-90"
+                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+                onClick={() => {
+                  setIsEditingZone(false);
+                  setIsDrawingZone((v) => !v);
+                }}
+              >
+                {isDrawingZone ? "Stop Drawing" : "Draw Zone"}
+              </button>
+              <button
+                className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                  isEditingZone
+                    ? "bg-amber-500 text-white hover:bg-amber-600"
+                    : "border border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
+                }`}
+                onClick={() => {
+                  setIsDrawingZone(false);
+                  setIsEditingZone((v) => !v);
+                }}
+              >
+                {isEditingZone ? "Stop Editing" : "Edit Zone"}
+              </button>
+              <button
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                onClick={() => {
+                  setSelectedZoneId(null);
+                  setIsEditingZone(false);
+                  setIsDrawingZone(false);
+                }}
+              >
+                Reset
+              </button>
+            </div>
           </div>
+
+          {(selectedZoneId ||
+            isDrawingZone ||
+            isEditingZone ||
+            selectedStatus !== "ALL") && (
+            <p className="mt-2 text-xs text-slate-500">
+              {isDrawingZone
+                ? "Drawing mode enabled: draw a polygon on the map."
+                : isEditingZone
+                  ? "Editing mode enabled: drag vertices to adjust the selected zone."
+                  : selectedStatus !== "ALL"
+                    ? `Showing ${filteredReports.length} report${filteredReports.length !== 1 ? "s" : ""} with ${ADMIN_REPORT_STATUS_LABELS[selectedStatus]}.`
+                    : "Zone selected: you can start editing or drawing."}
+            </p>
+          )}
         </div>
       )}
-      <div ref={containerRef} className="h-full w-full" />
+
+      <div className={`relative ${isAdmin ? "h-[62vh]" : "h-[70vh]"}`}>
+        <div ref={containerRef} className="h-full w-full" />
+      </div>
     </div>
   );
 }
