@@ -19,46 +19,8 @@
       "destination": "/api/[...path].ts"
     },
     {
-      "source": "/",
-      "destination": "/web"
-    },
-    {
       "source": "/:path*",
       "destination": "/web/:path*"
-    }
-  ]
-}
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/[...path].ts"
-    },
-    {
-      "source": "/dashboard/reports/:id",
-      "destination": "/web/dashboard/report?id=:id"
-    },
-    {
-      "source": "/",
-      "destination": "/web"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/web/:path*"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/api/:path*",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
-        },
-        {
-          "key": "Pragma",
-          "value": "no-cache"
-        }
-      ]
     }
   ]
 }
