@@ -113,6 +113,15 @@ app.use(morgan("dev"));
 app.use(generalLimiter);
 
 // Health check
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "BlueWaste API",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Also support /api/health for backward compatibility
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
@@ -124,7 +133,6 @@ app.get("/api/health", (req, res) => {
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/reports", reportRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/upload", uploadRoutes);

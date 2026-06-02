@@ -53,19 +53,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { data } = await api.post("/auth/login", { email, password });
-    setUser(data.user);
-    setToken(data.token);
-    localStorage.setItem("bluewaste_token", data.token);
-    localStorage.setItem("bluewaste_user", JSON.stringify(data.user));
+    try {
+      const { data } = await api.post("/auth/login", { email, password });
+      setUser(data.user);
+      setToken(data.token);
+      localStorage.setItem("bluewaste_token", data.token);
+      localStorage.setItem("bluewaste_user", JSON.stringify(data.user));
+    } catch (error) {
+      throw error;
+    }
   }, []);
 
   const register = useCallback(async (registerData: RegisterData) => {
-    const { data } = await api.post("/auth/register", registerData);
-    setUser(data.user);
-    setToken(data.token);
-    localStorage.setItem("bluewaste_token", data.token);
-    localStorage.setItem("bluewaste_user", JSON.stringify(data.user));
+    try {
+      const { data } = await api.post("/auth/register", registerData);
+      setUser(data.user);
+      setToken(data.token);
+      localStorage.setItem("bluewaste_token", data.token);
+      localStorage.setItem("bluewaste_user", JSON.stringify(data.user));
+    } catch (error) {
+      throw error;
+    }
   }, []);
 
   const logout = useCallback(() => {
