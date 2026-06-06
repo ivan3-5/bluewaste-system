@@ -50,6 +50,7 @@ class AuthService {
     required String firstName,
     required String lastName,
     String? phone,
+    required String address,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -60,6 +61,7 @@ class AuthService {
           "firstName": firstName,
           "lastName": lastName,
           "phone": phone,
+          "address": address,
         },
       );
 
@@ -83,6 +85,7 @@ class AuthService {
     required String lastName,
     String? phone,
     String? avatarUrl,
+    String? address,
   }) async {
     try {
       final payload = <String, dynamic>{
@@ -92,6 +95,9 @@ class AuthService {
       };
       if (avatarUrl != null) {
         payload["avatarUrl"] = avatarUrl;
+      }
+      if (address != null) {
+        payload["address"] = address;
       }
 
       final response = await _dio.put<Map<String, dynamic>>(

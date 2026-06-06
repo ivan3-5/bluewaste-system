@@ -1,5 +1,3 @@
-import "dart:async";
-
 import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
@@ -7,7 +5,6 @@ import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "notification_providers.dart";
-import "notification_widgets.dart";
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -65,7 +62,9 @@ class NotificationsScreen extends ConsumerWidget {
                     ),
                     TextButton(
                       onPressed: () {
-                        ref.read(markAllAsReadProvider);
+                        ref
+                            .read(notificationsListProvider.notifier)
+                            .markAllAsRead();
                       },
                       child: const Text("Mark all read"),
                     ),
@@ -75,7 +74,9 @@ class NotificationsScreen extends ConsumerWidget {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  ref.refresh(notificationsListProvider);
+                  await ref
+                      .read(notificationsListProvider.notifier)
+                      .refresh();
                 },
                 child: ListView.separated(
                   itemCount: notifications.length,
@@ -132,9 +133,9 @@ class NotificationsScreen extends ConsumerWidget {
                               ),
                         onTap: () {
                           if (!notification.isRead) {
-                            ref.read(
-                              markNotificationAsReadProvider(notification.id),
-                            );
+                            ref
+                                .read(notificationsListProvider.notifier)
+                                .markAsRead(notification.id);
                           }
                         },
                       ),
@@ -156,7 +157,8 @@ class NotificationsScreen extends ConsumerWidget {
             Text("Error loading notifications: $error"),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => ref.refresh(notificationsListProvider),
+              onPressed: () =>
+                  ref.read(notificationsListProvider.notifier).refresh(),
               child: const Text("Retry"),
             ),
           ],

@@ -96,6 +96,7 @@ class AuthController extends StateNotifier<AuthState> {
     required String firstName,
     required String lastName,
     String? phone,
+    required String address,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
 
@@ -106,6 +107,7 @@ class AuthController extends StateNotifier<AuthState> {
         firstName: firstName,
         lastName: lastName,
         phone: phone,
+        address: address,
       );
 
       await _storage.writeSession(
@@ -147,6 +149,7 @@ class AuthController extends StateNotifier<AuthState> {
     required String lastName,
     String? phone,
     String? avatarUrl,
+    String? address,
   }) async {
     if (!state.isAuthenticated) {
       return;
@@ -159,6 +162,7 @@ class AuthController extends StateNotifier<AuthState> {
         lastName: lastName,
         phone: phone,
         avatarUrl: avatarUrl,
+        address: address,
       );
 
       await _storage.writeSession(token: state.token!, user: updated.toJson());
@@ -191,6 +195,7 @@ class AuthController extends StateNotifier<AuthState> {
         lastName: currentUser.lastName,
         phone: currentUser.phone,
         avatarUrl: avatarUrl,
+        address: currentUser.address,
       );
 
       await _storage.writeSession(token: state.token!, user: updated.toJson());

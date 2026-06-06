@@ -4,98 +4,140 @@ import "dart:async";
 import "../data/notification_service.dart";
 import "../domain/app_notification.dart";
 
-// Real-time unread count with auto-refresh
-final unreadCountProvider = StreamProvider.autoDispose<int>((ref) {
-  final service = ref.watch(notificationServiceProvider);
-  final controller = StreamController<int>.broadcast();
+// Real-time unread count notifier
+class UnreadCountNotifier extends AutoDisposeAsyncNotifier<int> {
+  Timer? _timer;
 
-  // Initial fetch
-  service.getUnreadCount().then((count) {
-    if (!controller.isClosed) {
-      controller.add(count);
-    }
-  }).catchError((e) {
-    if (!controller.isClosed) {
-      controller.addError(e);
-    }
-  });
+  @override
+  FutureOr<int> build() {
+    final service = ref.watch(notificationServiceProvider);
 
-  // Poll for updates every 3 seconds
-  final timer = Timer.periodic(const Duration(seconds: 3), (_) {
-    service.getUnreadCount().then((count) {
-      if (!controller.isClosed) {
-        controller.add(count);
-      }
-    }).catchError((e) {
-      if (!controller.isClosed) {
-        controller.addError(e);
+    // Poll for updates every 10 seconds to reduce network load
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      try {
+        final count = await service.getUnreadCount();
+        state = AsyncData(count);
+      } catch (_) {}
+    });
+
+    ref.onDispose(() {
+      _timer?.cancel();
+    });
+
+    return service.getUnreadCount();
+  }
+
+  void decrement() {
+    state.whenData((count) {
+      if (count > 0) {
+        state = AsyncData(count - 1);
       }
     });
-  });
+  }
 
-  ref.onDispose(() {
-    timer.cancel();
-    controller.close();
-  });
+  void setZero() {
+    state = const AsyncData(0);
+  }
 
-  return controller.stream;
+  Future<void> refresh() async {
+    try {
+      final service = ref.read(notificationServiceProvider);
+      final count = await service.getUnreadCount();
+      state = AsyncData(count);
+    } catch (_) {}
+  }
+}
+
+final unreadCountProvider =
+    AsyncNotifierProvider.autoDispose<UnreadCountNotifier, int>(() {
+  return UnreadCountNotifier();
 });
 
-// Real-time notifications list with auto-refresh
-final notificationsListProvider =
-    StreamProvider.autoDispose<List<AppNotification>>((ref) {
-  final service = ref.watch(notificationServiceProvider);
-  final controller = StreamController<List<AppNotification>>.broadcast();
+// Real-time notifications list notifier with optimistic updates
+class NotificationsListNotifier
+    extends AutoDisposeAsyncNotifier<List<AppNotification>> {
+  Timer? _timer;
 
-  // Initial fetch
-  service.getNotifications(page: 1, limit: 50).then((result) {
-    if (!controller.isClosed) {
-      controller.add(result.data);
-    }
-  }).catchError((e) {
-    if (!controller.isClosed) {
-      controller.addError(e);
-    }
-  });
+  @override
+  FutureOr<List<AppNotification>> build() {
+    final service = ref.watch(notificationServiceProvider);
 
-  // Poll for updates every 4 seconds
-  final timer = Timer.periodic(const Duration(seconds: 4), (_) {
-    service.getNotifications(page: 1, limit: 50).then((result) {
-      if (!controller.isClosed) {
-        controller.add(result.data);
-      }
-    }).catchError((e) {
-      if (!controller.isClosed) {
-        controller.addError(e);
-      }
+    // Poll for updates every 12 seconds
+    _timer = Timer.periodic(const Duration(seconds: 12), (_) async {
+      try {
+        final result = await service.getNotifications(page: 1, limit: 50);
+        state = AsyncData(result.data);
+      } catch (_) {}
     });
-  });
 
-  ref.onDispose(() {
-    timer.cancel();
-    controller.close();
-  });
+    ref.onDispose(() {
+      _timer?.cancel();
+    });
 
-  return controller.stream;
-});
+    return service.getNotifications(page: 1, limit: 50).then((res) => res.data);
+  }
 
-// Mark notification as read and invalidate counts
-final markNotificationAsReadProvider =
-    FutureProvider.family<void, String>((ref, id) async {
-  final service = ref.watch(notificationServiceProvider);
-  await service.markAsRead(id);
+  Future<void> markAsRead(String id) async {
+    // Optimistic update
+    final currentList = state.value;
+    if (currentList != null) {
+      final updatedList = currentList.map((n) {
+        if (n.id == id) {
+          return n.copyWith(isRead: true);
+        }
+        return n;
+      }).toList();
+      state = AsyncData(updatedList);
+    }
 
-  // Invalidate streams to trigger refresh
-  ref.invalidate(unreadCountProvider);
-  ref.invalidate(notificationsListProvider);
-});
+    // Decrement unread count locally
+    ref.read(unreadCountProvider.notifier).decrement();
 
-// Mark all as read and invalidate counts
-final markAllAsReadProvider = FutureProvider<void>((ref) async {
-  final service = ref.watch(notificationServiceProvider);
-  await service.markAllAsRead();
+    try {
+      final service = ref.read(notificationServiceProvider);
+      await service.markAsRead(id);
+    } catch (e) {
+      // Rollback on failure
+      ref.invalidateSelf();
+      ref.read(unreadCountProvider.notifier).refresh();
+    }
+  }
 
-  // Invalidate streams to trigger refresh
-  ref.invalidate(unreadCountProvider);
-  ref.invalidate(notificationsListProvider);
+  Future<void> markAllAsRead() async {
+    // Optimistic update
+    final currentList = state.value;
+    if (currentList != null) {
+      final updatedList =
+          currentList.map((n) => n.copyWith(isRead: true)).toList();
+      state = AsyncData(updatedList);
+    }
+
+    // Reset unread count locally
+    ref.read(unreadCountProvider.notifier).setZero();
+
+    try {
+      final service = ref.read(notificationServiceProvider);
+      await service.markAllAsRead();
+    } catch (e) {
+      // Rollback on failure
+      ref.invalidateSelf();
+      ref.read(unreadCountProvider.notifier).refresh();
+    }
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    try {
+      final service = ref.read(notificationServiceProvider);
+      final result = await service.getNotifications(page: 1, limit: 50);
+      state = AsyncData(result.data);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
+}
+
+final notificationsListProvider = AsyncNotifierProvider.autoDispose<
+    NotificationsListNotifier, List<AppNotification>>(() {
+  return NotificationsListNotifier();
 });

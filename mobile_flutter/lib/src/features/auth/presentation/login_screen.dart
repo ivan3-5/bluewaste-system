@@ -259,23 +259,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Text(
-                                  "Welcome Back",
+                                  "Sign in to your account",
                                   style: Theme.of(context)
                                       .textTheme
                                       .titleLarge
                                       ?.copyWith(
                                         fontWeight: FontWeight.w800,
                                         fontSize: 24,
-                                      ),
-                                ),
-                                const SizedBox(height: AppSpacing.xs),
-                                Text(
-                                  "Sign in to your account",
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: AppColors.mutedForeground,
                                       ),
                                 ),
                                 const SizedBox(height: AppSpacing.xl),

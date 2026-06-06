@@ -73,6 +73,9 @@ class ReportService {
     required double longitude,
     String? address,
     bool isAnonymous = false,
+    bool isSpamFlagged = false,
+    String? spamReason,
+    double yoloConfidence = 0.0,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -85,6 +88,10 @@ class ReportService {
           "longitude": longitude,
           "address": address,
           "isAnonymous": isAnonymous,
+          // YOLO detection spam-flag fields
+          if (isSpamFlagged) "isSpamFlagged": true,
+          if (isSpamFlagged && spamReason != null) "spamReason": spamReason,
+          "yoloConfidence": yoloConfidence,
         },
       );
 

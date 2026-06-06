@@ -7,6 +7,7 @@ class AppUser {
     required this.role,
     this.phone,
     this.avatarUrl,
+    this.address,
   });
 
   final String id;
@@ -16,6 +17,7 @@ class AppUser {
   final String role;
   final String? phone;
   final String? avatarUrl;
+  final String? address;
 
   String get fullName => "$firstName $lastName".trim();
   bool get isWorker => role == "FIELD_WORKER";
@@ -29,6 +31,7 @@ class AppUser {
       role: (json["role"] ?? "CITIZEN").toString(),
       phone: json["phone"]?.toString(),
       avatarUrl: json["avatarUrl"]?.toString(),
+      address: json["address"]?.toString(),
     );
   }
 
@@ -41,6 +44,7 @@ class AppUser {
       "role": role,
       "phone": phone,
       "avatarUrl": avatarUrl,
+      "address": address,
     };
   }
 
@@ -49,6 +53,7 @@ class AppUser {
     String? lastName,
     String? phone,
     String? avatarUrl,
+    String? address,
   }) {
     return AppUser(
       id: id,
@@ -58,6 +63,7 @@ class AppUser {
       role: role,
       phone: phone ?? this.phone,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      address: address ?? this.address,
     );
   }
 }

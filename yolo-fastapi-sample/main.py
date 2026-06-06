@@ -61,6 +61,12 @@ DIRTY_MIN_WASTE_COUNT = 1
 MODEL_NAME = "yolov8n.pt"
 MODEL_VERSION = "ultralytics-8.3.2"
 
+# ── Custom waste model (1-class: "waste") used by the /detect endpoint ──
+DETECT_MODEL_PATH = os.getenv("DETECT_MODEL_PATH", "waste_model.pt")
+DETECT_CONFIDENCE_THRESHOLD = float(os.getenv("DETECT_CONF", "0.25"))
+_detect_model: Optional[Any] = None
+_detect_model_lock = Lock()
+
 
 class BoundingBox(BaseModel):
     x: float
@@ -109,6 +115,13 @@ class PredictResponse(BaseModel):
     decision: Decision
     thresholds: Thresholds
     model: ModelInfo
+
+
+class DetectResponse(BaseModel):
+    """Simplified response for the /detect endpoint (1-class waste model)."""
+    has_waste: bool
+    message: str
+    confidence: float  # 0.0 – 100.0 percentage
 
 
 def _normalize_label(value: Any) -> str:
@@ -361,6 +374,24 @@ def _get_model() -> Any:
     return _model
 
 
+def _get_detect_model() -> Any:
+    """Lazy-load the custom 1-class waste model used by /detect."""
+    global _detect_model
+    if _detect_model is None:
+        with _detect_model_lock:
+            if _detect_model is None:
+                if not os.path.isfile(DETECT_MODEL_PATH):
+                    raise FileNotFoundError(
+                        f"Custom waste model not found at '{DETECT_MODEL_PATH}'. "
+                        "Place waste_model.pt in the yolo-fastapi-sample directory "
+                        "or set the DETECT_MODEL_PATH environment variable."
+                    )
+                from ultralytics import YOLO
+
+                _detect_model = YOLO(DETECT_MODEL_PATH)
+    return _detect_model
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "model_loaded": _model is not None}
@@ -496,3 +527,69 @@ async def predict(
 @app.post("/predict-annotated", response_model=PredictResponse, response_model_by_alias=True)
 async def predict_annotated(image: UploadFile = File(...)):
     return await _predict_core(image=image, include_annotated=True)
+
+
+@app.post("/detect", response_model=DetectResponse)
+async def detect(image: UploadFile = File(...)):
+    """
+    Simplified waste detection endpoint for the Flutter mobile app.
+
+    Uses waste_model.pt — a custom-trained YOLOv8 model with a single class
+    ('waste').  Returns whether any waste is visible and the top confidence
+    score as a percentage (0.0 – 100.0).
+
+    Response:
+        has_waste  (bool)  – True if at least one 'waste' object is detected.
+        message    (str)   – Human-readable result summary.
+        confidence (float) – Top detection confidence in % (0.0 if none found).
+    """
+    allowed_types = {"image/jpeg", "image/png", "image/webp"}
+    if image.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported image type '{image.content_type}'. Use JPEG, PNG or WebP.",
+        )
+
+    data = await image.read()
+    try:
+        frame = _decode_uploaded_image(data)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or corrupt image.")
+
+    if frame is None:
+        raise HTTPException(status_code=400, detail="Could not decode image.")
+
+    try:
+        model = _get_detect_model()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Model load error: {exc}")
+
+    try:
+        results = model.predict(
+            source=frame,
+            conf=DETECT_CONFIDENCE_THRESHOLD,
+            iou=0.45,
+            verbose=False,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Inference error: {exc}")
+
+    # Collect all confident detections (all classes in this model are waste)
+    top_confidence = 0.0
+    if results and len(results) > 0:
+        r = results[0]
+        for box in r.boxes:
+            conf = float(box.conf.item())
+            if conf > top_confidence:
+                top_confidence = conf
+
+    has_waste = top_confidence > 0.0
+    confidence_pct = round(top_confidence * 100.0, 2)
+
+    return DetectResponse(
+        has_waste=has_waste,
+        message="Waste detected!" if has_waste else "No waste detected.",
+        confidence=confidence_pct,
+    )

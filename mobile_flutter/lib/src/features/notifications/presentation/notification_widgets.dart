@@ -27,7 +27,7 @@ class NotificationBadge extends ConsumerWidget {
           IconButton(
             icon: Icon(
               Icons.notifications,
-              color: iconColor ?? AppColors.dark,
+              color: iconColor ?? AppColors.foreground,
             ),
             onPressed: onPressed,
           ),
@@ -56,14 +56,14 @@ class NotificationBadge extends ConsumerWidget {
       loading: () => IconButton(
         icon: Icon(
           Icons.notifications,
-          color: iconColor ?? AppColors.dark,
+          color: iconColor ?? AppColors.foreground,
         ),
         onPressed: onPressed,
       ),
       error: (_, __) => IconButton(
         icon: Icon(
           Icons.notifications,
-          color: iconColor ?? AppColors.dark,
+          color: iconColor ?? AppColors.foreground,
         ),
         onPressed: onPressed,
       ),
@@ -146,7 +146,7 @@ class NotificationItemWidget extends ConsumerWidget {
               ),
         onTap: () {
           if (!isRead) {
-            ref.read(markNotificationAsReadProvider(id));
+            ref.read(notificationsListProvider.notifier).markAsRead(id);
           }
         },
       ),
@@ -211,7 +211,9 @@ class QuickNotificationPreview extends ConsumerWidget {
                     ),
                     TextButton(
                       onPressed: () {
-                        ref.read(markAllAsReadProvider);
+                        ref
+                            .read(notificationsListProvider.notifier)
+                            .markAllAsRead();
                       },
                       child: const Text(
                         "Mark all read",

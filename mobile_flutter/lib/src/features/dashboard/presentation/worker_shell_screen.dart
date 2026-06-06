@@ -1,14 +1,14 @@
-import "dart:async";
-
 import "package:flutter/material.dart";
+import "package:flutter/services.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
-import "../../notifications/data/notification_service.dart";
+import "../../notifications/presentation/notification_providers.dart";
 import "../../notifications/presentation/notifications_screen.dart";
 import "../../profile/presentation/profile_screen.dart";
-import "../../reports/presentation/reports_map_screen.dart";
+import "../../reports/presentation/worker_home_screen.dart";
+import "../../reports/presentation/worker_route_screen.dart";
 import "../../reports/presentation/worker_tasks_screen.dart";
 
 class WorkerShellScreen extends ConsumerStatefulWidget {
@@ -20,54 +20,11 @@ class WorkerShellScreen extends ConsumerStatefulWidget {
 
 class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
   int _index = 0;
-  int _unreadCount = 0;
-  bool _hasLoadedCount = false;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUnreadCount();
-    _timer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => _loadUnreadCount(),
-    );
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
 
   void _setTab(int value) {
     setState(() {
       _index = value;
     });
-  }
-
-  Future<void> _loadUnreadCount() async {
-    try {
-      final count =
-          await ref.read(notificationServiceProvider).getUnreadCount();
-      if (!mounted) {
-        return;
-      }
-      if (_hasLoadedCount && count > _unreadCount && count > 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("You have new alerts.")),
-        );
-      }
-      setState(() {
-        _unreadCount = count;
-        _hasLoadedCount = true;
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() => _hasLoadedCount = true);
-    }
   }
 
   Widget _buildBadgeIcon(IconData icon, int count) {
@@ -116,19 +73,35 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final unreadCount = ref.watch(unreadCountProvider).value ?? 0;
     final pages = <Widget>[
+      WorkerHomeScreen(
+        onSelectTab: (tab) => setState(() => _index = tab),
+      ),
       const WorkerTasksScreen(),
-      const ReportsMapScreen(assignedOnly: true),
+      const WorkerRouteScreen(),
       const NotificationsScreen(),
     ];
 
-    const titles = <String>["My Tasks", "Assigned Map", "Alerts"];
+    const titles = <String>["Home", "My Tasks", "Assigned Map", "Alerts"];
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           titles[_index],
-          style: const TextStyle(fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            letterSpacing: -0.5,
+          ),
+        ),
+        backgroundColor: AppColors.card,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarBrightness: Brightness.light,
+          statusBarIconBrightness: Brightness.dark,
         ),
         actions: [
           Padding(
@@ -143,7 +116,10 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
           ),
         ],
       ),
-      body: IndexedStack(index: _index, children: pages),
+      body: SafeArea(
+        top: false,
+        child: IndexedStack(index: _index, children: pages),
+      ),
       bottomNavigationBar: SafeArea(
         top: false,
         minimum: const EdgeInsets.fromLTRB(
@@ -180,6 +156,11 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
               onDestinationSelected: _setTab,
               destinations: [
                 const NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home),
+                  label: "Home",
+                ),
+                const NavigationDestination(
                   icon: Icon(Icons.assignment_outlined),
                   selectedIcon: Icon(Icons.assignment),
                   label: "Tasks",
@@ -192,11 +173,11 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
                 NavigationDestination(
                   icon: _buildBadgeIcon(
                     Icons.notifications_outlined,
-                    _unreadCount,
+                    unreadCount,
                   ),
                   selectedIcon: _buildBadgeIcon(
                     Icons.notifications,
-                    _unreadCount,
+                    unreadCount,
                   ),
                   label: "Alerts",
                 ),

@@ -4,12 +4,11 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
-import "../../dashboard/data/dashboard_service.dart";
 import "../../notifications/presentation/notification_providers.dart";
-import "my_reports_screen.dart";
+import "../../profile/presentation/profile_screen.dart";
 
-class CitizenHomeScreen extends ConsumerWidget {
-  const CitizenHomeScreen({
+class WorkerHomeScreen extends StatelessWidget {
+  const WorkerHomeScreen({
     super.key,
     required this.onSelectTab,
   });
@@ -17,21 +16,18 @@ class CitizenHomeScreen extends ConsumerWidget {
   final ValueChanged<int> onSelectTab;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return ListView(
       padding: AppSpacing.screen,
       children: [
-        _DashboardStatsSection(),
-        const SizedBox(height: AppSpacing.lg),
-        const SizedBox(height: AppSpacing.lg),
         const _SectionHeader(
           title: "Quick Actions",
-          subtitle: "Jump to the feature you need.",
+          subtitle: "Manage your tasks and alerts.",
         ),
         const SizedBox(height: AppSpacing.sm),
         GridView.builder(
           shrinkWrap: true,
-          itemCount: _homeActions.length,
+          itemCount: _workerActions.length,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
@@ -40,19 +36,14 @@ class CitizenHomeScreen extends ConsumerWidget {
             childAspectRatio: 1.22,
           ),
           itemBuilder: (context, index) {
-            final action = _homeActions[index];
+            final action = _workerActions[index];
             return _QuickActionCard(
               action: action,
               onTap: () {
                 if (action.tabIndex < 0) {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => Scaffold(
-                        appBar: AppBar(title: const Text("My Reports")),
-                        body: const SafeArea(
-                          child: MyReportsScreen(),
-                        ),
-                      ),
+                      builder: (_) => const ProfileScreen(),
                     ),
                   );
                 } else {
@@ -63,99 +54,14 @@ class CitizenHomeScreen extends ConsumerWidget {
           },
         ),
         const SizedBox(height: AppSpacing.lg),
-        const _TipCard(),
+        const _WorkerTipCard(),
       ],
     );
   }
 }
 
-class _DashboardStatsSection extends ConsumerWidget {
-  const _DashboardStatsSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(dashboardStatsProvider);
-
-    return async.when(
-      data: (stats) {
-        return Row(
-          children: [
-            Expanded(
-                child: _StatCard(
-                    label: 'Total Reports',
-                    value: stats.totalReports.toString(),
-                    color: AppColors.primary)),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-                child: _StatCard(
-                    label: 'Pending',
-                    value: stats.pendingCount.toString(),
-                    color: AppColors.warning)),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-                child: _StatCard(
-                    label: 'Resolved',
-                    value: stats.resolvedCount.toString(),
-                    color: AppColors.success)),
-          ],
-        );
-      },
-      loading: () => const SizedBox(
-          height: 64, child: Center(child: CircularProgressIndicator())),
-      error: (e, st) => const SizedBox.shrink(),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard(
-      {required this.label, required this.value, required this.color});
-
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppSectionCard(
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.tint(color),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.bar_chart, color: color),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: AppColors.mutedForeground)),
-                const SizedBox(height: 6),
-                Text(value,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeAction {
-  const _HomeAction({
+class _WorkerAction {
+  const _WorkerAction({
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -170,34 +76,34 @@ class _HomeAction {
   final int tabIndex;
 }
 
-const List<_HomeAction> _homeActions = [
-  _HomeAction(
-    title: "Report",
-    subtitle: "Create incident",
-    icon: Icons.add_box_outlined,
+const List<_WorkerAction> _workerActions = [
+  _WorkerAction(
+    title: "My Tasks",
+    subtitle: "View assigned work",
+    icon: Icons.assignment_outlined,
     color: AppColors.primary,
     tabIndex: 1,
   ),
-  _HomeAction(
-    title: "My Reports",
-    subtitle: "Track status",
-    icon: Icons.assignment_turned_in_outlined,
-    color: AppColors.success,
-    tabIndex: -1,
-  ),
-  _HomeAction(
-    title: "Map",
-    subtitle: "View report pins",
+  _WorkerAction(
+    title: "Assigned Map",
+    subtitle: "Navigate reports",
     icon: Icons.map_outlined,
     color: AppColors.info,
     tabIndex: 2,
   ),
-  _HomeAction(
+  _WorkerAction(
     title: "Alerts",
-    subtitle: "Read updates",
+    subtitle: "Read notifications",
     icon: Icons.notifications_active_outlined,
     color: AppColors.warning,
     tabIndex: 3,
+  ),
+  _WorkerAction(
+    title: "Profile",
+    subtitle: "Manage account",
+    icon: Icons.person_outline,
+    color: AppColors.success,
+    tabIndex: -1,
   ),
 ];
 
@@ -234,7 +140,7 @@ class _SectionHeader extends StatelessWidget {
 class _QuickActionCard extends ConsumerWidget {
   const _QuickActionCard({required this.action, required this.onTap});
 
-  final _HomeAction action;
+  final _WorkerAction action;
   final VoidCallback onTap;
 
   @override
@@ -327,8 +233,8 @@ class _QuickActionCard extends ConsumerWidget {
   }
 }
 
-class _TipCard extends StatelessWidget {
-  const _TipCard();
+class _WorkerTipCard extends StatelessWidget {
+  const _WorkerTipCard();
 
   @override
   Widget build(BuildContext context) {
@@ -346,7 +252,7 @@ class _TipCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Community Tip",
+                  "Worker Tip",
                   style: Theme.of(context)
                       .textTheme
                       .titleSmall
@@ -354,7 +260,7 @@ class _TipCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  "Use clear photos, include a nearby landmark, and keep the description short for faster validation.",
+                  "Take clear cleanup photos, write brief completion notes, and update task statuses promptly to keep the community informed.",
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.mutedForeground,
                       ),

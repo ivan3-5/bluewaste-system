@@ -278,14 +278,13 @@ export function ReportsTable({
                           aria-label={`Assign field worker for report ${report.id}`}
                           disabled={
                             savingReportId === report.id ||
-                            [
-                              "VERIFIED",
-                              "CLEANUP_SCHEDULED",
-                              "IN_PROGRESS",
-                              "CLEANED",
-                            ].includes(report.status)
+                            // Lock once report is actively in-progress or terminal
+                            (
+                              !!report.assignedToId &&
+                              ["IN_PROGRESS", "CLEANED", "REJECTED"].includes(report.status)
+                            )
                           }
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-900"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <option value="">Unassigned</option>
                           {workers.map((worker) => (
@@ -294,6 +293,11 @@ export function ReportsTable({
                             </option>
                           ))}
                         </select>
+                        {savingReportId === report.id && (
+                          <p className="text-xs text-primary animate-pulse">
+                            Saving assignment…
+                          </p>
+                        )}
                       </div>
                     ) : (
                       report.assignedToName || "Unassigned"

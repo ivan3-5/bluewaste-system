@@ -20,6 +20,26 @@ function getAutoDeleteAt(spamMarkedAt?: string | null) {
   return new Date(base.getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000);
 }
 
+/** Returns a formatted confidence string (e.g. "12.5%") or "—" if unknown. */
+function formatConfidence(value?: number | null): string {
+  if (value === null || value === undefined) return "—";
+  // analysisConfidence is stored as 0.0–1.0 fraction
+  const pct = value <= 1 ? value * 100 : value;
+  return `${pct.toFixed(1)}%`;
+}
+
+/** Determines whether spam originated from the citizen (client-side YOLO)
+ *  or was auto-flagged by the backend after image upload. */
+function getSpamSource(report: {
+  spamReason?: string | null;
+}): { label: string; color: string } {
+  const reason = (report.spamReason ?? "").toLowerCase();
+  if (reason.includes("yolov8") || reason.includes("no waste detected by")) {
+    return { label: "Citizen flagged", color: "bg-orange-100 text-orange-700" };
+  }
+  return { label: "Auto-detected", color: "bg-blue-100 text-blue-700" };
+}
+
 export default function SpamReportsPage() {
   const [page, setPage] = useState(1);
 
@@ -55,7 +75,7 @@ export default function SpamReportsPage() {
           <PageHeadingSkeleton withSubtitle={false} />
         </div>
         <FilterToolbarSkeleton blocks={2} />
-        <DataTableSkeleton rows={8} cols={6} />
+        <DataTableSkeleton rows={8} cols={7} />
       </div>
     );
   }
@@ -64,10 +84,12 @@ export default function SpamReportsPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Spam</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Spam Reports</h1>
           {pagination && (
             <p className="mt-0.5 text-sm text-gray-500">
               {pagination.total} spam report{pagination.total !== 1 ? "s" : ""}
+              {" — "}reports flagged as having no waste detected; excluded from
+              the main reports list.
             </p>
           )}
         </div>
@@ -82,6 +104,12 @@ export default function SpamReportsPage() {
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
                 Report
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+                Source
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+                YOLO Confidence
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
                 Reason
@@ -101,64 +129,77 @@ export default function SpamReportsPage() {
             {records.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={8}
                   className="px-4 py-10 text-center text-gray-400"
                 >
                   No spam reports
                 </td>
               </tr>
             ) : (
-              records.map((report) => (
-                <tr key={report.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    {report.images?.[0]?.imageUrl ? (
-                      <img
-                        src={report.images[0].imageUrl}
-                        alt={report.title}
-                        className="h-14 w-14 rounded-md border border-gray-200 object-cover"
-                      />
-                    ) : (
-                      <div className="h-14 w-14 rounded-md border border-gray-200 bg-gray-100" />
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="max-w-[240px] truncate text-sm font-medium text-gray-800">
-                      {report.title}
-                    </p>
-                    <p className="mt-0.5 text-xs text-gray-500">
-                      {WASTE_CATEGORY_LABELS[report.category]}
-                    </p>
-                  </td>
-                  <td className="max-w-[260px] px-4 py-3 text-sm text-gray-600">
-                    {report.spamReason ||
-                      "No visible waste or pollution detected in the submitted image."}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                    {report.spamMarkedAt
-                      ? formatDateTime(report.spamMarkedAt)
-                      : "-"}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
-                    {report.autoDeleteAt
-                      ? formatDateTime(report.autoDeleteAt.toISOString())
-                      : "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        className="bg-red-600 text-white hover:bg-red-700"
-                        disabled={pendingAction}
-                        onClick={async () => {
-                          await deleteSpam.mutateAsync(report.id);
-                        }}
+              records.map((report) => {
+                const source = getSpamSource(report);
+                return (
+                  <tr key={report.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      {report.images?.[0]?.imageUrl ? (
+                        <img
+                          src={report.images[0].imageUrl}
+                          alt={report.title}
+                          className="h-14 w-14 rounded-md border border-gray-200 object-cover"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 rounded-md border border-gray-200 bg-gray-100" />
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="max-w-[240px] truncate text-sm font-medium text-gray-800">
+                        {report.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {WASTE_CATEGORY_LABELS[report.category]}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${source.color}`}
                       >
-                        Delete Now
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        {source.label}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-sm text-gray-700">
+                      {formatConfidence(report.analysisConfidence)}
+                    </td>
+                    <td className="max-w-[260px] px-4 py-3 text-sm text-gray-600">
+                      {report.spamReason ||
+                        "No visible waste or pollution detected in the submitted image."}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
+                      {report.spamMarkedAt
+                        ? formatDateTime(report.spamMarkedAt)
+                        : "-"}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
+                      {report.autoDeleteAt
+                        ? formatDateTime(report.autoDeleteAt.toISOString())
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-red-600 text-white hover:bg-red-700"
+                          disabled={pendingAction}
+                          onClick={async () => {
+                            await deleteSpam.mutateAsync(report.id);
+                          }}
+                        >
+                          Delete Now
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

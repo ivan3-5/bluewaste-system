@@ -19,6 +19,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
   final _imagePicker = ImagePicker();
 
   bool _saving = false;
@@ -31,6 +32,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _firstNameController.text = user?.firstName ?? "";
     _lastNameController.text = user?.lastName ?? "";
     _phoneController.text = user?.phone ?? "";
+    _addressController.text = user?.address ?? "";
   }
 
   @override
@@ -38,6 +40,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -45,6 +48,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
     final phone = _phoneController.text.trim();
+    final address = _addressController.text.trim();
 
     if (firstName.isEmpty || lastName.isEmpty) {
       _showMessage("First and last name are required.");
@@ -57,6 +61,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             firstName: firstName,
             lastName: lastName,
             phone: phone.isEmpty ? null : phone,
+            address: address.isEmpty ? null : address,
           );
       _showMessage("Profile updated.");
     } catch (error) {
@@ -245,6 +250,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   decoration: const InputDecoration(
                     labelText: "Phone",
                     prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: _addressController,
+                  decoration: const InputDecoration(
+                    labelText: "Address",
+                    prefixIcon: Icon(Icons.location_on_outlined),
                   ),
                 ),
               ],

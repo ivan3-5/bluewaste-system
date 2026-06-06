@@ -402,16 +402,6 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.assignedOnly
-                            ? "Assigned Reports Map"
-                            : "City Reports Map",
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
                         "Tap any marker to open complete report details.",
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.mutedForeground,
@@ -453,31 +443,6 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLegendCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xs),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Legend",
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 4),
-            _legendItem("Pending", AppColors.warning),
-            _legendItem("In Progress", AppColors.orange),
-            _legendItem("Cleaned", AppColors.success),
-            _legendItem("Rejected", AppColors.destructive),
           ],
         ),
       ),
@@ -565,11 +530,6 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
           child: _buildTopPanel(context),
         ),
         Positioned(
-          left: AppSpacing.sm,
-          bottom: AppSpacing.sm,
-          child: _buildLegendCard(),
-        ),
-        Positioned(
           right: AppSpacing.sm,
           bottom: AppSpacing.sm,
           child: _buildMapActions(),
@@ -598,38 +558,6 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
             ),
           ),
       ],
-    );
-  }
-
-  Widget _legendItem(String label, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 18,
-            height: 18,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Center(
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Text(label),
-        ],
-      ),
     );
   }
 }

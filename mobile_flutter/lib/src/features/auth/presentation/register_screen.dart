@@ -19,6 +19,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -32,6 +33,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -42,18 +44,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final lastName = _lastNameController.text.trim();
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
+    final address = _addressController.text.trim();
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
     if (firstName.isEmpty ||
         lastName.isEmpty ||
         email.isEmpty ||
+        address.isEmpty ||
         password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text("Please complete required fields."),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           backgroundColor: AppColors.foreground,
         ),
       );
@@ -65,7 +70,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         SnackBar(
           content: const Text("Password must be at least 6 characters."),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           backgroundColor: AppColors.foreground,
         ),
       );
@@ -77,7 +83,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         SnackBar(
           content: const Text("Passwords do not match."),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           backgroundColor: AppColors.destructive,
         ),
       );
@@ -92,6 +99,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             firstName: firstName,
             lastName: lastName,
             phone: phone.isEmpty ? null : phone,
+            address: address,
           );
 
       if (mounted) {
@@ -105,7 +113,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         SnackBar(
           content: Text(error.toString()),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           backgroundColor: AppColors.destructive,
         ),
       );
@@ -149,7 +158,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             color: AppColors.mutedForeground.withOpacity(0.8),
             fontWeight: FontWeight.w500,
           ),
-          prefixIcon: Icon(prefixIcon, color: AppColors.primary.withOpacity(0.8)),
+          prefixIcon:
+              Icon(prefixIcon, color: AppColors.primary.withOpacity(0.8)),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
           contentPadding:
@@ -237,13 +247,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   color: AppColors.card,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppColors.primary.withOpacity(0.15),
+                                      color:
+                                          AppColors.primary.withOpacity(0.15),
                                       blurRadius: 30,
                                       offset: const Offset(0, 15),
                                     ),
                                   ],
                                   border: Border.all(
-                                    color: AppColors.background.withOpacity(0.5),
+                                    color:
+                                        AppColors.background.withOpacity(0.5),
                                     width: 2,
                                   ),
                                 ),
@@ -266,12 +278,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   color: AppColors.card.withOpacity(0.7),
                                   borderRadius: BorderRadius.circular(32),
                                   border: Border.all(
-                                    color: AppColors.background.withOpacity(0.5),
+                                    color:
+                                        AppColors.background.withOpacity(0.5),
                                     width: 1.5,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppColors.foreground.withOpacity(0.04),
+                                      color: AppColors.foreground
+                                          .withOpacity(0.04),
                                       blurRadius: 24,
                                       offset: const Offset(0, 12),
                                     ),
@@ -279,7 +293,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 ),
                                 padding: const EdgeInsets.all(AppSpacing.xl),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     Text(
                                       "Create Account",
@@ -313,7 +328,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                             controller: _firstNameController,
                                             labelText: "First Name",
                                             prefixIcon: Icons.person_rounded,
-                                            textInputAction: TextInputAction.next,
+                                            textInputAction:
+                                                TextInputAction.next,
                                           ),
                                         ),
                                         const SizedBox(width: AppSpacing.sm),
@@ -322,7 +338,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                             controller: _lastNameController,
                                             labelText: "Last Name",
                                             prefixIcon: Icons.badge_rounded,
-                                            textInputAction: TextInputAction.next,
+                                            textInputAction:
+                                                TextInputAction.next,
                                           ),
                                         ),
                                       ],
@@ -345,6 +362,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     ),
                                     const SizedBox(height: AppSpacing.md),
                                     _buildTextField(
+                                      controller: _addressController,
+                                      labelText: "Address",
+                                      prefixIcon: Icons.location_on_rounded,
+                                      keyboardType: TextInputType.streetAddress,
+                                      textInputAction: TextInputAction.next,
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    _buildTextField(
                                       controller: _passwordController,
                                       labelText: "Password",
                                       prefixIcon: Icons.lock_rounded,
@@ -358,7 +383,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                           color: AppColors.mutedForeground,
                                         ),
                                         onPressed: () => setState(() =>
-                                            _obscurePassword = !_obscurePassword),
+                                            _obscurePassword =
+                                                !_obscurePassword),
                                       ),
                                     ),
                                     const SizedBox(height: AppSpacing.md),
@@ -385,7 +411,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                       decoration: BoxDecoration(
                                         boxShadow: [
                                           BoxShadow(
-                                            color: AppColors.primary.withOpacity(0.3),
+                                            color: AppColors.primary
+                                                .withOpacity(0.3),
                                             blurRadius: 16,
                                             offset: const Offset(0, 8),
                                           ),
@@ -401,15 +428,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                                   BorderRadius.circular(16)),
                                           elevation: 0,
                                         ),
-                                        onPressed:
-                                            _isSubmitting ? null : _handleRegister,
+                                        onPressed: _isSubmitting
+                                            ? null
+                                            : _handleRegister,
                                         child: _isSubmitting
                                             ? const SizedBox(
                                                 height: 24,
                                                 width: 24,
-                                                child: CircularProgressIndicator(
-                                                    strokeWidth: 2.5,
-                                                    color: Colors.white))
+                                                child:
+                                                    CircularProgressIndicator(
+                                                        strokeWidth: 2.5,
+                                                        color: Colors.white))
                                             : const Text("Create Account",
                                                 style: TextStyle(
                                                   fontSize: 16,
@@ -420,7 +449,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     ),
                                     const SizedBox(height: AppSpacing.xxl),
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           "Already have an account?",
@@ -428,7 +458,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                               .textTheme
                                               .bodyMedium
                                               ?.copyWith(
-                                                color: AppColors.mutedForeground,
+                                                color:
+                                                    AppColors.mutedForeground,
                                                 fontWeight: FontWeight.w600,
                                               ),
                                         ),

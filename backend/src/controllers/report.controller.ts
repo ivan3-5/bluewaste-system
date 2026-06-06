@@ -11,6 +11,13 @@ export class ReportController {
       const report = await ReportService.create({
         ...req.body,
         reporterId: req.user?.id,
+        // Forward YOLO spam-flag fields from the Flutter client payload
+        isSpamFlagged: req.body.isSpamFlagged === true,
+        spamReason: req.body.spamReason ?? undefined,
+        yoloConfidence:
+          typeof req.body.yoloConfidence === "number"
+            ? req.body.yoloConfidence
+            : undefined,
       });
       res.status(201).json(report);
     } catch (error: any) {

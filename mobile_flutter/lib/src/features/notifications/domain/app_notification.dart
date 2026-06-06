@@ -42,4 +42,26 @@ class AppNotification {
           : null,
     );
   }
+
+  AppNotification copyWith({
+    String? id,
+    String? title,
+    String? message,
+    String? type,
+    bool? isRead,
+    DateTime? createdAt,
+    String? reportId,
+    ReportRecord? report,
+  }) {
+    return AppNotification(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      message: message ?? this.message,
+      type: type ?? this.type,
+      isRead: isRead ?? this.isRead,
+      createdAt: createdAt ?? this.createdAt,
+      reportId: reportId ?? this.reportId,
+      report: report ?? this.report,
+    );
+  }
 }

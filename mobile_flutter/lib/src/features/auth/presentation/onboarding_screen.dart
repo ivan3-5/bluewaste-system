@@ -81,11 +81,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Image.asset(
-                    'assets/images/logo-final.png',
-                    height: 32,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const SizedBox(height: 32),
+                  // Circular logo container to prevent cropping and align with app aesthetics
+                  Container(
+                    height: 40,
+                    width: 40,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.card,
+                      border: Border.all(
+                        color: AppColors.border.withValues(alpha: 0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Image.asset(
+                      'assets/images/logo-final.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.transparent,
+                          child: const Icon(
+                            Icons.image_outlined,
+                            size: 20,
+                            color: AppColors.mutedForeground,
+                          ),
+                        );
+                      },
+                    ),
                   ),
                   TextButton(
                     onPressed: widget.onGetStarted,

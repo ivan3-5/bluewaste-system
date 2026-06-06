@@ -83,6 +83,7 @@ export class AuthService {
         role: true,
         phone: true,
         avatarUrl: true,
+        address: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -102,6 +103,7 @@ export class AuthService {
       lastName?: string;
       phone?: string | null;
       avatarUrl?: string | null;
+      address?: string | null;
     },
   ) {
     const user = await prisma.user.update({
@@ -115,6 +117,7 @@ export class AuthService {
         role: true,
         phone: true,
         avatarUrl: true,
+        address: true,
         createdAt: true,
         updatedAt: true,
       },

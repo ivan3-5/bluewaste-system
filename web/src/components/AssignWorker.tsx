@@ -32,8 +32,10 @@ export default function AssignWorker({
   // Only LGU admins can assign
   if (user?.role !== "LGU_ADMIN") return null;
 
-  // Only allow assignment changes if status is PENDING
-  const isDisabled = status ? status !== "PENDING" : false;
+  // Allow assignment until report is actively in-progress or in a terminal state
+  const isDisabled = status
+    ? ["IN_PROGRESS", "CLEANED", "REJECTED"].includes(status) && !!initialAssignedToId
+    : false;
 
   const onAssign = async () => {
     setMessage("");

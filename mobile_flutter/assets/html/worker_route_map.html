@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Worker Route Map</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <!-- Leaflet Routing Machine CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"
+  />
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Loading overlay ── */
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: rgba(248, 250, 252, 0.96);
+      backdrop-filter: blur(4px);
+    }
+
+    #loading .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #0066cc;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    #loading p {
+      font-size: 14px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Worker marker (blue pulsing dot) ── */
+    .worker-marker-wrap {
+      position: relative;
+      width: 36px;
+      height: 36px;
+    }
+
+    .worker-marker-wrap .pulse {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: rgba(0, 102, 204, 0.25);
+      animation: pulse 1.8s ease-out infinite;
+    }
+
+    .worker-marker-wrap .dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 16px;
+      height: 16px;
+      background: #0066cc;
+      border: 2.5px solid #ffffff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 2px 8px rgba(0, 102, 204, 0.5);
+    }
+
+    @keyframes pulse {
+      0%   { transform: scale(0.7); opacity: 0.9; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    /* ── Numbered stop marker ── */
+    .stop-marker {
+      width: 30px;
+      height: 30px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+    }
+
+    .stop-marker span {
+      display: block;
+      transform: rotate(45deg);
+      font-size: 11px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1;
+    }
+
+    /* ── Popup styles ── */
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px !important;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15) !important;
+      padding: 0 !important;
+      overflow: hidden;
+    }
+
+    .leaflet-popup-content {
+      margin: 0 !important;
+      width: auto !important;
+    }
+
+    .popup-inner {
+      padding: 14px 16px 12px;
+      min-width: 200px;
+      max-width: 260px;
+    }
+
+    .popup-stop-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #0066cc;
+      background: rgba(0, 102, 204, 0.1);
+      border-radius: 20px;
+      padding: 3px 8px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .popup-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #020817;
+      margin-bottom: 3px;
+      line-height: 1.3;
+    }
+
+    .popup-category {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 10px;
+    }
+
+    .popup-coords {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-bottom: 10px;
+      font-family: monospace;
+    }
+
+    .popup-divider {
+      height: 1px;
+      background: #e2e8f0;
+      margin: 0 -16px 10px;
+    }
+
+    .btn-resolve {
+      width: 100%;
+      padding: 9px 14px;
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: opacity 0.15s, transform 0.1s;
+      letter-spacing: 0.1px;
+    }
+
+    .btn-resolve:active {
+      opacity: 0.85;
+      transform: scale(0.97);
+    }
+
+    .btn-resolve.resolved {
+      background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+      cursor: default;
+    }
+
+    /* ── Legend ── */
+    #legend {
+      position: absolute;
+      bottom: 24px;
+      left: 12px;
+      z-index: 1000;
+      background: rgba(255,255,255,0.96);
+      border-radius: 12px;
+      padding: 10px 14px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+      border: 1px solid #e2e8f0;
+      font-size: 11px;
+      color: #374151;
+      backdrop-filter: blur(4px);
+    }
+
+    #legend .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+
+    #legend .legend-row:last-child { margin-bottom: 0; }
+
+    #legend .dot-blue {
+      width: 12px; height: 12px;
+      background: #0066cc;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1.5px #0066cc;
+      flex-shrink: 0;
+    }
+
+    #legend .dot-stop {
+      width: 12px; height: 12px;
+      background: #f97316;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #legend .line-route {
+      width: 20px; height: 3px;
+      background: linear-gradient(90deg, #0066cc, #3b82f6);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>Loading route map…</p>
+</div>
+
+<div id="map"></div>
+
+<div id="legend">
+  <div class="legend-row">
+    <div class="dot-blue"></div>
+    <span>Your location</span>
+  </div>
+  <div class="legend-row">
+    <div class="dot-stop"></div>
+    <span>Report stop</span>
+  </div>
+  <div class="legend-row">
+    <div class="line-route"></div>
+    <span>Route</span>
+  </div>
+</div>
+
+<!-- Leaflet JS -->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
+<!-- Leaflet Routing Machine JS -->
+<script
+  src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js">
+</script>
+
+<script>
+  // ─────────────────────────────────────────────
+  // Colour palette for numbered stops
+  // ─────────────────────────────────────────────
+  const STOP_COLORS = [
+    '#f97316','#8b5cf6','#ec4899','#14b8a6',
+    '#f59e0b','#6366f1','#ef4444','#10b981',
+  ];
+
+  function stopColor(index) {
+    return STOP_COLORS[index % STOP_COLORS.length];
+  }
+
+  // ─────────────────────────────────────────────
+  // Build a pulsing "You are here" icon
+  // ─────────────────────────────────────────────
+  function makeWorkerIcon() {
+    return L.divIcon({
+      html: `<div class="worker-marker-wrap">
+               <div class="pulse"></div>
+               <div class="dot"></div>
+             </div>`,
+      iconSize:   [36, 36],
+      iconAnchor: [18, 18],
+      popupAnchor:[0, -20],
+      className:  '',
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // Build a numbered teardrop stop icon
+  // ─────────────────────────────────────────────
+  function makeStopIcon(number, color) {
+    return L.divIcon({
+      html: `<div class="stop-marker" style="background:${color};">
+               <span>${number}</span>
+             </div>`,
+      iconSize:   [30, 30],
+      iconAnchor: [15, 30],
+      popupAnchor:[0, -32],
+      className:  '',
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // Category label helper
+  // ─────────────────────────────────────────────
+  const CATEGORY_LABELS = {
+    PLASTIC_WASTE: 'Plastic Waste',
+    ORGANIC_WASTE: 'Organic Waste',
+    GLASS_WASTE:   'Glass Waste',
+    METAL_WASTE:   'Metal Waste',
+    PAPER_WASTE:   'Paper Waste',
+  };
+
+  // ─────────────────────────────────────────────
+  // Initialise the map (lazy — called once)
+  // ─────────────────────────────────────────────
+  let map = null;
+  let routingControl = null;
+  const resolvedIds = new Set();
+
+  function ensureMap() {
+    if (map) return;
+    map = L.map('map', {
+      zoomControl:         true,
+      attributionControl:  true,
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom:     19,
+      attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+  }
+
+  // ─────────────────────────────────────────────
+  // Main entry-point called from Flutter
+  //   waypoints: [
+  //     { lat, lng, label, id, title, category }
+  //     ...
+  //   ]
+  //   waypoints[0] is always the worker origin.
+  // ─────────────────────────────────────────────
+  function initRoute(waypoints) {
+    // Hide loading overlay
+    document.getElementById('loading').style.display = 'none';
+
+    ensureMap();
+
+    // Clear any previous routing control + layers
+    if (routingControl) {
+      try { routingControl.remove(); } catch (_) {}
+      routingControl = null;
+    }
+    map.eachLayer(layer => {
+      if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+        if (!(layer instanceof L.TileLayer)) map.removeLayer(layer);
+      }
+    });
+
+    if (!waypoints || waypoints.length === 0) return;
+
+    const latlngs = waypoints.map(w => L.latLng(w.lat, w.lng));
+
+    // ── Worker marker (index 0) ──────────────────
+    const workerWp = waypoints[0];
+    L.marker(latlngs[0], { icon: makeWorkerIcon(), zIndexOffset: 1000 })
+      .addTo(map)
+      .bindPopup(`
+        <div class="popup-inner">
+          <div class="popup-stop-badge">📍 Your Location</div>
+          <div class="popup-title">You are here</div>
+          <div class="popup-coords">${workerWp.lat.toFixed(5)}, ${workerWp.lng.toFixed(5)}</div>
+        </div>
+      `);
+
+    // ── Report stop markers (index 1+) ──────────
+    for (let i = 1; i < waypoints.length; i++) {
+      const wp      = waypoints[i];
+      const stopNum = i;
+      const color   = stopColor(i - 1);
+      const catLabel = CATEGORY_LABELS[wp.category] || wp.category || '';
+
+      const marker = L.marker(latlngs[i], { icon: makeStopIcon(stopNum, color) }).addTo(map);
+
+      // Bind popup with resolve button
+      const popupId = `popup-${wp.id || i}`;
+      marker.bindPopup(() => {
+        const isResolved = resolvedIds.has(wp.id);
+        const btnClass   = isResolved ? 'btn-resolve resolved' : 'btn-resolve';
+        const btnText    = isResolved ? '✓ Resolved' : '✓ Mark as Resolved';
+        const btnDisabled = isResolved ? 'disabled' : '';
+
+        return `
+          <div class="popup-inner" id="${popupId}">
+            <div class="popup-stop-badge">Stop ${stopNum}</div>
+            <div class="popup-title">${wp.title || 'Waste Report'}</div>
+            ${catLabel ? `<div class="popup-category">${catLabel}</div>` : ''}
+            <div class="popup-coords">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</div>
+            <div class="popup-divider"></div>
+            <button
+              class="${btnClass}"
+              ${btnDisabled}
+              onclick="markResolved('${wp.id}', this)">
+              ${btnText}
+            </button>
+          </div>
+        `;
+      }, { maxWidth: 280 });
+    }
+
+    // ── OSRM routing (no API key) ────────────────
+    if (latlngs.length >= 2) {
+      routingControl = L.Routing.control({
+        waypoints: latlngs,
+        router: L.Routing.osrmv1({
+          serviceUrl: 'https://router.project-osrm.org/route/v1',
+          profile:    'driving',
+        }),
+        lineOptions: {
+          styles: [{ color: '#0066cc', weight: 4, opacity: 0.85 }],
+          extendToWaypoints:    false,
+          missingRouteTolerance: 0,
+        },
+        show:           false,   // hide the turn-by-turn panel
+        addWaypoints:   false,
+        routeWhileDragging: false,
+        fitSelectedRoutes:  false,
+        showAlternatives:   false,
+        createMarker:   () => null,  // we placed our own markers
+      }).addTo(map);
+
+      routingControl.on('routesfound', () => {
+        // Fit after route is drawn so both route line + markers are visible
+        const bounds = L.latLngBounds(latlngs);
+        map.fitBounds(bounds, { padding: [48, 48], maxZoom: 16 });
+      });
+
+      routingControl.on('routingerror', () => {
+        // Fall back: just fit bounds without route line
+        const bounds = L.latLngBounds(latlngs);
+        map.fitBounds(bounds, { padding: [48, 48], maxZoom: 16 });
+      });
+    } else {
+      // Single waypoint — just centre on it
+      map.setView(latlngs[0], 15);
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Called when worker taps "Mark as Resolved"
+  // Sends report ID back to Flutter via RouteChannel
+  // ─────────────────────────────────────────────
+  function markResolved(reportId, btn) {
+    if (!reportId || resolvedIds.has(reportId)) return;
+
+    // Optimistic UI update
+    resolvedIds.add(reportId);
+    btn.textContent  = '✓ Resolved';
+    btn.disabled     = true;
+    btn.classList.add('resolved');
+
+    // Post message to Flutter
+    try {
+      RouteChannel.postMessage(reportId);
+    } catch (e) {
+      console.warn('RouteChannel not available:', e);
+    }
+  }
+</script>
+</body>
+</html>

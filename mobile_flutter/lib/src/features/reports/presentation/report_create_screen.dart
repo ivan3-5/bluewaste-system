@@ -12,6 +12,7 @@ import "../../../core/ui/app_components.dart";
 import "../../../core/config/app_env.dart";
 import "../data/report_service.dart";
 import "../domain/report_models.dart";
+import "../../../../services/detect_service.dart";
 
 class ReportCreateScreen extends ConsumerStatefulWidget {
   const ReportCreateScreen({super.key});
@@ -34,15 +35,125 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   bool _isSubmitting = false;
   bool _isOutsideZone = false;
 
+  // ── YOLO detection state ──────────────────────────────────────────────────
+  bool _isDetecting = false;
+  double? _detectedConfidence; // null = not yet run; 0.0 = no waste
+  bool _isSpamFlagged = false;
+  bool _detectionFailed = false; // true = server unreachable
+
   bool get _hasLocation => _latitude != null && _longitude != null;
 
+  /// Detection must have run successfully before submission is allowed.
+  bool get _detectionReady =>
+      _detectedConfidence != null && !_detectionFailed;
+
   int get _remainingImageSlots => 1 - _images.length;
+
+  // ── helpers ───────────────────────────────────────────────────────────────
+
+  /// Resets all detection state to pristine (call when image is removed).
+  void _resetDetection() {
+    _detectedConfidence = null;
+    _isSpamFlagged = false;
+    _detectionFailed = false;
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  // ── Detection ─────────────────────────────────────────────────────────────
+
+  /// Calls the FastAPI /detect endpoint and handles the result in-place.
+  /// Always called after a new image is picked.
+  Future<void> _runDetection(XFile pickedFile) async {
+    if (!mounted) return;
+    setState(() {
+      _isDetecting = true;
+      _detectionFailed = false;
+      _detectedConfidence = null;
+      _isSpamFlagged = false;
+    });
+
+    DetectResult? result;
+    String? errorMessage;
+
+    try {
+      result = await DetectService.instance.detect(File(pickedFile.path));
+    } on DetectServerUnreachableException catch (e) {
+      errorMessage = e.message;
+    } on DetectServerException catch (e) {
+      errorMessage = e.message;
+    } catch (e) {
+      errorMessage = "Detection failed unexpectedly. Please try again.";
+    }
+
+    if (!mounted) return;
+
+    if (errorMessage != null) {
+      // Server unreachable — remove the image and block submission.
+      setState(() {
+        _images.clear();
+        _isDetecting = false;
+        _detectionFailed = true;
+      });
+      _showMessage("❌ Detection error: $errorMessage");
+      return;
+    }
+
+    setState(() {
+      _isDetecting = false;
+      _detectedConfidence = result!.confidence;
+      _isSpamFlagged = false; // may be updated by dialog below
+    });
+
+    if (!result!.hasWaste) {
+      await _showNoWasteDialog();
+    }
+  }
+
+  /// Dialog shown when the model returns has_waste: false.
+  Future<void> _showNoWasteDialog() async {
+    if (!mounted) return;
+    final action = await showDialog<_NoWasteAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text("No Waste Detected"),
+        content: const Text(
+          "Our system did not detect any waste in your photo. "
+          "Submitting false reports may be flagged as spam.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(_NoWasteAction.retake),
+            child: const Text("Retake Photo"),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(_NoWasteAction.submitAnyway),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.destructive,
+            ),
+            child: const Text("Submit Anyway"),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (action == _NoWasteAction.retake || action == null) {
+      setState(() {
+        _images.clear();
+        _resetDetection();
+      });
+    } else {
+      // Submit Anyway — mark as spam flagged
+      setState(() => _isSpamFlagged = true);
+    }
   }
 
   Future<void> _pickFromCamera() async {
@@ -56,7 +167,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     setState(() {
       _images.clear();
       _images.add(picked);
+      _resetDetection();
     });
+
+    await _runDetection(picked);
   }
 
   Future<void> _pickFromGallery() async {
@@ -68,7 +182,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     setState(() {
       _images.clear();
       _images.add(picked);
+      _resetDetection();
     });
+
+    await _runDetection(picked);
   }
 
   Future<void> _getCurrentLocation() async {
@@ -212,6 +329,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       return;
     }
 
+    if (!_detectionReady) {
+      _showMessage("Please wait for detection to complete or retake the photo.");
+      return;
+    }
+
     // Hard zone guard — catches any state mismatch
     if (_isOutsideZone) {
       _showMessage(
@@ -231,6 +353,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         latitude: _latitude!,
         longitude: _longitude!,
         isAnonymous: _isAnonymous,
+        isSpamFlagged: _isSpamFlagged,
+        spamReason: _isSpamFlagged ? "No waste detected by YOLOv8" : null,
+        yoloConfidence: _detectedConfidence ?? 0.0,
       );
 
       if (_images.isNotEmpty) {
@@ -248,6 +373,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         _images.clear();
         _isAnonymous = false;
         _category = "PLASTIC_WASTE";
+        _resetDetection();
       });
 
       _showMessage("Report submitted successfully.");
@@ -279,7 +405,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       if (!_hasLocation) "Location",
     ];
     if (_images.isEmpty) missingRequirements.add("Photo");
+    if (_images.isNotEmpty && !_detectionReady) {
+      missingRequirements.add("Detection");
+    }
     final canSubmit = !_isSubmitting &&
+        !_isDetecting &&
         missingRequirements.isEmpty &&
         !_isOutsideZone &&
         _images.isNotEmpty;
@@ -287,6 +417,32 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     return ListView(
       padding: AppSpacing.screen,
       children: [
+        // ── Detection loading overlay ────────────────────────────────────────
+        if (_isDetecting)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: AppSpacing.sm),
+                    Text(
+                      "Analyzing image for waste…",
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
         AppSectionCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,7 +621,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               _FormSectionHeader(
                 icon: Icons.photo_library_outlined,
                 title: "Photos",
-                subtitle: "Attach one clear photo (required).",
+                subtitle: "Attach one clear photo (required). Detection runs automatically.",
               ),
               const SizedBox(height: AppSpacing.xs),
               Row(
@@ -492,7 +648,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _pickFromCamera,
+                      onPressed: _isDetecting ? null : _pickFromCamera,
                       icon: const Icon(Icons.photo_camera_outlined),
                       label: const Text("Camera"),
                     ),
@@ -500,7 +656,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _pickFromGallery,
+                      onPressed: _isDetecting ? null : _pickFromGallery,
                       icon: const Icon(Icons.image_outlined),
                       label: const Text("Gallery (single)"),
                     ),
@@ -535,6 +691,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                                 onTap: () {
                                   setState(() {
                                     _images.removeAt(entry.key);
+                                    _resetDetection();
                                   });
                                 },
                                 child: const CircleAvatar(
@@ -553,6 +710,15 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                       )
                       .toList(growable: false),
                 ),
+                // ── Confidence badge ───────────────────────────────────────
+                if (_detectedConfidence != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  _ConfidenceBadge(
+                    confidence: _detectedConfidence!,
+                    hasWaste: _detectedConfidence! > 0,
+                    isSpamFlagged: _isSpamFlagged,
+                  ),
+                ],
               ],
             ],
           ),
@@ -564,16 +730,29 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
             children: [
               FilledButton.icon(
                 onPressed: canSubmit ? _submitReport : null,
-                icon: const Icon(Icons.send_outlined),
-                label: Text(_isSubmitting ? "Submitting..." : "Submit Report"),
+                icon: _isSubmitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.send_outlined),
+                label: Text(_isSubmitting ? "Submitting…" : "Submit Report"),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 missingRequirements.isEmpty
-                    ? "Ready to submit. Please review details before sending."
+                    ? _isSpamFlagged
+                        ? "⚠️ Submitting as spam-flagged report."
+                        : "Ready to submit. Please review details before sending."
                     : "Complete required fields: ${missingRequirements.join(", ")}",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.mutedForeground,
+                      color: _isSpamFlagged
+                          ? AppColors.destructive
+                          : AppColors.mutedForeground,
                     ),
               ),
             ],
@@ -674,6 +853,75 @@ class _StepChip extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: AppColors.secondaryForeground,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Actions available in the "No Waste Detected" dialog.
+enum _NoWasteAction { retake, submitAnyway }
+
+/// Small badge shown below the selected photo preview with the YOLO confidence.
+class _ConfidenceBadge extends StatelessWidget {
+  const _ConfidenceBadge({
+    required this.confidence,
+    required this.hasWaste,
+    required this.isSpamFlagged,
+  });
+
+  final double confidence;
+  final bool hasWaste;
+  final bool isSpamFlagged;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color color;
+    final IconData icon;
+    final String label;
+
+    if (!hasWaste) {
+      color = isSpamFlagged ? AppColors.destructive : Colors.orange;
+      icon = isSpamFlagged ? Icons.warning_amber_rounded : Icons.help_outline;
+      label = isSpamFlagged
+          ? "Spam flagged — no waste detected"
+          : "No waste detected (${confidence.toStringAsFixed(1)}%)";
+    } else {
+      color = confidence >= 75
+          ? const Color(0xFF2ECC71)
+          : confidence >= 40
+              ? const Color(0xFFF39C12)
+              : Colors.orange;
+      icon = Icons.check_circle_outline;
+      label = "Waste detected — confidence ${confidence.toStringAsFixed(1)}%";
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
                   fontWeight: FontWeight.w600,
                 ),
           ),

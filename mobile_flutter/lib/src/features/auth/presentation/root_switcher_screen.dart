@@ -52,23 +52,54 @@ class _RootSwitcherScreenState extends ConsumerState<RootSwitcherScreen> {
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: AppColors.secondary,
-              child: ClipOval(
-                child: Image.asset(
-                  "assets/images/logo-final.png",
-                  width: 34,
-                  height: 34,
-                  fit: BoxFit.cover,
+            // Responsive logo container
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.3,
+                maxHeight: MediaQuery.of(context).size.height * 0.25,
+              ),
+              child: AspectRatio(
+                aspectRatio: 1.0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.secondary,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: Image.asset(
+                    "assets/images/logo-final.png",
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: AppColors.secondary,
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          color: Colors.white,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
             const CircularProgressIndicator(),
-            const SizedBox(height: 10),
-            const Text("Preparing BlueWaste..."),
+            const SizedBox(height: 16),
+            const Text(
+              "Preparing BlueWaste...",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
+            ),
           ],
         ),
       ),

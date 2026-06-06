@@ -411,8 +411,29 @@ export class ReportService {
     address?: string;
     isAnonymous?: boolean;
     reporterId?: string;
+    /** Set to true when the Flutter client's /detect returned has_waste: false
+     *  but the citizen chose "Submit Anyway". */
+    isSpamFlagged?: boolean;
+    /** Human-readable reason for the spam flag (from Flutter). */
+    spamReason?: string;
+    /** Top YOLOv8 confidence score (0.0 – 100.0) from the /detect endpoint. */
+    yoloConfidence?: number;
   }) {
     await this.purgeExpiredSpamIfDue();
+
+    const clientSpamFlagged = data.isSpamFlagged === true;
+    const resolvedSpamReason = clientSpamFlagged
+      ? (data.spamReason ?? "No waste detected by YOLOv8")
+      : data.category === "no_waste"
+        ? "No visible waste or pollution detected in the submitted image."
+        : null;
+    const isSpam = clientSpamFlagged || data.category === "no_waste";
+    // Convert 0–100 percentage back to 0–1 fraction for consistency with
+    // the analysisConfidence column (which stores 0.0–1.0).
+    const yoloConfidenceFraction =
+      typeof data.yoloConfidence === "number" && data.yoloConfidence > 0
+        ? data.yoloConfidence / 100.0
+        : null;
 
     const report = await prisma.$transaction(async (tx) => {
       const created = await tx.report.create({
@@ -424,12 +445,11 @@ export class ReportService {
           longitude: data.longitude,
           address: data.address,
           isAnonymous: data.isAnonymous || false,
-          isSpam: data.category === "no_waste",
-          spamMarkedAt: data.category === "no_waste" ? new Date() : null,
-          spamReason:
-            data.category === "no_waste"
-              ? "No visible waste or pollution detected in the submitted image."
-              : null,
+          isSpam,
+          spamMarkedAt: isSpam ? new Date() : null,
+          spamReason: resolvedSpamReason,
+          // Persist the client-side YOLO confidence so the spam page can show it.
+          analysisConfidence: yoloConfidenceFraction,
           reporterId: data.isAnonymous ? null : data.reporterId,
         },
         include: {
