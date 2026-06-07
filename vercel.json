@@ -15,8 +15,20 @@
   ],
   "routes": [
     {
+      "src": "/api/reports/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})",
+      "dest": "/web/api/reports/[id]?nxtPid=$1"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/[...path].ts"
+    },
+    {
+      "src": "/dashboard/reports/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})",
+      "dest": "/web/dashboard/reports/[id]?nxtPid=$1"
+    },
+    {
+      "src": "/field-worker/tasks/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})",
+      "dest": "/web/field-worker/tasks/[id]?nxtPid=$1"
     },
     {
       "src": "/(.*)",
