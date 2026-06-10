@@ -138,6 +138,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
                 ]}
                 center={[report.latitude, report.longitude]}
                 zoom={16}
+                hideControls
               />
             </div>
           </div>

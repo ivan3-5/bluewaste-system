@@ -15,6 +15,7 @@ type MapViewProps = {
   reports: AdminReport[];
   center?: [number, number];
   zoom?: number;
+  hideControls?: boolean;
 };
 
 const DEFAULT_CENTER: [number, number] = [7.3132, 125.6844];
@@ -35,11 +36,11 @@ function buildIcon(color: string) {
 
 function escapeHtml(value: string) {
   return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replace(/&/g, "\x26amp;")
+    .replace(/</g, "\x26lt;")
+    .replace(/>/g, "\x26gt;")
+    .replace(/"/g, "\x26quot;")
+    .replace(/'/g, "\x26#39;");
 }
 
 function getCategoryPill(category: AdminReport["category"]) {
@@ -91,6 +92,7 @@ export default function MapView({
   reports,
   center = DEFAULT_CENTER,
   zoom = 12,
+  hideControls = false,
 }: MapViewProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<
@@ -434,7 +436,7 @@ export default function MapView({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      {isAdmin && (
+      {isAdmin && !hideControls && (
         <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap lg:w-auto">
