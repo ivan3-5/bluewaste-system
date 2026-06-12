@@ -16,6 +16,7 @@ import {
   LogOut,
   Menu,
   Users,
+  Calendar,
 } from "lucide-react";
 
 const adminLinks = [
@@ -26,6 +27,7 @@ const adminLinks = [
     icon: ClipboardList,
   },
   { href: "/dashboard/spam", label: "Spam", icon: AlertTriangle },
+  { href: "/dashboard/schedules", label: "Cleanup Schedules", icon: Calendar },
   { href: "/dashboard/map", label: "Waste Map", icon: Map },
   { href: "/dashboard/users", label: "User Management", icon: Users },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },

@@ -10,6 +10,7 @@ import "../../profile/presentation/profile_screen.dart";
 import "../../reports/presentation/worker_home_screen.dart";
 import "../../reports/presentation/worker_route_screen.dart";
 import "../../reports/presentation/worker_tasks_screen.dart";
+import "../../schedules/presentation/schedules_screen.dart";
 
 class WorkerShellScreen extends ConsumerStatefulWidget {
   const WorkerShellScreen({super.key});
@@ -80,10 +81,11 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
       ),
       const WorkerTasksScreen(),
       const WorkerRouteScreen(),
+      const SchedulesScreen(),
       const NotificationsScreen(),
     ];
 
-    const titles = <String>["Home", "My Tasks", "Assigned Map", "Alerts"];
+    const titles = <String>["Home", "Tasks", "Map", "Schedules", "Alerts"];
 
     return Scaffold(
       appBar: AppBar(
@@ -169,6 +171,11 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
                   icon: Icon(Icons.map_outlined),
                   selectedIcon: Icon(Icons.map),
                   label: "Map",
+                ),
+                const NavigationDestination(
+                  icon: Icon(Icons.calendar_month_outlined),
+                  selectedIcon: Icon(Icons.calendar_month),
+                  label: "Schedules",
                 ),
                 NavigationDestination(
                   icon: _buildBadgeIcon(

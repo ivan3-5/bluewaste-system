@@ -7,6 +7,7 @@ import "../../../core/ui/app_components.dart";
 import "../../dashboard/data/dashboard_service.dart";
 import "../../notifications/presentation/notification_providers.dart";
 import "my_reports_screen.dart";
+import "../../schedules/presentation/schedules_screen.dart";
 
 class CitizenHomeScreen extends ConsumerWidget {
   const CitizenHomeScreen({
@@ -44,7 +45,7 @@ class CitizenHomeScreen extends ConsumerWidget {
             return _QuickActionCard(
               action: action,
               onTap: () {
-                if (action.tabIndex < 0) {
+                if (action.tabIndex == -1) {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => Scaffold(
@@ -53,6 +54,12 @@ class CitizenHomeScreen extends ConsumerWidget {
                           child: MyReportsScreen(),
                         ),
                       ),
+                    ),
+                  );
+                } else if (action.tabIndex == -2) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const SchedulesScreen(),
                     ),
                   );
                 } else {
@@ -198,6 +205,13 @@ const List<_HomeAction> _homeActions = [
     icon: Icons.notifications_active_outlined,
     color: AppColors.warning,
     tabIndex: 3,
+  ),
+  _HomeAction(
+    title: "Cleanups",
+    subtitle: "Upcoming events",
+    icon: Icons.calendar_month_outlined,
+    color: AppColors.secondary,
+    tabIndex: -2,
   ),
 ];
 

@@ -16,6 +16,7 @@ import notificationRoutes from "./routes/notification.routes";
 import uploadRoutes from "./routes/upload.routes";
 import reportingZoneRoutes from "./routes/reportingZone.routes";
 import analyticsRoutes from "./routes/analytics.routes";
+import scheduleRoutes from "./routes/schedule.routes";
 
 const app = express();
 
@@ -138,6 +139,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/reporting-zones", reportingZoneRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/schedules", scheduleRoutes);
 
 // Error handler
 app.use(errorHandler);

@@ -106,9 +106,14 @@ export class AuthService {
       address?: string | null;
     },
   ) {
+    const updateData = {
+      ...data,
+      address: data.address === null ? "" : data.address,
+    };
+
     const user = await prisma.user.update({
       where: { id: userId },
-      data,
+      data: updateData,
       select: {
         id: true,
         email: true,

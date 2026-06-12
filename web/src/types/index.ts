@@ -251,3 +251,69 @@ export const STATUS_COLORS: Record<ReportStatus, string> = {
   CLEANED: "#22c55e",
   REJECTED: "#ef4444",
 };
+
+// ==================== CLEANUP SCHEDULES ====================
+
+export type CleanupScheduleStatus =
+  | "UPCOMING"
+  | "ONGOING"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export interface ScheduleWorker {
+  id: string;
+  workerId: string;
+  worker: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+    phone?: string;
+  };
+  assignedAt: string;
+}
+
+export interface CleanupSchedule {
+  id: string;
+  title: string;
+  description: string;
+  barangay: string;
+  latitude: number;
+  longitude: number;
+  scheduledAt: string;
+  status: CleanupScheduleStatus;
+  notes?: string;
+  createdById: string;
+  createdBy?: { id: string; firstName: string; lastName: string; email?: string };
+  verifiedById?: string;
+  verifiedBy?: { id: string; firstName: string; lastName: string };
+  verifiedAt?: string;
+  workers: ScheduleWorker[];
+  reports?: Report[];
+  equipment: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScheduleStatistics {
+  total: number;
+  byStatus: Record<CleanupScheduleStatus, number>;
+  byBarangay: { barangay: string; count: number }[];
+  completionRate: number;
+  averageDuration: number;
+  monthlyTrend: { month: string; count: number }[];
+}
+
+export const SCHEDULE_STATUS_LABELS: Record<CleanupScheduleStatus, string> = {
+  UPCOMING: "Upcoming",
+  ONGOING: "Ongoing",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+};
+
+export const SCHEDULE_STATUS_COLORS: Record<CleanupScheduleStatus, string> = {
+  UPCOMING: "#3b82f6",
+  ONGOING: "#f97316",
+  COMPLETED: "#22c55e",
+  CANCELLED: "#ef4444",
+};

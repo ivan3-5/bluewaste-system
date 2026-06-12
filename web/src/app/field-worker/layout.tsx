@@ -14,6 +14,7 @@ import {
   Map,
   Bell,
   User,
+  Calendar,
 } from "lucide-react";
 import { useUnreadCount } from "@/hooks/useNotifications";
 import { FieldWorkerLayoutSkeleton } from "@/components/skeletons/page-skeletons";
@@ -21,6 +22,7 @@ import { FieldWorkerLayoutSkeleton } from "@/components/skeletons/page-skeletons
 const navLinks = [
   { href: "/field-worker", label: "Dashboard", icon: LayoutDashboard },
   { href: "/field-worker/tasks", label: "My Tasks", icon: ClipboardList },
+  { href: "/field-worker/schedules", label: "My Schedules", icon: Calendar },
   { href: "/field-worker/map", label: "Waste Map", icon: Map },
   { href: "/field-worker/notifications", label: "Notifications", icon: Bell },
 ];

@@ -39,6 +39,14 @@ enum NotificationType {
   STATUS_CHANGE
   ASSIGNMENT
   SYSTEM
+  CLEANUP_SCHEDULE
+}
+
+enum CleanupScheduleStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
 }
 
 enum WasteType {
@@ -85,6 +93,12 @@ model User {
   // (WasteReport model removed)
   // Reporting zones created by admin
   reportingZones  ReportingZone[]
+  // Cleanup schedules created by admin
+  createdSchedules    CleanupSchedule[]       @relation("ScheduleCreator")
+  // Cleanup schedules verified/completed by admin
+  verifiedSchedules   CleanupSchedule[]       @relation("ScheduleVerifier")
+  // Cleanup schedule worker assignments
+  scheduleAssignments CleanupScheduleWorker[] @relation("AssignedSchedules")
 
   @@index([role])
   @@index([role, isActive])
@@ -119,6 +133,10 @@ model Report {
   // Assigned field worker
   assignedToId String?
   assignedTo   User?   @relation("AssignedReports", fields: [assignedToId], references: [id])
+
+  // Cleanup Schedule
+  cleanupScheduleId String?
+  cleanupSchedule   CleanupSchedule? @relation(fields: [cleanupScheduleId], references: [id], onDelete: SetNull)
 
   // Related records
   images        ReportImage[]
@@ -205,4 +223,54 @@ model ReportingZone {
 
   @@index([isActive])
   @@index([createdById])
+}
+
+model CleanupSchedule {
+  id          String                @id @default(uuid())
+  title       String
+  description String
+  barangay    String
+  latitude    Float
+  longitude   Float
+  scheduledAt DateTime
+  status      CleanupScheduleStatus @default(UPCOMING)
+  notes       String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  // Creator (admin)
+  createdById String
+  createdBy   User @relation("ScheduleCreator", fields: [createdById], references: [id])
+
+  // Verified/completed by admin
+  verifiedById String?
+  verifiedBy   User?    @relation("ScheduleVerifier", fields: [verifiedById], references: [id])
+  verifiedAt   DateTime?
+
+  // Many-to-many assigned workers
+  workers CleanupScheduleWorker[]
+
+  // Linked Reports
+  reports Report[]
+
+  equipment String[] @default([])
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([createdById])
+  @@index([barangay])
+}
+
+model CleanupScheduleWorker {
+  id         String   @id @default(uuid())
+  assignedAt DateTime @default(now())
+
+  scheduleId String
+  schedule   CleanupSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  workerId String
+  worker   User   @relation("AssignedSchedules", fields: [workerId], references: [id])
+
+  @@unique([scheduleId, workerId])
+  @@index([workerId])
 }
