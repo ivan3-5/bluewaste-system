@@ -226,3 +226,11 @@ final authControllerProvider =
     ref.watch(sessionStorageProvider),
   );
 });
+
+final currentUserProvider = Provider<AsyncValue<AppUser?>>((ref) {
+  final authState = ref.watch(authControllerProvider);
+  if (authState.isLoading && authState.user == null) {
+    return const AsyncValue.loading();
+  }
+  return AsyncValue.data(authState.user);
+});

@@ -102,7 +102,7 @@ class NotificationItemWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      color: isRead ? Colors.transparent : AppColors.primary.withOpacity(0.05),
+      color: isRead ? Colors.transparent : AppColors.primary.withValues(alpha: 0.05),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Text(

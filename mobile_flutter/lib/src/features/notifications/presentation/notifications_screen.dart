@@ -86,7 +86,7 @@ class NotificationsScreen extends ConsumerWidget {
                     return Container(
                       color: notification.isRead
                           ? Colors.transparent
-                          : AppColors.primary.withOpacity(0.05),
+                          : AppColors.primary.withValues(alpha: 0.05),
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 8),

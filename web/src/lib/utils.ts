@@ -34,3 +34,21 @@ export function timeAgo(date: string | Date) {
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
   return formatDate(date);
 }
+
+export async function getReverseGeocodedLocation(latitude: number, longitude: number): Promise<string | null> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`, {
+      headers: {
+        'User-Agent': 'BlueWaste-Admin/1.0'
+      }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.display_name) {
+      return data.display_name;
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}

@@ -959,11 +959,12 @@ export default function SubmitReportPage() {
                     <select
                       id="waste-category"
                       title="Select waste category"
-                      className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-70 disabled:bg-gray-100"
                       value={selectedCategory}
                       onChange={(event) =>
                         setSelectedCategory(event.target.value as WasteBucket)
                       }
+                      disabled={selectedCategory === "with_waste"}
                     >
                       <option value="">Select waste category…</option>
                       {(["with_waste", "no_waste"] as WasteBucket[]).map(

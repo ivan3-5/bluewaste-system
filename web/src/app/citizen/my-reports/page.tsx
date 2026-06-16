@@ -154,49 +154,92 @@ export default function MyReportsPage() {
         </div>
       )}
 
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">My Reports</h1>
+      <div className="mb-8 flex items-center justify-between">
+        <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-blue-700 via-blue-500 to-emerald-500 bg-clip-text text-transparent drop-shadow-sm">
+          My Reports
+        </h1>
         <Link href="/citizen/report">
-          <Button size="sm">+ New Report</Button>
+          <Button 
+            size="sm" 
+            className="group relative overflow-hidden bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5"
+          >
+            <span className="relative z-10 flex items-center gap-1.5 font-medium">
+              <span className="text-lg leading-none transition-transform group-hover:rotate-90 duration-300">+</span>
+              New Report
+            </span>
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+          </Button>
         </Link>
       </div>
 
       {/* Filter */}
-      <div className="mb-4">
-        <select
-          title="Filter by status"
-          className="rounded-md border px-3 py-2 text-sm"
-          value={statusFilter || ""}
-          onChange={(e) => {
-            setStatusFilter((e.target.value as ReportStatus) || undefined);
-            setPage(1);
-          }}
-        >
-          <option value="">All Statuses</option>
-          {Object.entries(REPORT_STATUS_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </select>
+      <div className="mb-8 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex w-max gap-2 px-1">
+          <button
+            onClick={() => {
+              setStatusFilter(undefined);
+              setPage(1);
+            }}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 ${
+              !statusFilter
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-1 ring-blue-600"
+                : "bg-white text-gray-600 hover:bg-blue-50 border border-gray-200"
+            }`}
+          >
+            All Reports
+          </button>
+          {Object.entries(REPORT_STATUS_LABELS).map(([k, v]) => {
+            const isActive = statusFilter === k;
+            return (
+              <button
+                key={k}
+                onClick={() => {
+                  setStatusFilter(k as ReportStatus);
+                  setPage(1);
+                }}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 ${
+                  isActive
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-1 ring-blue-600"
+                    : "bg-white text-gray-600 hover:bg-blue-50 border border-gray-200"
+                }`}
+              >
+                {v}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Reports List */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         {isLoading ? (
-          <div className="py-10 text-center text-gray-400">
-            Loading your reports...
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse rounded-xl border border-gray-100 bg-white/50 p-5 shadow-sm">
+                <div className="flex gap-4">
+                  <div className="flex-1 space-y-3">
+                    <div className="h-5 w-1/3 rounded-md bg-gray-200"></div>
+                    <div className="h-4 w-2/3 rounded-md bg-gray-100"></div>
+                    <div className="flex gap-2 pt-2">
+                      <div className="h-6 w-20 rounded-full bg-gray-200"></div>
+                      <div className="h-6 w-24 rounded-full bg-gray-100"></div>
+                    </div>
+                  </div>
+                  <div className="h-20 w-20 rounded-xl bg-gray-200"></div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : reports.length === 0 ? (
-          <div className="relative overflow-hidden rounded-2xl border border-dashed border-blue-200 bg-gradient-to-br from-white via-blue-50/40 to-white p-8 text-center shadow-sm">
-            <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-100/60 blur-2xl" />
-            <div className="pointer-events-none absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-emerald-100/50 blur-2xl" />
+          <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-white/60 p-12 text-center shadow-lg shadow-blue-900/5 backdrop-blur-md transition-all">
+            <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-300/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl" />
 
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600/10 ring-1 ring-blue-200">
+            <div className="relative mx-auto flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-50 to-blue-100/50 ring-1 ring-blue-200 shadow-inner group">
               <svg
                 aria-hidden="true"
                 viewBox="0 0 24 24"
-                className="h-8 w-8 text-blue-600"
+                className="h-12 w-12 text-blue-500 transition-transform duration-700 ease-in-out group-hover:scale-110 group-hover:rotate-3 animate-[bounce_3s_infinite]"
               >
                 <path
                   fill="currentColor"
@@ -234,22 +277,25 @@ export default function MyReportsPage() {
             return (
               <div
                 key={report.id}
-                className="rounded-lg border bg-white p-4 shadow-sm hover:border-blue-200 transition-colors"
+                className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 p-5 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/5"
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none" />
+                <div className="relative flex flex-col sm:flex-row sm:items-start justify-between gap-5">
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-gray-800 truncate">
+                    <h3 className="text-lg font-bold text-gray-900 truncate transition-colors group-hover:text-blue-700">
                       {report.title}
                     </h3>
-                    <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                    <p className="mt-1.5 text-sm leading-relaxed text-gray-500 line-clamp-2">
                       {report.description}
                     </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div className="mt-4 flex flex-wrap items-center gap-2.5">
                       <StatusBadge status={report.status} />
-                      <span className="text-xs text-gray-400">
+                      <div className="h-4 w-px bg-gray-200" />
+                      <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
                         {WASTE_CATEGORY_LABELS[report.category]}
                       </span>
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         {timeAgo(report.createdAt)}
                       </span>
                     </div>

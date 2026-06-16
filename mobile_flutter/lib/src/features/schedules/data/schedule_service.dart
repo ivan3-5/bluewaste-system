@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../auth/presentation/auth_providers.dart';
+import '../../../core/providers.dart';
 import '../domain/schedule_models.dart';
 
 final scheduleServiceProvider = Provider<ScheduleService>((ref) {

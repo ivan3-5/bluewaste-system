@@ -5,6 +5,9 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import {
   ADMIN_REPORT_STATUS_LABELS,
   type AdminReport,
@@ -22,7 +25,7 @@ const DEFAULT_CENTER: [number, number] = [7.3132, 125.6844];
 
 function buildIcon(color: string) {
   return L.divIcon({
-    className: "",
+    className: "marker-pulse",
     html: `
       <div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;background:${color};border:3px solid white;box-shadow:0 8px 20px rgba(0,0,0,0.25)">
         <div style="width:8px;height:8px;border-radius:999px;background:white"></div>
@@ -76,7 +79,7 @@ function buildPopupHtml(report: AdminReport) {
 
   return `
     <div style="display:flex;flex-direction:column;gap:12px;min-width:220px">
-      <img src="${imageUrl}" alt="Report image" style="height:112px;width:100%;border-radius:12px;object-fit:cover" />
+      <img src="${imageUrl}" alt="Report image" loading="lazy" style="height:112px;width:100%;border-radius:12px;object-fit:cover" />
       <div style="display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${getCategoryPill(report.category)}
@@ -86,6 +89,18 @@ function buildPopupHtml(report: AdminReport) {
       </div>
     </div>
   `;
+}
+
+function isPointInPolygon(point: [number, number], vs: [number, number][]) {
+  const x = point[0], y = point[1];
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    const xi = vs[i][0], yi = vs[i][1];
+    const xj = vs[j][0], yj = vs[j][1];
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
 }
 
 export default function MapView({
@@ -141,12 +156,32 @@ export default function MapView({
   );
 
   const filteredReports = useMemo(() => {
-    if (selectedStatus === "ALL") {
-      return reports;
+    // Always hide cleaned reports from the map
+    let result = reports.filter((report) => report.status !== "CLEANED");
+
+    if (selectedStatus !== "ALL") {
+      result = result.filter((report) => report.status === selectedStatus);
     }
 
-    return reports.filter((report) => report.status === selectedStatus);
-  }, [reports, selectedStatus]);
+    if (selectedZoneId) {
+      const zone = zones.find((z: any) => z.id === selectedZoneId);
+      if (zone) {
+        const polygonCoords = zone.coordinates.map((c: any) => [Number(c.lat), Number(c.lng)] as [number, number]);
+        result = result.filter((r) => isPointInPolygon([Number(r.latitude), Number(r.longitude)], polygonCoords));
+      }
+    }
+
+    console.log("MapView debug:", {
+      reportsCount: reports.length,
+      filteredCount: result.length,
+      selectedZoneId,
+      zonesCount: zones.length,
+      sampleReport: reports[0],
+      isInside: reports.length > 0 && zones.length > 0 ? isPointInPolygon([reports[0].latitude, reports[0].longitude], zones[0].coordinates.map((c: any) => [c.lat, c.lng] as [number, number])) : null
+    });
+
+    return result;
+  }, [reports, selectedStatus, selectedZoneId, zones]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -385,8 +420,10 @@ export default function MapView({
       return;
     }
 
-    const markersLayer = markersLayerRef.current;
+    const markersLayer = markersLayerRef.current as any;
     markersLayer.clearLayers();
+
+    const newMarkers: L.Marker[] = [];
 
     filteredReports.forEach((report) => {
       const marker = L.marker([report.latitude, report.longitude], {
@@ -395,8 +432,17 @@ export default function MapView({
       });
 
       marker.bindPopup(buildPopupHtml(report), { maxWidth: 260 });
-      marker.addTo(markersLayer);
+      newMarkers.push(marker);
     });
+
+    newMarkers.forEach((marker) => markersLayer.addLayer(marker));
+
+    if (newMarkers.length > 0) {
+      const bounds = L.latLngBounds(filteredReports.map(r => [r.latitude, r.longitude]));
+      if (bounds.isValid()) {
+        mapRef.current?.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+      }
+    }
   }, [filteredReports, icons]);
 
   // render reporting zones as polygon layers (and put the selected one into editable group)
@@ -412,27 +458,29 @@ export default function MapView({
       zoneLayersRef.current.clearLayers();
     }
 
-    (zones || []).forEach((zone: any) => {
-      const latlngs = zone.coordinates.map(
-        (p: any) => [p.lat, p.lng] as [number, number],
-      );
-      const polygon = L.polygon(latlngs, {
-        color: zone.id === selectedZoneId ? "#1d4ed8" : "#2563eb",
-        weight: 2,
-        fillColor: zone.id === selectedZoneId ? "#3b82f6" : "#3b82f6",
-        fillOpacity: zone.id === selectedZoneId ? 0.2 : 0.12,
+    if (isAdmin && !hideControls) {
+      (zones || []).forEach((zone: any) => {
+        const latlngs = zone.coordinates.map(
+          (p: any) => [p.lat, p.lng] as [number, number],
+        );
+        const polygon = L.polygon(latlngs, {
+          color: zone.id === selectedZoneId ? "#1d4ed8" : "#2563eb",
+          weight: 2,
+          fillColor: zone.id === selectedZoneId ? "#3b82f6" : "#3b82f6",
+          fillOpacity: zone.id === selectedZoneId ? 0.2 : 0.12,
+        });
+        polygon.bindTooltip(zone.name, { permanent: false, direction: "center" });
+      
+        if (zone.id === selectedZoneId && zoneEditableGroupRef.current) {
+          zoneEditableGroupRef.current.addLayer(polygon);
+        } else if (zoneLayersRef.current) {
+          zoneLayersRef.current.addLayer(polygon);
+        } else {
+          polygon.addTo(map);
+        }
       });
-      polygon.bindTooltip(zone.name, { permanent: false, direction: "center" });
-
-      if (zone.id === selectedZoneId && zoneEditableGroupRef.current) {
-        zoneEditableGroupRef.current.addLayer(polygon);
-      } else if (zoneLayersRef.current) {
-        zoneLayersRef.current.addLayer(polygon);
-      } else {
-        polygon.addTo(map);
-      }
-    });
-  }, [zones, selectedZoneId]);
+    }
+  }, [zones, selectedZoneId, isAdmin, hideControls]);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

@@ -61,9 +61,21 @@ export function ScheduleCalendar({
             onEventClick(info.event.extendedProps.schedule as CleanupSchedule);
           }}
           dateClick={(info) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (info.date < today) return;
+
             if (onDateClick) {
               onDateClick(info.date);
             }
+          }}
+          dayCellClassNames={(arg) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (arg.date < today) {
+              return "!bg-gray-50/50 !opacity-60 cursor-not-allowed";
+            }
+            return "";
           }}
           height="auto"
           eventDisplay="block"

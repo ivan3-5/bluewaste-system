@@ -63,6 +63,13 @@ export class ScheduleService {
       throw new Error("One or more worker IDs are invalid");
     }
 
+    const scheduledDateObj = new Date(data.scheduledAt);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (scheduledDateObj < today) {
+      throw new Error("Cannot create schedule for a past date");
+    }
+
     const schedule = await prisma.cleanupSchedule.create({
       data: {
         title: data.title,
@@ -169,8 +176,15 @@ export class ScheduleService {
     if (data.barangay !== undefined) updateData.barangay = data.barangay;
     if (data.latitude !== undefined) updateData.latitude = data.latitude;
     if (data.longitude !== undefined) updateData.longitude = data.longitude;
-    if (data.scheduledAt !== undefined)
-      updateData.scheduledAt = new Date(data.scheduledAt);
+    if (data.scheduledAt !== undefined) {
+      const scheduledDateObj = new Date(data.scheduledAt);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (scheduledDateObj < today) {
+        throw new Error("Cannot update schedule to a past date");
+      }
+      updateData.scheduledAt = scheduledDateObj;
+    }
     if (data.status !== undefined)
       updateData.status = data.status as CleanupScheduleStatus;
     if (data.equipment !== undefined) updateData.equipment = data.equipment;

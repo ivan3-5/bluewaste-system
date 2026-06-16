@@ -3,8 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
-import '../../../common_widgets/error_view.dart';
-import '../../auth/presentation/auth_providers.dart';
+import '../../../core/ui/app_components.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../data/schedule_service.dart';
 import '../domain/schedule_models.dart';
 import 'schedules_screen.dart'; // For upcomingSchedulesProvider & mySchedulesProvider
@@ -80,19 +80,17 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
         ref.invalidate(upcomingSchedulesProvider);
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Status updated to $status')),
-        );
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Status updated to $status')),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Error updating status: $e'),
-              backgroundColor: Colors.red),
-        );
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Error updating status: $e'),
+            backgroundColor: Colors.red),
+      );
     } finally {
       if (mounted) {
         setState(() => _isUpdating = false);
@@ -111,10 +109,15 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
         loading: () => widget.initialSchedule != null
             ? _buildDetail(context, widget.initialSchedule!)
             : const Center(child: CircularProgressIndicator()),
-        error: (e, st) => ErrorView(
-          message: e.toString(),
-          onRetry: () =>
-              ref.invalidate(scheduleDetailProvider(widget.scheduleId)),
+        error: (e, st) => ListView(
+          children: [
+            const SizedBox(height: 140),
+            AppEmptyState(
+              icon: Icons.error_outline,
+              title: "Error loading schedule",
+              subtitle: e.toString(),
+            ),
+          ],
         ),
       ),
     );
@@ -196,7 +199,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: statusColor),
                       ),

@@ -15,7 +15,7 @@ enum CleanupScheduleStatus {
 }
 
 @freezed
-class CleanupSchedule with _$CleanupSchedule {
+abstract class CleanupSchedule with _$CleanupSchedule {
   const factory CleanupSchedule({
     required String id,
     required String title,
@@ -40,7 +40,7 @@ class CleanupSchedule with _$CleanupSchedule {
 }
 
 @freezed
-class ScheduleWorker with _$ScheduleWorker {
+abstract class ScheduleWorker with _$ScheduleWorker {
   const factory ScheduleWorker({
     required String id,
     required String workerId,
@@ -53,7 +53,7 @@ class ScheduleWorker with _$ScheduleWorker {
 }
 
 @freezed
-class ScheduleWorkerUser with _$ScheduleWorkerUser {
+abstract class ScheduleWorkerUser with _$ScheduleWorkerUser {
   const factory ScheduleWorkerUser({
     required String id,
     required String firstName,

@@ -22,11 +22,13 @@ _CleanupSchedule _$CleanupScheduleFromJson(Map<String, dynamic> json) =>
       verifiedAt: json['verifiedAt'] == null
           ? null
           : DateTime.parse(json['verifiedAt'] as String),
-      workers: (json['workers'] as List<dynamic>?)
+      workers:
+          (json['workers'] as List<dynamic>?)
               ?.map((e) => ScheduleWorker.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
-      equipment: (json['equipment'] as List<dynamic>?)
+      equipment:
+          (json['equipment'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
@@ -65,8 +67,9 @@ _ScheduleWorker _$ScheduleWorkerFromJson(Map<String, dynamic> json) =>
     _ScheduleWorker(
       id: json['id'] as String,
       workerId: json['workerId'] as String,
-      worker:
-          ScheduleWorkerUser.fromJson(json['worker'] as Map<String, dynamic>),
+      worker: ScheduleWorkerUser.fromJson(
+        json['worker'] as Map<String, dynamic>,
+      ),
       assignedAt: DateTime.parse(json['assignedAt'] as String),
     );
 

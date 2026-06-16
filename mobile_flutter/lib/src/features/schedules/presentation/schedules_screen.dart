@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../common_widgets/error_view.dart';
-import '../../auth/presentation/auth_providers.dart';
+import '../../../core/ui/app_components.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../data/schedule_service.dart';
 import '../domain/schedule_models.dart';
 import 'schedule_detail_screen.dart';
@@ -103,15 +103,15 @@ class _SchedulesScreenState extends ConsumerState<SchedulesScreen> {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) => ErrorView(
-          message: e.toString(),
-          onRetry: () {
-            if (isWorker) {
-              ref.invalidate(mySchedulesProvider);
-            } else {
-              ref.invalidate(upcomingSchedulesProvider);
-            }
-          },
+        error: (e, st) => ListView(
+          children: [
+            const SizedBox(height: 140),
+            AppEmptyState(
+              icon: Icons.error_outline,
+              title: "Error loading schedules",
+              subtitle: e.toString(),
+            ),
+          ],
         ),
       ),
     );
@@ -186,9 +186,9 @@ class _ScheduleCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _getStatusColor().withOpacity(0.1),
+                      color: _getStatusColor().withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _getStatusColor().withOpacity(0.5)),
+                      border: Border.all(color: _getStatusColor().withValues(alpha: 0.5)),
                     ),
                     child: Text(
                       _getStatusText(),

@@ -19,12 +19,6 @@ export default async function DashboardMapPage() {
               manage coastal reporting zones in one interactive workspace.
             </p>
           </div>
-
-          <div className="flex flex-wrap gap-2 text-xs font-semibold">
-            <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-700">
-              Total Reports: {adminReports.length}
-            </span>
-          </div>
         </div>
       </div>
 

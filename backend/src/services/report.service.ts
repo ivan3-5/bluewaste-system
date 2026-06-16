@@ -119,7 +119,7 @@ function extractDetectionLabels(payload: unknown): string[] {
 }
 
 export class ReportService {
-  private static readonly GEO_CACHE_TTL_MS = 20_000;
+  private static readonly GEO_CACHE_TTL_MS = 60_000;
   private static readonly SPAM_RETENTION_MS =
     env.SPAM_RETENTION_DAYS * 24 * 60 * 60 * 1000;
   private static readonly SPAM_PURGE_INTERVAL_MS = 60 * 60 * 1000;

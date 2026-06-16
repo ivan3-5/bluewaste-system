@@ -4,6 +4,7 @@ import MapView from "@/components/MapView";
 import { ReportStatusUpdater } from "@/components/ReportStatusUpdater";
 import AssignWorker from "@/components/AssignWorker";
 import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
+import { getReverseGeocodedLocation } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,14 @@ export default async function ReportDetailPage({ params }: PageProps) {
   const cleanupImages = report.images.filter(
     (image) => image.type === "CLEANUP",
   );
+
+  let displayLocationName = report.locationName;
+  if (displayLocationName.toLowerCase().startsWith("waste report")) {
+    const geocoded = await getReverseGeocodedLocation(report.latitude, report.longitude);
+    if (geocoded) {
+      displayLocationName = geocoded;
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -129,7 +138,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
                     confidence: report.confidence,
                     latitude: report.latitude,
                     longitude: report.longitude,
-                    locationName: report.locationName,
+                    locationName: displayLocationName,
                     description: report.description,
                     status: report.status,
                     reportedAt: report.reportedAt,
@@ -155,7 +164,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
                   Location Name
                 </dt>
                 <dd className="mt-1 text-lg font-semibold text-slate-900">
-                  {report.locationName}
+                  {displayLocationName}
                 </dd>
               </div>
               <div className="rounded-xl bg-slate-50 p-3">

@@ -31,6 +31,7 @@ const registerSchema = z
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
     phone: z.string().optional(),
+    address: z.string().min(1, "Address is required"),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -71,6 +72,7 @@ export default function RegisterPage() {
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
+        address: data.address,
       });
       router.push("/citizen/report");
     } catch (err: any) {
@@ -283,6 +285,35 @@ export default function RegisterPage() {
                       {...register("phone")}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="address"
+                    className="text-sm font-medium text-slate-700"
+                  >
+                    Address
+                  </Label>
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      id="address"
+                      type="text"
+                      autoComplete="street-address"
+                      placeholder="Your complete address"
+                      aria-invalid={Boolean(errors.address)}
+                      aria-describedby={
+                        errors.address ? "address-error" : undefined
+                      }
+                      className="h-11 rounded-xl border-slate-200 pl-10 focus-visible:border-primary focus-visible:ring-primary/30"
+                      {...register("address")}
+                    />
+                  </div>
+                  {errors.address && (
+                    <p id="address-error" className="text-xs text-red-600">
+                      {errors.address.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">

@@ -7,6 +7,9 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import "leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 // Barangay boundaries removed from map - no-op imports
 import {
   MapReport,
@@ -58,10 +61,9 @@ function createMarkerIcon(category: string, status: string) {
   const statusColor =
     (STATUS_COLORS as Record<string, string>)[status] || "#6b7280";
   const size = 15;
-  const isPending = status === "PENDING";
 
   return L.divIcon({
-    html: `<div class="waste-marker${isPending ? " waste-marker--pulse" : ""}" style="--mc:${color};width:${size + 8}px;height:${size + 8}px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><div style="width:${Math.max(4, Math.round(size * 0.38))}px;height:${Math.max(4, Math.round(size * 0.38))}px;background:${statusColor};border-radius:50%;border:1.5px solid rgba(255,255,255,0.8);"></div></div>`,
+    html: `<div class="waste-marker waste-marker--pulse" style="--mc:${color};width:${size + 8}px;height:${size + 8}px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><div style="width:${Math.max(4, Math.round(size * 0.38))}px;height:${Math.max(4, Math.round(size * 0.38))}px;background:${statusColor};border-radius:50%;border:1.5px solid rgba(255,255,255,0.8);"></div></div>`,
     className: "",
     iconSize: [size + 8, size + 8],
     iconAnchor: [(size + 8) / 2, (size + 8) / 2],
@@ -87,6 +89,7 @@ export default function WasteMap({
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  const markerClusterGroupRef = useRef<any>(null);
   const zoneLayersRef = useRef<L.Polygon[]>([]);
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null);
   const zoneDrawControlRef = useRef<any>(null);
@@ -269,22 +272,12 @@ export default function WasteMap({
 
     let combinedBounds: L.LatLngBounds | null = null;
 
-    // Build a flat list of coordinates from reports and active reporting zones,
-    // then compute bounds in one call to avoid Leaflet/TS inference issues.
+    // Build a flat list of coordinates from reports only, ignoring zones for bounds
     const allCoords: [number, number][] = [];
     if (reports.length > 0) {
       allCoords.push(
         ...reports.map((r) => [r.latitude, r.longitude] as [number, number]),
       );
-    }
-    if (reportingZones && reportingZones.length > 0) {
-      reportingZones
-        .filter((z) => z.isActive)
-        .forEach((zone) => {
-          allCoords.push(
-            ...zone.coordinates.map((p) => [p.lat, p.lng] as [number, number]),
-          );
-        });
     }
 
     if (allCoords.length > 0) {
@@ -413,27 +406,28 @@ export default function WasteMap({
     zoneLayersRef.current.forEach((l) => l.remove());
     zoneLayersRef.current = [];
 
-    reportingZones
-      .filter((z) => z.isActive)
-      .forEach((zone) => {
-        const latlngs = zone.coordinates.map(
-          (p) => [p.lat, p.lng] as [number, number],
-        );
-        const polygon = L.polygon(latlngs, {
-          color: "#2563eb",
-          weight: 2,
-          fillColor: "#3b82f6",
-          fillOpacity: 0.15,
-          dashArray: undefined,
-        });
-        polygon.bindTooltip(zone.name, {
-          permanent: false,
-          direction: "center",
-          className: "waste-marker-tooltip",
-        });
-        polygon.addTo(map);
-        zoneLayersRef.current.push(polygon);
-      });
+    // Hide reporting zones for now per requirements
+    // reportingZones
+    //   .filter((z) => z.isActive)
+    //   .forEach((zone) => {
+    //     const latlngs = zone.coordinates.map(
+    //       (p) => [p.lat, p.lng] as [number, number],
+    //     );
+    //     const polygon = L.polygon(latlngs, {
+    //       color: "#2563eb",
+    //       weight: 2,
+    //       fillColor: "#3b82f6",
+    //       fillOpacity: 0.15,
+    //       dashArray: undefined,
+    //     });
+    //     polygon.bindTooltip(zone.name, {
+    //       permanent: false,
+    //       direction: "center",
+    //       className: "waste-marker-tooltip",
+    //     });
+    //     polygon.addTo(map);
+    //     zoneLayersRef.current.push(polygon);
+    //   });
   }, [reportingZones]);
 
   useEffect(() => {
@@ -442,6 +436,16 @@ export default function WasteMap({
 
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
+
+    if (!markerClusterGroupRef.current) {
+      markerClusterGroupRef.current = L.layerGroup();
+      map.addLayer(markerClusterGroupRef.current);
+    }
+
+    const clusterGroup = markerClusterGroupRef.current;
+    clusterGroup.clearLayers();
+
+    const newMarkers: L.Marker[] = [];
 
     reports.forEach((report) => {
       const marker = L.marker([report.latitude, report.longitude], {
@@ -499,9 +503,11 @@ export default function WasteMap({
         marker.on("click", () => onReportClick(report));
       }
 
-      marker.addTo(map);
+      newMarkers.push(marker);
       markersRef.current.push(marker);
     });
+
+    newMarkers.forEach((m) => clusterGroup.addLayer(m));
   }, [reports, onReportClick]);
 
   useEffect(() => {

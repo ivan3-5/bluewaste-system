@@ -263,6 +263,7 @@ export function ScheduleForm({
               id="scheduledAt"
               type="datetime-local"
               required
+              min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
               value={formData.scheduledAt}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -451,7 +452,7 @@ export function ScheduleForm({
             </Button>
             <Button
               type="submit"
-              disabled={loading || formData.workerIds.length === 0}
+              disabled={loading || formData.workerIds.length === 0 || formData.reportIds.length === 0}
               className="rounded-xl h-11 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-indigo-500/20 text-white font-semibold transition-all"
             >
               {loading ? "Saving..." : "Save Schedule"}

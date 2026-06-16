@@ -10,6 +10,7 @@ export class AuthService {
     firstName: string;
     lastName: string;
     phone?: string;
+    address?: string;
   }) {
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
@@ -27,6 +28,7 @@ export class AuthService {
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
+        address: data.address || "",
         role: Role.CITIZEN,
       },
       select: {
@@ -37,6 +39,7 @@ export class AuthService {
         role: true,
         phone: true,
         avatarUrl: true,
+        address: true,
         createdAt: true,
       },
     });
