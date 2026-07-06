@@ -70,7 +70,7 @@ ALLOWED_ORIGINS="http://localhost:19006,http://127.0.0.1:19006"
 ```dotenv
 NEXT_PUBLIC_API_URL="http://localhost:5000/api"
 BACKEND_API_URL="http://localhost:5000/api"
-YOLO_API_URL="http://localhost:8000/predict"
+YOLO_API_URL="https://bluewaste-system.onrender.com/analyze"
 ```
 
 ### Mobile runtime config (Flutter)
@@ -133,7 +133,7 @@ pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-If you deploy YOLO to Render, set `YOLO_API_URL` to your deployed `/analyze` endpoint (e.g. `https://bluewaste-yolo-api.onrender.com/analyze`).
+If you deploy YOLO to Render, set `YOLO_API_URL` to your deployed `/analyze` endpoint (e.g. `https://bluewaste-system.onrender.com/analyze`).
 
 ## Useful Commands
 
