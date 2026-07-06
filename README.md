@@ -133,7 +133,7 @@ pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-If you deploy YOLO to Railway, set `YOLO_API_URL` to your deployed `/predict` endpoint.
+If you deploy YOLO to Render, set `YOLO_API_URL` to your deployed `/analyze` endpoint (e.g. `https://bluewaste-yolo-api.onrender.com/analyze`).
 
 ## Useful Commands
 
@@ -152,4 +152,4 @@ npm run db:studio
 ## Deployment Notes
 
 - `vercel.json` rewrites `/api/*` to the backend serverless function while Next.js handles frontend routes directly.
-- In production, set environment variables in your hosting provider (Vercel, Railway, etc.).
+- In production, set environment variables in your hosting provider (Vercel, Render, etc.).

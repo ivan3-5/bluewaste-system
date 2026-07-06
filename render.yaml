@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: bluewaste-yolo-api
+    env: python
+    rootDir: yolo-fastapi-sample
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: GOOGLE_CLOUD_API_KEY
+        sync: false
