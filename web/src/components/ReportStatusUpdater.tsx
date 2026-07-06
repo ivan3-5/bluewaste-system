@@ -16,6 +16,15 @@ const STATUS_FLOW: Record<AdminReportStatus, AdminReportStatus[]> = {
   REJECTED: [],
 };
 
+const STATUS_SELECT_STYLES: Record<AdminReportStatus, string> = {
+  PENDING: "border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-500",
+  VERIFIED: "border-blue-200 bg-blue-50 text-blue-700 focus:ring-blue-500",
+  CLEANUP_SCHEDULED: "border-violet-200 bg-violet-50 text-violet-700 focus:ring-violet-500",
+  IN_PROGRESS: "border-orange-200 bg-orange-50 text-orange-700 focus:ring-orange-500",
+  CLEANED: "border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-500",
+  REJECTED: "border-rose-200 bg-rose-50 text-rose-700 focus:ring-rose-500",
+};
+
 export function ReportStatusUpdater({
   reportId,
   initialStatus,
@@ -84,13 +93,14 @@ export function ReportStatusUpdater({
             void saveStatus(nextStatus);
           }}
           disabled={isFinalStatus}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+          className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${STATUS_SELECT_STYLES[status]}`}
         >
           {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(([value, label]) => (
             <option
               key={value}
               value={value}
               disabled={!allowedStatuses.includes(value as AdminReportStatus)}
+              className="bg-white text-slate-900 font-normal"
             >
               {label}
             </option>

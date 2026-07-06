@@ -19,6 +19,7 @@ export interface AdminReport {
   reporterEmail?: string | null;
   assignedToId?: string | null;
   assignedToName?: string | null;
+  assignedWorkerNames?: string | null;
   reportedAt: string | Date;
   updatedAt: string | Date;
 }

@@ -610,6 +610,45 @@ export class ReportService {
         reportId,
         NotificationType.STATUS_CHANGE,
       );
+
+      // Auto-complete the linked CleanupSchedule if ALL its reports are now CLEANED
+      if (report.cleanupScheduleId) {
+        const scheduleId = report.cleanupScheduleId;
+
+        const [totalLinked, cleanedLinked] = await Promise.all([
+          prisma.report.count({
+            where: { cleanupScheduleId: scheduleId, isDeleted: false },
+          }),
+          prisma.report.count({
+            where: {
+              cleanupScheduleId: scheduleId,
+              isDeleted: false,
+              status: ReportStatus.CLEANED,
+            },
+          }),
+        ]);
+
+        if (totalLinked > 0 && cleanedLinked === totalLinked) {
+          // All reports cleaned — mark the schedule as COMPLETED
+          await prisma.cleanupSchedule.update({
+            where: { id: scheduleId },
+            data: {
+              status: "COMPLETED",
+              verifiedAt: new Date(),
+              verifiedBy: { connect: { id: changedById } },
+            },
+          });
+
+          await prisma.statusHistory.create({
+            data: {
+              reportId,
+              newStatus: ReportStatus.CLEANED,
+              notes: `Cleanup Schedule auto-completed: all linked reports marked as cleaned.`,
+              changedById,
+            },
+          });
+        }
+      }
     }
 
     this.invalidateGeoCaches();

@@ -22,7 +22,8 @@ export default function WorkerSchedulesPage() {
       const res = await api.get("/schedules/my-schedules?limit=100");
       return res.data.data as CleanupSchedule[];
     },
-    refetchInterval: 15000,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
 
   const updateStatusMutation = useMutation({

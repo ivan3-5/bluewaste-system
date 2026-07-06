@@ -5,11 +5,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { StatusBadge } from "@/components/StatusBadge";
 import {
   CleanupSchedule,
   SCHEDULE_STATUS_COLORS,
   SCHEDULE_STATUS_LABELS,
   CleanupScheduleStatus,
+  Report,
 } from "@/types";
 import { format } from "date-fns";
 import {
@@ -22,14 +24,19 @@ import {
   CheckCircle2,
   FileText,
   Wrench,
+  Link2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
 
 interface ScheduleDetailProps {
   schedule: CleanupSchedule | null;
   isOpen: boolean;
   onClose: () => void;
   onEdit: (schedule: CleanupSchedule) => void;
+  onRefresh?: (schedule: CleanupSchedule) => void;
   onDelete: (id: string) => Promise<void>;
   onVerify: (id: string, notes?: string) => Promise<void>;
   onWorkerUpdateStatus?: (
@@ -45,13 +52,17 @@ export function ScheduleDetail({
   isOpen,
   onClose,
   onEdit,
+  onRefresh,
   onDelete,
   onVerify,
   onWorkerUpdateStatus,
   isAdmin,
 }: ScheduleDetailProps) {
+  const queryClient = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isLinkingReports, setIsLinkingReports] = useState(false);
+  const [linkDraftIds, setLinkDraftIds] = useState<string[]>([]);
 
   if (!schedule) return null;
 
@@ -86,6 +97,64 @@ export function ScheduleDetail({
       await onWorkerUpdateStatus(schedule.id, status, notes);
       onClose();
     }
+  };
+
+  // --- Link Reports inline ---
+  const { data: eligibleReports = [], isFetching: fetchingReports } = useQuery({
+    queryKey: ["reports", "eligible-for-schedule"],
+    queryFn: async () => {
+      const [verified, scheduled] = await Promise.all([
+        api.get("/reports?status=VERIFIED&limit=100"),
+        api.get("/reports?status=CLEANUP_SCHEDULED&limit=100"),
+      ]);
+      const combined = [
+        ...(verified.data.data as Report[]),
+        ...(scheduled.data.data as Report[]),
+      ];
+      return combined.filter((r, i, arr) => arr.findIndex((x) => x.id === r.id) === i);
+    },
+    enabled: isLinkingReports,
+  });
+
+  const linkReportsMutation = useMutation({
+    mutationFn: async (reportIds: string[]) => {
+      // Build the full merged list (existing + newly linked)
+      const existingIds = (schedule.reports ?? []).map((r: any) => r.id);
+      const mergedIds = Array.from(new Set([...existingIds, ...reportIds]));
+      const res = await api.put(`/schedules/${schedule.id}`, {
+        reportIds: mergedIds,
+        // Keep existing workers and other fields intact
+        workerIds: schedule.workers.map((w) => w.workerId),
+        title: schedule.title,
+        description: schedule.description,
+        barangay: schedule.barangay,
+        latitude: schedule.latitude,
+        longitude: schedule.longitude,
+        scheduledAt: schedule.scheduledAt,
+        equipment: schedule.equipment,
+        status: schedule.status,
+      });
+      return res.data as CleanupSchedule;
+    },
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["schedules"] });
+      queryClient.invalidateQueries({ queryKey: ["reports", "eligible-for-schedule"] });
+      setIsLinkingReports(false);
+      setLinkDraftIds([]);
+      // Refresh the detail modal with the latest data via dedicated callback
+      onRefresh?.(updated);
+    },
+  });
+
+  const openLinkPanel = () => {
+    setLinkDraftIds((schedule.reports ?? []).map((r: any) => r.id));
+    setIsLinkingReports(true);
+  };
+
+  const toggleLinkDraft = (id: string) => {
+    setLinkDraftIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   return (
@@ -210,7 +279,63 @@ export function ScheduleDetail({
           <div>
             <h4 className="flex items-center gap-2 font-semibold text-gray-900 mb-3">
               <FileText className="w-5 h-5" /> Linked Waste Reports
+              {isAdmin && !isLinkingReports && (
+                <button
+                  onClick={openLinkPanel}
+                  className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-100"
+                >
+                  <Link2 className="w-3.5 h-3.5" /> Link Reports
+                </button>
+              )}
             </h4>
+
+            {/* Inline link-reports panel */}
+            {isLinkingReports && (
+              <div className="mb-4 border border-indigo-100 rounded-2xl bg-indigo-50/40 p-4 space-y-3">
+                <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Select reports to link</p>
+                {fetchingReports ? (
+                  <p className="text-sm text-gray-400 animate-pulse">Loading reports…</p>
+                ) : eligibleReports.length === 0 ? (
+                  <p className="text-sm text-gray-500">No eligible reports found (VERIFIED or CLEANUP SCHEDULED).</p>
+                ) : (
+                  <div className="max-h-52 overflow-y-auto space-y-1.5">
+                    {eligibleReports.map((r) => (
+                      <label key={r.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={linkDraftIds.includes(r.id)}
+                          onChange={() => toggleLinkDraft(r.id)}
+                          className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{r.title}</p>
+                          <p className="text-xs text-gray-500 truncate">{r.address || "No address"} · {r.status}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    onClick={() => linkReportsMutation.mutate(linkDraftIds)}
+                    disabled={linkReportsMutation.isPending}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs h-9 px-4"
+                  >
+                    {linkReportsMutation.isPending ? "Saving…" : "Save Links"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setIsLinkingReports(false); setLinkDraftIds([]); }}
+                    className="rounded-xl border-gray-200 text-xs h-9 px-4"
+                  >
+                    <X className="w-3 h-3 mr-1" /> Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {!schedule.reports || schedule.reports.length === 0 ? (
                 <p className="text-sm text-gray-500">No linked reports.</p>
@@ -223,12 +348,12 @@ export function ScheduleDetail({
                     <p className="text-sm font-semibold text-gray-900 line-clamp-1">
                       {r.title}
                     </p>
-                    <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
+                    <p className="text-xs text-gray-500 line-clamp-1 mt-0.5 mb-2">
                       {r.address || "No address"}
                     </p>
-                    <p className="text-xs font-semibold text-blue-600 mt-1">
-                      {r.status}
-                    </p>
+                    <div className="mt-auto">
+                      <StatusBadge status={r.status} />
+                    </div>
                   </div>
                 ))
               )}

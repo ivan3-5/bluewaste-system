@@ -4,6 +4,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
+import "../../auth/presentation/auth_controller.dart";
 import "../../notifications/presentation/notification_providers.dart";
 import "../../notifications/presentation/notifications_screen.dart";
 import "../../profile/presentation/profile_screen.dart";
@@ -75,6 +76,17 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
   @override
   Widget build(BuildContext context) {
     final unreadCount = ref.watch(unreadCountProvider).value ?? 0;
+    final user = ref.watch(authControllerProvider).user;
+    final avatarUrl = (user?.avatarUrl ?? "").trim();
+    final hasAvatar = avatarUrl.isNotEmpty;
+    ImageProvider<Object>? profileImage;
+    if (hasAvatar) {
+      profileImage = NetworkImage(avatarUrl);
+    }
+    final firstName = (user?.firstName ?? "").trim();
+    final initials =
+        firstName.isEmpty ? "U" : firstName.substring(0, 1).toUpperCase();
+
     final pages = <Widget>[
       WorkerHomeScreen(
         onSelectTab: (tab) => setState(() => _index = tab),
@@ -85,7 +97,7 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
       const NotificationsScreen(),
     ];
 
-    const titles = <String>["Home", "Tasks", "Map", "Schedules", "Alerts"];
+    const titles = <String>["Home", "Tasks", "Map", "Schedule", "Alerts"];
 
     return Scaffold(
       appBar: AppBar(
@@ -107,13 +119,39 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              style: IconButton.styleFrom(
-                backgroundColor: AppColors.secondary,
+            padding: const EdgeInsets.only(right: 16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: _openProfile,
+              child: Hero(
+                tag: "profile_avatar",
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      width: 2,
+                    ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor:
+                        AppColors.tint(AppColors.primary, opacity: 0.1),
+                    foregroundImage: profileImage,
+                    child: profileImage == null
+                        ? Text(
+                            initials,
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
               ),
-              onPressed: _openProfile,
-              icon: const Icon(Icons.person_outline),
             ),
           ),
         ],
@@ -175,7 +213,7 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
                 const NavigationDestination(
                   icon: Icon(Icons.calendar_month_outlined),
                   selectedIcon: Icon(Icons.calendar_month),
-                  label: "Schedules",
+                  label: "Schedule",
                 ),
                 NavigationDestination(
                   icon: _buildBadgeIcon(

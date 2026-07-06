@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { useUnreadCount } from "@/hooks/useNotifications";
 import { FieldWorkerLayoutSkeleton } from "@/components/skeletons/page-skeletons";
+import { LiveNotificationProvider } from "@/contexts/LiveNotificationContext";
+import { LiveNotificationPanel } from "@/components/LiveNotificationPanel";
 
 const navLinks = [
   { href: "/field-worker", label: "Dashboard", icon: LayoutDashboard },
@@ -59,13 +61,14 @@ export default function FieldWorkerLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sidebar */}
-      <aside
-        className={`hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 border-r border-white/70 bg-white/65 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:30px_30px] shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all duration-300 ease-in-out z-40 ${
-          isCollapsed ? "md:w-20" : "md:w-64"
-        }`}
-      >
+    <LiveNotificationProvider>
+      <div className="min-h-screen bg-gray-50">
+        {/* Sidebar */}
+        <aside
+          className={`hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 border-r border-white/70 bg-white/65 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:30px_30px] shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all duration-300 ease-in-out z-40 ${
+            isCollapsed ? "md:w-20" : "md:w-64"
+          }`}
+        >
         <div
           className={`flex items-center border-b border-white/70 ${
             isCollapsed
@@ -346,5 +349,7 @@ export default function FieldWorkerLayout({
         <main className="p-4 md:p-6">{children}</main>
       </div>
     </div>
+    <LiveNotificationPanel />
+  </LiveNotificationProvider>
   );
 }

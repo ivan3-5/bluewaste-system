@@ -37,7 +37,8 @@ export default function SchedulesPage() {
       const res = await api.get("/schedules?limit=1000"); // fetch all for calendar/map
       return res.data.data as CleanupSchedule[];
     },
-    refetchInterval: 15000,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
 
   const { data: workers = [] } = useQuery({
@@ -59,11 +60,16 @@ export default function SchedulesPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      await api.put(`/schedules/${id}`, data);
+      const res = await api.put(`/schedules/${id}`, data);
+      return res.data as CleanupSchedule;
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["schedules"] });
-      setIsDetailOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["reports", "eligible-for-schedule"] });
+      // Refresh the detail modal with the latest data
+      setSelectedSchedule(updated);
+      setIsDetailOpen(true);
+      setIsFormOpen(false);
     },
   });
 
@@ -86,7 +92,7 @@ export default function SchedulesPage() {
   });
 
   const handleFormSubmit = async (data: any) => {
-    if (editingSchedule) {
+    if (editingSchedule?.id) {
       await updateMutation.mutateAsync({ id: editingSchedule.id, data });
     } else {
       await createMutation.mutateAsync(data);
@@ -97,6 +103,11 @@ export default function SchedulesPage() {
     setEditingSchedule(schedule);
     setIsFormOpen(true);
     setIsDetailOpen(false);
+  };
+
+  const handleRefresh = (schedule: CleanupSchedule) => {
+    setSelectedSchedule(schedule);
+    setIsDetailOpen(true);
   };
 
   const stats = useMemo(() => {
@@ -281,6 +292,7 @@ export default function SchedulesPage() {
           onClose={() => setIsDetailOpen(false)}
           schedule={selectedSchedule}
           onEdit={handleEdit}
+          onRefresh={handleRefresh}
           onDelete={async (id) => {
             await deleteMutation.mutateAsync(id);
           }}

@@ -35,6 +35,7 @@ type DashboardReportRow = {
   reporterEmail?: string | null;
   assignedToId?: string | null;
   assignedToName?: string | null;
+  assignedWorkerNames?: string | null;
 };
 
 type DashboardStatsRow = {
@@ -110,6 +111,7 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
     reporterEmail: row.reporterEmail ?? null,
     assignedToId: row.assignedToId ?? null,
     assignedToName: row.assignedToName ?? null,
+    assignedWorkerNames: row.assignedWorkerNames ?? null,
     reportedAt: row.reportedAt,
     updatedAt: row.updatedAt,
   };
@@ -136,7 +138,8 @@ export async function getDashboardReports(limit: number) {
       COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous') AS "reporterName",
       rep.email AS "reporterEmail",
       r."assignedToId",
-      COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName"
+      COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
+      schedule_workers."assignedWorkerNames"
     FROM "Report" r
     LEFT JOIN "User" rep ON rep.id = r."reporterId"
     LEFT JOIN "User" u ON u.id = r."assignedToId"
@@ -161,6 +164,17 @@ export async function getDashboardReports(limit: number) {
       FROM "ReportImage" ri
       WHERE ri."reportId" = r.id
     ) images ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT string_agg(
+        sw."firstName" || ' ' || sw."lastName",
+        ', '
+        ORDER BY csw."assignedAt" ASC
+      ) AS "assignedWorkerNames"
+      FROM "CleanupSchedule" cs
+      JOIN "CleanupScheduleWorker" csw ON csw."scheduleId" = cs.id
+      JOIN "User" sw ON sw.id = csw."workerId"
+      WHERE cs.id = r."cleanupScheduleId"
+    ) schedule_workers ON TRUE
     WHERE r."isDeleted" = false
       AND r."isSpam" = false
     ORDER BY r."createdAt" DESC
@@ -191,7 +205,8 @@ export async function getDashboardReportById(id: string) {
       COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous') AS "reporterName",
       rep.email AS "reporterEmail",
       r."assignedToId",
-      COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName"
+      COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
+      schedule_workers."assignedWorkerNames"
     FROM "Report" r
     LEFT JOIN "User" rep ON rep.id = r."reporterId"
     LEFT JOIN "User" u ON u.id = r."assignedToId"
@@ -216,6 +231,17 @@ export async function getDashboardReportById(id: string) {
       FROM "ReportImage" ri
       WHERE ri."reportId" = r.id
     ) images ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT string_agg(
+        sw."firstName" || ' ' || sw."lastName",
+        ', '
+        ORDER BY csw."assignedAt" ASC
+      ) AS "assignedWorkerNames"
+      FROM "CleanupSchedule" cs
+      JOIN "CleanupScheduleWorker" csw ON csw."scheduleId" = cs.id
+      JOIN "User" sw ON sw.id = csw."workerId"
+      WHERE cs.id = r."cleanupScheduleId"
+    ) schedule_workers ON TRUE
     WHERE r.id = ${id}
     LIMIT 1
   `;
@@ -304,11 +330,11 @@ export async function updateDashboardReportStatus(
   id: string,
   status: AdminReport["status"],
 ) {
-  // Read reporter id and title first (avoid Prisma model mismatches)
+  // Read reporter id, title, and cleanupScheduleId first (avoid Prisma model mismatches)
   const rows = await prisma.$queryRaw<
-    { reporterId: string | null; title: string }[]
+    { reporterId: string | null; title: string; cleanupScheduleId: string | null }[]
   >`
-    SELECT r."reporterId", r.title
+    SELECT r."reporterId", r.title, r."cleanupScheduleId"
     FROM "Report" r
     WHERE r.id = ${id}
     LIMIT 1
@@ -316,6 +342,7 @@ export async function updateDashboardReportStatus(
 
   const reporterId = rows?.[0]?.reporterId ?? null;
   const title = rows?.[0]?.title ?? "";
+  const cleanupScheduleId = rows?.[0]?.cleanupScheduleId ?? null;
 
   // Update status (cast to DB enum)
   await prisma.$executeRaw`
@@ -342,5 +369,33 @@ export async function updateDashboardReportStatus(
     `;
   }
 
+  // Auto-complete the linked CleanupSchedule if ALL its reports are now CLEANED
+  if (status === "CLEANED" && cleanupScheduleId) {
+    const totals = await prisma.$queryRaw<
+      { total: bigint; cleaned: bigint }[]
+    >`
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE status = 'CLEANED') AS cleaned
+      FROM "Report"
+      WHERE "cleanupScheduleId" = ${cleanupScheduleId}
+        AND "isDeleted" = false
+    `;
+
+    const total = Number(totals?.[0]?.total ?? 0);
+    const cleaned = Number(totals?.[0]?.cleaned ?? 0);
+
+    if (total > 0 && cleaned === total) {
+      await prisma.$executeRaw`
+        UPDATE "CleanupSchedule"
+        SET status = 'COMPLETED'::"CleanupScheduleStatus",
+            "verifiedAt" = NOW()
+        WHERE id = ${cleanupScheduleId}
+          AND status != 'COMPLETED'
+      `;
+    }
+  }
+
   return getDashboardReportById(id);
 }
+

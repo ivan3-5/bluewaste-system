@@ -6,6 +6,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "auth_controller.dart";
+import "widgets/auth_components.dart";
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -55,7 +56,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text("Please complete required fields."),
+          content: const Text("Please fill in all required fields."),
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -94,16 +95,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     setState(() => _isSubmitting = true);
     try {
       await ref.read(authControllerProvider.notifier).register(
-            email: email,
-            password: password,
             firstName: firstName,
             lastName: lastName,
-            phone: phone.isEmpty ? null : phone,
+            email: email,
+            phone: phone,
             address: address,
+            password: password,
           );
-
       if (mounted) {
         Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Registration successful! Please log in."),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: AppColors.success,
+          ),
+        );
       }
     } catch (error) {
       if (!mounted) {
@@ -125,118 +134,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String labelText,
-    required IconData prefixIcon,
-    bool obscureText = false,
-    TextInputType? keyboardType,
-    TextInputAction? textInputAction,
-    Widget? suffixIcon,
-    ValueChanged<String>? onSubmitted,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.background.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5), width: 1),
-      ),
-      child: TextField(
-        controller: controller,
-        obscureText: obscureText,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
-        onSubmitted: onSubmitted,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: AppColors.foreground.withValues(alpha: 0.9),
-          letterSpacing: 0.3,
-        ),
-        decoration: InputDecoration(
-          labelText: labelText,
-          labelStyle: TextStyle(
-            color: AppColors.mutedForeground.withValues(alpha: 0.8),
-            fontWeight: FontWeight.w500,
-          ),
-          prefixIcon:
-              Icon(prefixIcon, color: AppColors.primary.withValues(alpha: 0.8)),
-          suffixIcon: suffixIcon,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      body: Stack(
-        children: [
-          // Premium Background Gradient
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Color(0xFFE0F2FE), // Very light blue
-                    Color(0xFFF8FAFC), // Slate 50
-                    Color(0xFFFFFFFF), // White
-                  ],
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                ),
-              ),
-            ),
-          ),
-          // Decorative blurry circles
-          Positioned(
-            top: -50,
-            left: -50,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.info.withValues(alpha: 0.15),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -100,
-            right: -100,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.1),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-              child: const SizedBox(),
-            ),
-          ),
-          // Form content
-          SafeArea(
-            child: Stack(
-              children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 460),
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: AppSpacing.md),
-                          Hero(
+      body: AnimatedGradientBackground(
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: AppSpacing.md),
+                        FadeInSlide(
+                          duration: const Duration(milliseconds: 700),
+                          child: Hero(
                             tag: 'app_logo',
                             child: Container(
                               alignment: Alignment.center,
@@ -247,15 +165,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   color: AppColors.card,
                                   boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          AppColors.primary.withValues(alpha: 0.15),
+                                      color: AppColors.primary
+                                          .withValues(alpha: 0.15),
                                       blurRadius: 30,
                                       offset: const Offset(0, 15),
                                     ),
                                   ],
                                   border: Border.all(
-                                    color:
-                                        AppColors.background.withValues(alpha: 0.5),
+                                    color: AppColors.background
+                                        .withValues(alpha: 0.5),
                                     width: 2,
                                   ),
                                 ),
@@ -267,9 +185,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.xl),
-                          // Glassmorphism Card
-                          ClipRRect(
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        // Glassmorphism Card
+                        FadeInSlide(
+                          delay: const Duration(milliseconds: 200),
+                          child: ClipRRect(
                             borderRadius: BorderRadius.circular(32),
                             child: BackdropFilter(
                               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -278,8 +199,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   color: AppColors.card.withValues(alpha: 0.7),
                                   borderRadius: BorderRadius.circular(32),
                                   border: Border.all(
-                                    color:
-                                        AppColors.background.withValues(alpha: 0.5),
+                                    color: AppColors.background
+                                        .withValues(alpha: 0.5),
                                     width: 1.5,
                                   ),
                                   boxShadow: [
@@ -324,177 +245,178 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     Row(
                                       children: [
                                         Expanded(
-                                          child: _buildTextField(
-                                            controller: _firstNameController,
-                                            labelText: "First Name",
-                                            prefixIcon: Icons.person_rounded,
-                                            textInputAction:
-                                                TextInputAction.next,
+                                          child: FadeInSlide(
+                                            delay: const Duration(
+                                                milliseconds: 300),
+                                            child: PremiumTextField(
+                                              controller: _firstNameController,
+                                              labelText: "First Name",
+                                              prefixIcon: Icons.person_rounded,
+                                              textInputAction:
+                                                  TextInputAction.next,
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(width: AppSpacing.sm),
                                         Expanded(
-                                          child: _buildTextField(
-                                            controller: _lastNameController,
-                                            labelText: "Last Name",
-                                            prefixIcon: Icons.badge_rounded,
-                                            textInputAction:
-                                                TextInputAction.next,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: AppSpacing.md),
-                                    _buildTextField(
-                                      controller: _emailController,
-                                      labelText: "Email address",
-                                      prefixIcon: Icons.email_rounded,
-                                      keyboardType: TextInputType.emailAddress,
-                                      textInputAction: TextInputAction.next,
-                                    ),
-                                    const SizedBox(height: AppSpacing.md),
-                                    _buildTextField(
-                                      controller: _phoneController,
-                                      labelText: "Phone (optional)",
-                                      prefixIcon: Icons.phone_rounded,
-                                      keyboardType: TextInputType.phone,
-                                      textInputAction: TextInputAction.next,
-                                    ),
-                                    const SizedBox(height: AppSpacing.md),
-                                    _buildTextField(
-                                      controller: _addressController,
-                                      labelText: "Address",
-                                      prefixIcon: Icons.location_on_rounded,
-                                      keyboardType: TextInputType.streetAddress,
-                                      textInputAction: TextInputAction.next,
-                                    ),
-                                    const SizedBox(height: AppSpacing.md),
-                                    _buildTextField(
-                                      controller: _passwordController,
-                                      labelText: "Password",
-                                      prefixIcon: Icons.lock_rounded,
-                                      obscureText: _obscurePassword,
-                                      textInputAction: TextInputAction.next,
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _obscurePassword
-                                              ? Icons.visibility_off_rounded
-                                              : Icons.visibility_rounded,
-                                          color: AppColors.mutedForeground,
-                                        ),
-                                        onPressed: () => setState(() =>
-                                            _obscurePassword =
-                                                !_obscurePassword),
-                                      ),
-                                    ),
-                                    const SizedBox(height: AppSpacing.md),
-                                    _buildTextField(
-                                      controller: _confirmPasswordController,
-                                      labelText: "Confirm Password",
-                                      prefixIcon: Icons.verified_user_rounded,
-                                      obscureText: _obscureConfirmPassword,
-                                      onSubmitted: (_) => _handleRegister(),
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _obscureConfirmPassword
-                                              ? Icons.visibility_off_rounded
-                                              : Icons.visibility_rounded,
-                                          color: AppColors.mutedForeground,
-                                        ),
-                                        onPressed: () => setState(() =>
-                                            _obscureConfirmPassword =
-                                                !_obscureConfirmPassword),
-                                      ),
-                                    ),
-                                    const SizedBox(height: AppSpacing.xl),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: AppColors.primary
-                                                .withValues(alpha: 0.3),
-                                            blurRadius: 16,
-                                            offset: const Offset(0, 8),
-                                          ),
-                                        ],
-                                      ),
-                                      child: FilledButton(
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 18),
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(16)),
-                                          elevation: 0,
-                                        ),
-                                        onPressed: _isSubmitting
-                                            ? null
-                                            : _handleRegister,
-                                        child: _isSubmitting
-                                            ? const SizedBox(
-                                                height: 24,
-                                                width: 24,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                        strokeWidth: 2.5,
-                                                        color: Colors.white))
-                                            : const Text("Create Account",
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                  letterSpacing: 0.5,
-                                                )),
-                                      ),
-                                    ),
-                                    const SizedBox(height: AppSpacing.xxl),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          "Already have an account?",
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodyMedium
-                                              ?.copyWith(
-                                                color:
-                                                    AppColors.mutedForeground,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                        ),
-                                        const SizedBox(width: AppSpacing.xs),
-                                        InkWell(
-                                          splashColor: Colors.transparent,
-                                          highlightColor: Colors.transparent,
-                                          onTap: _isSubmitting
-                                              ? null
-                                              : () {
-                                                  Navigator.of(context).pop();
-                                                },
-                                          child: const Text(
-                                            "Sign in",
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                              color: AppColors.primary,
+                                          child: FadeInSlide(
+                                            delay: const Duration(
+                                                milliseconds: 350),
+                                            child: PremiumTextField(
+                                              controller: _lastNameController,
+                                              labelText: "Last Name",
+                                              prefixIcon: Icons.badge_rounded,
+                                              textInputAction:
+                                                  TextInputAction.next,
                                             ),
                                           ),
                                         ),
                                       ],
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    FadeInSlide(
+                                      delay: const Duration(milliseconds: 400),
+                                      child: PremiumTextField(
+                                        controller: _emailController,
+                                        labelText: "Email address",
+                                        prefixIcon: Icons.email_rounded,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        textInputAction: TextInputAction.next,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    FadeInSlide(
+                                      delay: const Duration(milliseconds: 450),
+                                      child: PremiumTextField(
+                                        controller: _phoneController,
+                                        labelText: "Phone (optional)",
+                                        prefixIcon: Icons.phone_rounded,
+                                        keyboardType: TextInputType.phone,
+                                        textInputAction: TextInputAction.next,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    FadeInSlide(
+                                      delay: const Duration(milliseconds: 500),
+                                      child: PremiumTextField(
+                                        controller: _addressController,
+                                        labelText: "Address",
+                                        prefixIcon: Icons.location_on_rounded,
+                                        keyboardType: TextInputType.streetAddress,
+                                        textInputAction: TextInputAction.next,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    FadeInSlide(
+                                      delay: const Duration(milliseconds: 550),
+                                      child: PremiumTextField(
+                                        controller: _passwordController,
+                                        labelText: "Password",
+                                        prefixIcon: Icons.lock_rounded,
+                                        obscureText: _obscurePassword,
+                                        textInputAction: TextInputAction.next,
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _obscurePassword
+                                                ? Icons.visibility_off_rounded
+                                                : Icons.visibility_rounded,
+                                            color: AppColors.mutedForeground,
+                                          ),
+                                          onPressed: () => setState(() =>
+                                              _obscurePassword =
+                                                  !_obscurePassword),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    FadeInSlide(
+                                      delay: const Duration(milliseconds: 600),
+                                      child: PremiumTextField(
+                                        controller: _confirmPasswordController,
+                                        labelText: "Confirm Password",
+                                        prefixIcon:
+                                            Icons.verified_user_rounded,
+                                        obscureText: _obscureConfirmPassword,
+                                        onSubmitted: (_) => _handleRegister(),
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _obscureConfirmPassword
+                                                ? Icons.visibility_off_rounded
+                                                : Icons.visibility_rounded,
+                                            color: AppColors.mutedForeground,
+                                          ),
+                                          onPressed: () => setState(() =>
+                                              _obscureConfirmPassword =
+                                                  !_obscureConfirmPassword),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.xl),
+                                    FadeInSlide(
+                                      delay: const Duration(milliseconds: 700),
+                                      child: PremiumButton(
+                                        onPressed: _isSubmitting
+                                            ? null
+                                            : _handleRegister,
+                                        isLoading: _isSubmitting,
+                                        text: "Create Account",
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.xxl),
+                                    FadeInSlide(
+                                      delay: const Duration(milliseconds: 800),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            "Already have an account?",
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                                  color:
+                                                      AppColors.mutedForeground,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                          ),
+                                          const SizedBox(width: AppSpacing.xs),
+                                          InkWell(
+                                            splashColor: Colors.transparent,
+                                            highlightColor: Colors.transparent,
+                                            onTap: _isSubmitting
+                                                ? null
+                                                : () {
+                                                    Navigator.of(context).pop();
+                                                  },
+                                            child: const Text(
+                                              "Sign in",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                Positioned(
-                  top: 16,
-                  left: 16,
+              ),
+              Positioned(
+                top: 16,
+                left: 16,
+                child: FadeInSlide(
+                  delay: const Duration(milliseconds: 900),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: BackdropFilter(
@@ -519,10 +441,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

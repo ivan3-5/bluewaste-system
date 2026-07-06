@@ -199,6 +199,37 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
                   const SizedBox(height: AppSpacing.xs),
                   Text(task.description,
                       maxLines: 3, overflow: TextOverflow.ellipsis),
+                  if (task.images.where((i) => i.type == "REPORT").isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    SizedBox(
+                      height: 80,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: task.images.where((i) => i.type == "REPORT").length,
+                        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+                        itemBuilder: (context, index) {
+                          final image = task.images
+                              .where((i) => i.type == "REPORT")
+                              .elementAt(index);
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(AppSpacing.xs),
+                            child: Image.network(
+                              image.imageUrl,
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                width: 80,
+                                height: 80,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.broken_image, color: Colors.grey),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.sm),
                   Wrap(
                     spacing: AppSpacing.xs,
@@ -262,6 +293,37 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
                                 : AppColors.success,
                           ),
                     ),
+                    if (cleanupCount > 0) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      SizedBox(
+                        height: 80,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: cleanupCount,
+                          separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+                          itemBuilder: (context, index) {
+                            final image = task.images
+                                .where((i) => i.type == "CLEANUP")
+                                .elementAt(index);
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(AppSpacing.xs),
+                              child: Image.network(
+                                image.imageUrl,
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  width: 80,
+                                  height: 80,
+                                  color: Colors.grey[200],
+                                  child: const Icon(Icons.broken_image, color: Colors.grey),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                     if (needsCleanupPhoto) ...[
                       const SizedBox(height: AppSpacing.xs),
                       Text(

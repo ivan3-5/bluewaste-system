@@ -15,6 +15,7 @@ export const createScheduleSchema = z.object({
   workerIds: z
     .array(z.string().uuid("Each worker ID must be a valid UUID"))
     .min(1, "At least one worker must be assigned"),
+  reportIds: z.array(z.string().uuid()).optional(),
   equipment: z.array(z.string()).optional(),
 });
 
@@ -34,6 +35,7 @@ export const updateScheduleSchema = z.object({
     .array(z.string().uuid("Each worker ID must be a valid UUID"))
     .min(1, "At least one worker must be assigned")
     .optional(),
+  reportIds: z.array(z.string().uuid()).optional(),
   status: z
     .enum(["UPCOMING", "ONGOING", "COMPLETED", "CANCELLED"])
     .optional(),

@@ -65,7 +65,7 @@ export default function MyReportsPage() {
       {/* ── Lightbox modal ── */}
       {lightbox && (
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={closeLightbox}
         >
           {/* Panel — stop propagation so clicks inside don't close */}
@@ -155,7 +155,7 @@ export default function MyReportsPage() {
       )}
 
       <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-blue-700 via-blue-500 to-emerald-500 bg-clip-text text-transparent drop-shadow-sm">
+        <h1 className="text-3xl font-extrabold tracking-tight text-black">
           My Reports
         </h1>
         <Link href="/citizen/report">

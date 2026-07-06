@@ -11,23 +11,28 @@ import {
   AdminOverviewSkeleton,
   DashboardLayoutSkeleton,
 } from "@/components/skeletons/page-skeletons";
+import { LiveNotificationProvider } from "@/contexts/LiveNotificationContext";
+import { LiveNotificationPanel } from "@/components/LiveNotificationPanel";
 
 function DashboardContent({ children }: { children: ReactNode }) {
   const { isCollapsed } = useSidebar();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      <div
-        className={cn(
-          "transition-all duration-300 ease-in-out",
-          isCollapsed ? "md:pl-20" : "md:pl-64",
-        )}
-      >
-        <Header />
-        <main className="p-4 md:p-6">{children}</main>
+    <LiveNotificationProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Sidebar />
+        <div
+          className={cn(
+            "transition-all duration-300 ease-in-out",
+            isCollapsed ? "md:pl-20" : "md:pl-64",
+          )}
+        >
+          <Header />
+          <main className="p-4 md:p-6">{children}</main>
+        </div>
       </div>
-    </div>
+      <LiveNotificationPanel />
+    </LiveNotificationProvider>
   );
 }
 

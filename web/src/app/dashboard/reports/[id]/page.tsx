@@ -2,7 +2,7 @@ import { getDashboardReportById } from "@/lib/dashboard-reports";
 import { StatusBadge } from "@/components/StatusBadge";
 import MapView from "@/components/MapView";
 import { ReportStatusUpdater } from "@/components/ReportStatusUpdater";
-import AssignWorker from "@/components/AssignWorker";
+import Link from "next/link";
 import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
 import { getReverseGeocodedLocation } from "@/lib/utils";
 
@@ -212,12 +212,17 @@ export default async function ReportDetailPage({ params }: PageProps) {
                 reportId={report.id}
                 initialStatus={report.status}
               />
-              <AssignWorker
-                reportId={report.id}
-                initialAssignedToId={report.assignedToId}
-                initialAssignedToName={report.assignedToName}
-                status={report.status}
-              />
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="mb-3 text-sm font-medium text-slate-700">
+                  Cleanup Scheduling
+                </p>
+                <Link
+                  href="/dashboard/schedules"
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                >
+                  Cleanup Schedules
+                </Link>
+              </div>
             </div>
           </section>
         </aside>

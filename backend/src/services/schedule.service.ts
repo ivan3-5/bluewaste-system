@@ -109,6 +109,15 @@ export class ScheduleService {
         changedById: adminId,
       }));
       await prisma.statusHistory.createMany({ data: historyData });
+
+      // Sync assignedToId on linked reports so Report Management shows the worker
+      if (data.workerIds.length > 0) {
+        const primaryWorkerId = data.workerIds[0];
+        await prisma.report.updateMany({
+          where: { id: { in: data.reportIds } },
+          data: { assignedToId: primaryWorkerId },
+        });
+      }
     }
 
     // Notify assigned workers
@@ -272,7 +281,7 @@ export class ScheduleService {
       include: scheduleInclude,
     });
 
-    if (data.reportIds !== undefined) {
+    if (data.reportIds !== undefined && data.reportIds.length > 0) {
       await prisma.report.updateMany({
         where: {
           id: { in: data.reportIds },
@@ -280,6 +289,19 @@ export class ScheduleService {
         },
         data: { status: "CLEANUP_SCHEDULED" },
       });
+
+      // Sync assignedToId on linked reports so Report Management stays in sync
+      const effectiveWorkerIds =
+        data.workerIds !== undefined
+          ? data.workerIds
+          : existing.workers.map((w) => w.workerId);
+      if (effectiveWorkerIds.length > 0) {
+        const primaryWorkerId = effectiveWorkerIds[0];
+        await prisma.report.updateMany({
+          where: { id: { in: data.reportIds } },
+          data: { assignedToId: primaryWorkerId },
+        });
+      }
     }
 
     return schedule;

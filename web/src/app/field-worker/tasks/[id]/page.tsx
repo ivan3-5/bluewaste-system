@@ -273,69 +273,78 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
-      {/* Report Photos */}
-      {reportImages.length > 0 && (
-        <div className="overflow-hidden rounded-3xl border border-slate-200/60 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-          <div className="border-b border-slate-100/60 bg-slate-50/50 px-6 py-4">
-            <h2 className="flex items-center gap-3 text-sm font-bold text-slate-900">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
-                <ImageIcon className="h-4 w-4" />
+      {/* Photos Grid */}
+      {(reportImages.length > 0 || existingCleanupImages.length > 0) && (
+        <div className={`grid gap-5 ${
+          reportImages.length > 0 && existingCleanupImages.length > 0
+            ? "grid-cols-1 lg:grid-cols-2"
+            : "grid-cols-1"
+        }`}>
+          {/* Report Photos */}
+          {reportImages.length > 0 && (
+            <div className="overflow-hidden rounded-3xl border border-slate-200/60 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+              <div className="border-b border-slate-100/60 bg-slate-50/50 px-6 py-4">
+                <h2 className="flex items-center gap-3 text-sm font-bold text-slate-900">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                    <ImageIcon className="h-4 w-4" />
+                  </div>
+                  Report Photos
+                  <span className="rounded-full bg-slate-200/80 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
+                    {reportImages.length}
+                  </span>
+                </h2>
               </div>
-              Report Photos
-              <span className="rounded-full bg-slate-200/80 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
-                {reportImages.length}
-              </span>
-            </h2>
-          </div>
-          <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {reportImages.map((img: ReportImage) => (
-              <button
-                key={img.id}
-                onClick={() => setLightboxImage(img.imageUrl)}
-                className="group relative aspect-square overflow-hidden rounded-2xl border border-slate-200/60 bg-slate-100 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/20"
-              >
-                <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                <img
-                  src={img.imageUrl}
-                  alt="Report evidence"
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+              <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 md:grid-cols-4">
+                {reportImages.map((img: ReportImage) => (
+                  <button
+                    key={img.id}
+                    onClick={() => setLightboxImage(img.imageUrl)}
+                    className="group relative aspect-square overflow-hidden rounded-2xl border border-slate-200/60 bg-slate-100 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/20"
+                  >
+                    <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                    <img
+                      src={img.imageUrl}
+                      alt="Report evidence"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Cleanup Photos (already uploaded) */}
-      {existingCleanupImages.length > 0 && (
-        <div className="overflow-hidden rounded-3xl border border-green-200/60 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-          <div className="border-b border-green-100/60 bg-green-50/50 px-6 py-4">
-            <h2 className="flex items-center gap-3 text-sm font-bold text-green-900">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-green-100 text-green-600">
-                <CheckCircle2 className="h-4 w-4" />
+          {/* Cleanup Photos (already uploaded) */}
+          {existingCleanupImages.length > 0 && (
+            <div className="overflow-hidden rounded-3xl border border-green-200/60 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+              <div className="border-b border-green-100/60 bg-green-50/50 px-6 py-4">
+                <h2 className="flex items-center gap-3 text-sm font-bold text-green-900">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-green-100 text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  Cleanup Photos
+                  <span className="rounded-full bg-green-200/60 px-2.5 py-0.5 text-[10px] font-bold text-green-800">
+                    {existingCleanupImages.length}
+                  </span>
+                </h2>
               </div>
-              Cleanup Photos
-              <span className="rounded-full bg-green-200/60 px-2.5 py-0.5 text-[10px] font-bold text-green-800">
-                {existingCleanupImages.length}
-              </span>
-            </h2>
-          </div>
-          <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {existingCleanupImages.map((img: ReportImage) => (
-              <button
-                key={img.id}
-                onClick={() => setLightboxImage(img.imageUrl)}
-                className="group relative aspect-square overflow-hidden rounded-2xl border border-green-200/60 bg-green-50 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-green-500/20"
-              >
-                <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                <img
-                  src={img.imageUrl}
-                  alt="Cleanup proof"
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-              </button>
-            ))}
-          </div>
+              <div className="grid grid-cols-2 gap-4 p-6 sm:grid-cols-3 md:grid-cols-4">
+                {existingCleanupImages.map((img: ReportImage) => (
+                  <button
+                    key={img.id}
+                    onClick={() => setLightboxImage(img.imageUrl)}
+                    className="group relative aspect-square overflow-hidden rounded-2xl border border-green-200/60 bg-green-50 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-green-500/20"
+                  >
+                    <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                    <img
+                      src={img.imageUrl}
+                      alt="Cleanup proof"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

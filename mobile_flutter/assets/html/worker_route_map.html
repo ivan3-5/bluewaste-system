@@ -414,27 +414,15 @@
 
       const marker = L.marker(latlngs[i], { icon: makeStopIcon(stopNum, color) }).addTo(map);
 
-      // Bind popup with resolve button
+      // Bind popup
       const popupId = `popup-${wp.id || i}`;
       marker.bindPopup(() => {
-        const isResolved = resolvedIds.has(wp.id);
-        const btnClass   = isResolved ? 'btn-resolve resolved' : 'btn-resolve';
-        const btnText    = isResolved ? '✓ Resolved' : '✓ Mark as Resolved';
-        const btnDisabled = isResolved ? 'disabled' : '';
-
         return `
           <div class="popup-inner" id="${popupId}">
             <div class="popup-stop-badge">Stop ${stopNum}</div>
             <div class="popup-title">${wp.title || 'Waste Report'}</div>
             ${catLabel ? `<div class="popup-category">${catLabel}</div>` : ''}
             <div class="popup-coords">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</div>
-            <div class="popup-divider"></div>
-            <button
-              class="${btnClass}"
-              ${btnDisabled}
-              onclick="markResolved('${wp.id}', this)">
-              ${btnText}
-            </button>
           </div>
         `;
       }, { maxWidth: 280 });

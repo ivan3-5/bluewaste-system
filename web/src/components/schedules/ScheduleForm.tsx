@@ -24,6 +24,13 @@ interface ScheduleFormProps {
   isEditing?: boolean;
 }
 
+const SCHEDULE_STATUS_SELECT_STYLES: Record<CleanupScheduleStatus, string> = {
+  UPCOMING: "border-blue-200 bg-blue-50 text-blue-700 focus:ring-blue-500",
+  ONGOING: "border-orange-200 bg-orange-50 text-orange-700 focus:ring-orange-500",
+  COMPLETED: "border-green-200 bg-green-50 text-green-700 focus:ring-green-500",
+  CANCELLED: "border-red-200 bg-red-50 text-red-700 focus:ring-red-500",
+};
+
 export function ScheduleForm({
   isOpen,
   onClose,
@@ -47,10 +54,19 @@ export function ScheduleForm({
   });
 
   const { data: eligibleReports = [] } = useQuery({
-    queryKey: ["reports", "verified"],
+    queryKey: ["reports", "eligible-for-schedule"],
     queryFn: async () => {
-      const res = await api.get("/reports?status=VERIFIED&limit=100");
-      return res.data.data as Report[];
+      // Include both VERIFIED and CLEANUP_SCHEDULED so already-scheduled reports remain linkable
+      const [verified, scheduled] = await Promise.all([
+        api.get("/reports?status=VERIFIED&limit=100"),
+        api.get("/reports?status=CLEANUP_SCHEDULED&limit=100"),
+      ]);
+      const combined = [
+        ...(verified.data.data as Report[]),
+        ...(scheduled.data.data as Report[]),
+      ];
+      // Deduplicate by id
+      return combined.filter((r, i, arr) => arr.findIndex((x) => x.id === r.id) === i);
     },
     enabled: isOpen,
   });
@@ -345,12 +361,14 @@ export function ScheduleForm({
                     status: e.target.value as CleanupScheduleStatus,
                   }))
                 }
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`flex h-11 w-full rounded-xl border px-3 py-2 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                  SCHEDULE_STATUS_SELECT_STYLES[formData.status]
+                }`}
               >
-                <option value="UPCOMING">Upcoming</option>
-                <option value="ONGOING">Ongoing</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
+                <option value="UPCOMING" className="bg-white text-gray-900 font-normal">Upcoming</option>
+                <option value="ONGOING" className="bg-white text-gray-900 font-normal">Ongoing</option>
+                <option value="COMPLETED" className="bg-white text-gray-900 font-normal">Completed</option>
+                <option value="CANCELLED" className="bg-white text-gray-900 font-normal">Cancelled</option>
               </select>
             </div>
           )}

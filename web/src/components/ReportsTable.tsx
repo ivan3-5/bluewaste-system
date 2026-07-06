@@ -31,6 +31,15 @@ const STATUS_FLOW: Record<AdminReportStatus, AdminReportStatus[]> = {
   REJECTED: [],
 };
 
+const STATUS_SELECT_STYLES: Record<AdminReportStatus, string> = {
+  PENDING: "border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-500",
+  VERIFIED: "border-blue-200 bg-blue-50 text-blue-700 focus:ring-blue-500",
+  CLEANUP_SCHEDULED: "border-violet-200 bg-violet-50 text-violet-700 focus:ring-violet-500",
+  IN_PROGRESS: "border-orange-200 bg-orange-50 text-orange-700 focus:ring-orange-500",
+  CLEANED: "border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-500",
+  REJECTED: "border-rose-200 bg-rose-50 text-rose-700 focus:ring-rose-500",
+};
+
 export function ReportsTable({
   reports,
   compact = false,
@@ -170,11 +179,15 @@ export function ReportsTable({
               setStatusFilter(event.target.value as AdminReportStatus | "")
             }
             aria-label="Filter reports by status"
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+              statusFilter
+                ? STATUS_SELECT_STYLES[statusFilter]
+                : "border-slate-200 bg-white text-slate-900 focus:ring-blue-500"
+            }`}
           >
-            <option value="">All Statuses</option>
+            <option value="" className="bg-white text-slate-900 font-normal">All Statuses</option>
             {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
+              <option key={key} value={key} className="bg-white text-slate-900 font-normal">
                 {label}
               </option>
             ))}
@@ -249,50 +262,59 @@ export function ReportsTable({
                       {report.reporterEmail || "No email available."}
                     </p>
                   </td>
-                  <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                  <td className="px-4 py-3 text-sm text-slate-900">
                     {isLGUAdmin ? (
                       <div className="space-y-2">
-                        <select
-                          value={
-                            assignmentDrafts[report.id] ??
-                            report.assignedToId ??
-                            ""
-                          }
-                          onChange={(event) => {
-                            const nextAssignedToId = event.target.value;
-
-                            if (!nextAssignedToId) {
-                              return;
-                            }
-
-                            setAssignmentDrafts((current) => ({
-                              ...current,
-                              [report.id]: nextAssignedToId,
-                            }));
-
-                            void handleAssignWorker(
-                              report.id,
-                              nextAssignedToId,
-                            );
-                          }}
-                          aria-label={`Assign field worker for report ${report.id}`}
-                          disabled={
-                            savingReportId === report.id ||
-                            // Lock once report is actively in-progress or terminal
-                            (
-                              !!report.assignedToId &&
-                              ["IN_PROGRESS", "CLEANED", "REJECTED"].includes(report.status)
-                            )
-                          }
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <option value="">Unassigned</option>
-                          {workers.map((worker) => (
-                            <option key={worker.id} value={worker.id}>
-                              {worker.firstName} {worker.lastName}
-                            </option>
-                          ))}
-                        </select>
+                        {/* If schedule workers exist, show them as read-only pills */}
+                        {report.assignedWorkerNames ? (
+                          <div className="flex flex-wrap gap-1">
+                            {report.assignedWorkerNames.split(", ").map((name, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800"
+                              >
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
+                                  {name.trim().charAt(0)}
+                                </span>
+                                {name.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        ) : report.assignedToName ? (
+                          /* Directly assigned (not via schedule) — show single pill */
+                          <div className="flex flex-wrap gap-1">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
+                                {report.assignedToName.trim().charAt(0)}
+                              </span>
+                              {report.assignedToName.trim()}
+                            </span>
+                          </div>
+                        ) : (
+                          /* No assignment yet — show dropdown to assign manually */
+                          <select
+                            value={assignmentDrafts[report.id] ?? ""}
+                            onChange={(event) => {
+                              const nextAssignedToId = event.target.value;
+                              if (!nextAssignedToId) return;
+                              setAssignmentDrafts((current) => ({
+                                ...current,
+                                [report.id]: nextAssignedToId,
+                              }));
+                              void handleAssignWorker(report.id, nextAssignedToId);
+                            }}
+                            aria-label={`Assign field worker for report ${report.id}`}
+                            disabled={savingReportId === report.id}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <option value="">Unassigned</option>
+                            {workers.map((worker) => (
+                              <option key={worker.id} value={worker.id}>
+                                {worker.firstName} {worker.lastName}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         {savingReportId === report.id && (
                           <p className="text-xs text-primary animate-pulse">
                             Saving assignment…
@@ -300,7 +322,8 @@ export function ReportsTable({
                         )}
                       </div>
                     ) : (
-                      report.assignedToName || "Unassigned"
+                      // Non-admin view
+                      report.assignedWorkerNames ?? report.assignedToName ?? "Unassigned"
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -321,7 +344,9 @@ export function ReportsTable({
                           }}
                           aria-label={`Update status for report ${report.id}`}
                           disabled={savingStatusReportId === report.id}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-900"
+                          className={`w-full rounded-lg border px-2 py-2 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                            STATUS_SELECT_STYLES[statusDrafts[report.id] ?? report.status]
+                          }`}
                         >
                           {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(
                             ([value, label]) => {
@@ -335,6 +360,7 @@ export function ReportsTable({
                                   key={value}
                                   value={value}
                                   disabled={!isCurrent && !isAllowed}
+                                  className="bg-white text-slate-900 font-normal"
                                 >
                                   {label}
                                 </option>
