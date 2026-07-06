@@ -15,6 +15,7 @@ import {
 import { getApiErrorMessage } from "@/lib/apiError";
 import { DetectionBox, inferWasteCategory } from "@/lib/waste-classification";
 import DetectionImageOverlay from "@/components/ai/DetectionImageOverlay";
+import { SeverityBadge, type SeverityLevel } from "@/components/SeverityBadge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,7 +42,8 @@ type AnalyzeWasteResult = {
   detectedObject: string;
   dominantWaste: WasteType | null;
   totalItems: number;
-  severity: WasteSeverity;
+  severity: any;
+  has_waste?: boolean;
   wasteCategory?: WasteCategory;
   confidence: number;
   status: "DIRTY" | "CLEAN";
@@ -54,7 +56,7 @@ type AnalyzeWasteResult = {
     retakeRecommended: boolean;
     captureTips: string[];
   };
-  labels: string[];
+  labels: any[];
   detections: DetectionBox[];
 };
 
@@ -85,6 +87,29 @@ const SEVERITY_STYLES: Record<WasteSeverity, string> = {
   low: "bg-green-100 text-green-700 border-green-200",
   medium: "bg-amber-100 text-amber-700 border-amber-200",
   high: "bg-red-100 text-red-700 border-red-200",
+};
+
+function resolveSeverityLevel(val: unknown, confidence: number): SeverityLevel {
+  if (typeof val === "string") {
+    const upper = val.toUpperCase();
+    if (upper === "CRITICAL" || upper === "HIGH" || upper === "MODERATE" || upper === "SPAM") {
+      return upper as SeverityLevel;
+    }
+    if (upper === "HIGH") return "HIGH";
+    if (upper === "MEDIUM" || upper === "MODERATE") return "MODERATE";
+    if (upper === "LOW") return "MODERATE";
+  }
+  if (confidence >= 0.9) return "CRITICAL";
+  if (confidence >= 0.7) return "HIGH";
+  if (confidence >= 0.5) return "MODERATE";
+  return "SPAM";
+}
+
+const SEVERITY_DESCRIPTIONS: Record<string, string> = {
+  CRITICAL: "Immediate cleanup required!",
+  HIGH: "Schedule cleanup within 24 hours.",
+  MODERATE: "Queued for cleanup.",
+  SPAM: "Flagged for admin review.",
 };
 
 function mapAnalysisToBucket(result: AnalyzeWasteResult): WasteBucket {
@@ -443,6 +468,7 @@ export default function SubmitReportPage() {
     }
 
     const payload = await requestAnalyzeWaste(formData, token);
+    console.log("🔍 Waste Analysis API JSON Output:", payload);
 
     const status = normalizeDecisionStatus(payload?.status);
     const wasteCount = toNonNegativeInt(payload?.waste_count);
@@ -484,10 +510,8 @@ export default function SubmitReportPage() {
       payload?.totalItems,
       Array.isArray(payload?.detections) ? payload.detections.length : 0,
     );
-    const severity: WasteSeverity =
-      payload?.severity === "low" ||
-      payload?.severity === "medium" ||
-      payload?.severity === "high"
+    const severity =
+      payload?.severity !== undefined
         ? payload.severity
         : totalItems >= 7
           ? "high"
@@ -503,6 +527,7 @@ export default function SubmitReportPage() {
       dominantWaste,
       totalItems,
       severity,
+      has_waste: payload?.has_waste ?? (status === "DIRTY"),
       confidence:
         typeof payload?.confidence === "number" &&
         Number.isFinite(payload.confidence)
@@ -824,22 +849,56 @@ export default function SubmitReportPage() {
                   )}
 
                   {analysisResult && (
-                    <div className="space-y-2 rounded-xl border border-gray-100 bg-gray-50 p-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">Detected</span>
-                        <span className="text-xs font-semibold text-gray-800 capitalize">
-                          {analysisResult.detectedObject}
-                        </span>
+                    <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3.5">
+                      <div className="flex items-center justify-between gap-2 border-b border-gray-200/80 pb-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${analysisResult.has_waste !== false ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                            {analysisResult.has_waste !== false ? "✓" : "✕"}
+                          </span>
+                          <span className="text-xs font-bold text-gray-900">
+                            {analysisResult.has_waste !== false ? "Waste Detected" : "No Waste Detected"}
+                          </span>
+                        </div>
+                        <SeverityBadge severity={resolveSeverityLevel(analysisResult.severity, analysisResult.confidence)} />
                       </div>
-                      {/* Dominant waste display removed per request */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
-                          Confidence
-                        </span>
-                        <span className="text-xs font-semibold text-gray-800">
-                          {(analysisResult.confidence * 100).toFixed(1)}%
-                        </span>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500 font-medium">Confidence</span>
+                          <span className="font-bold text-gray-800">
+                            {(analysisResult.confidence * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                          <div
+                            className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                            style={{ width: `${Math.min(100, Math.max(0, analysisResult.confidence * 100))}%` }}
+                          />
+                        </div>
                       </div>
+
+                      {resolveSeverityLevel(analysisResult.severity, analysisResult.confidence) && (
+                        <p className="text-[11px] text-gray-600 italic">
+                          {SEVERITY_DESCRIPTIONS[resolveSeverityLevel(analysisResult.severity, analysisResult.confidence) || "MODERATE"]}
+                        </p>
+                      )}
+
+                      {analysisResult.labels && analysisResult.labels.length > 0 && (
+                        <div className="pt-1 border-t border-gray-200/80">
+                          <span className="text-[11px] font-semibold text-gray-700 block mb-1.5">Detected Labels:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {analysisResult.labels.map((lbl: any, idx: number) => {
+                              const labelText = typeof lbl === "string" ? lbl : (lbl?.label || lbl?.class_name || "item");
+                              const confText = typeof lbl === "object" && typeof lbl?.confidence === "number" ? ` (${(lbl.confidence * 100).toFixed(0)}%)` : "";
+                              return (
+                                <span key={idx} className="inline-flex items-center rounded-md bg-white border border-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-700 shadow-2xs">
+                                  {labelText}{confText}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
