@@ -57,7 +57,7 @@ const envSchema = z.object({
   WEB_URL: z.string().default("http://localhost:3000"),
   MOBILE_URL: z.string().default("http://localhost:8081"),
   ALLOWED_ORIGINS: z.string().optional(),
-  YOLO_API_URL: z.string().url().default("http://localhost:8000/predict"),
+  YOLO_API_URL: z.string().url().default("http://localhost:8000/analyze"),
   SPAM_RETENTION_DAYS: z.coerce.number().int().min(1).default(3),
 });
 

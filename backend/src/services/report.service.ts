@@ -208,7 +208,6 @@ export class ReportService {
       new Blob([imageBuffer], { type: contentType }),
       "report-image.jpg",
     );
-    yoloBody.append("return_annotated", "true");
 
     let yoloResponse: Response;
     try {
@@ -234,57 +233,50 @@ export class ReportService {
       throw new Error(`YOLO API error: ${message}`);
     }
 
-    const count = toNonNegativeInt((yoloJson as any)?.count, 0);
-    const detections = Array.isArray((yoloJson as any)?.detections)
-      ? (yoloJson as any).detections
-      : [];
-    const wasteCount = toNonNegativeInt(
-      (yoloJson as any)?.waste_count,
-      detections.length > 0 ? detections.length : count,
+    // ── Parse /analyze response (hybrid pipeline) ──────────────────────────
+    const severity: string | null =
+      typeof (yoloJson as any)?.severity === "string"
+        ? (yoloJson as any).severity
+        : null;
+
+    const hasWaste: boolean = (yoloJson as any)?.has_waste === true;
+    const confidence: number | null = toFiniteNumberOrNull(
+      (yoloJson as any)?.confidence,
     );
+    const layer1Passed: boolean = (yoloJson as any)?.layer1_passed !== false;
+    const spamReason: string | null =
+      typeof (yoloJson as any)?.spam_reason === "string"
+        ? (yoloJson as any).spam_reason
+        : null;
 
-    const annotatedImageBuffer = decodeBase64ImageBuffer(
-      (yoloJson as any)?.annotated_image_base64,
-    );
-    let annotatedImageUpload: { url: string; publicId: string } | null = null;
-
-    if (annotatedImageBuffer) {
-      try {
-        annotatedImageUpload = await (
-          await import("../services/cloudinary.service")
-        ).CloudinaryService.uploadImage(
-          annotatedImageBuffer,
-          "bluewaste/analysis",
-        );
-      } catch (error) {
-        console.warn("Failed to upload annotated YOLO image:", error);
-      }
-    }
-
-    const labels = Array.isArray((yoloJson as any)?.labels)
+    // Collect waste-matched labels for display
+    const rawLabels = Array.isArray((yoloJson as any)?.labels)
       ? (yoloJson as any).labels
-          .filter(
-            (label: unknown): label is string => typeof label === "string",
-          )
-          .map((label: string) => label.trim().toLowerCase())
-          .filter((label: string) => label.length > 0)
-      : extractDetectionLabels(detections);
+      : [];
+    const labels: string[] = rawLabels
+      .map((l: any) =>
+        typeof l?.label === "string" ? l.label.trim().toLowerCase() : "",
+      )
+      .filter((l: string) => l.length > 0);
+
+    // Determine DIRTY / CLEAN for backward compat with analyzeReport()
+    const status: "DIRTY" | "CLEAN" =
+      hasWaste && severity !== "SPAM" ? "DIRTY" : "CLEAN";
 
     return {
-      status:
-        (yoloJson as any)?.status === "DIRTY"
-          ? ("DIRTY" as const)
-          : ("CLEAN" as const),
-      wasteCount,
-      count,
-      confidence:
-        toFiniteNumberOrNull((yoloJson as any)?.top_confidence) ??
-        toFiniteNumberOrNull((yoloJson as any)?.confidence),
-      labels,
-      detections,
-      inferenceMs: toFiniteNumberOrNull((yoloJson as any)?.inference_ms),
-      annotatedImageUrl: annotatedImageUpload?.url ?? null,
-      annotatedImagePublicId: annotatedImageUpload?.publicId ?? null,
+      status,
+      wasteCount: hasWaste ? 1 : 0,
+      count: hasWaste ? 1 : 0,
+      confidence,
+      labels: hasWaste ? ["with_waste", ...labels] : ["no_waste"],
+      detections: [],
+      inferenceMs: null,
+      annotatedImageUrl: null,
+      annotatedImagePublicId: null,
+      // New fields from /analyze
+      severity,
+      layer1Passed,
+      spamReason,
     };
   }
 
@@ -310,18 +302,28 @@ export class ReportService {
 
     const labels = Array.isArray(analysis.labels) ? analysis.labels : [];
 
-    // Decide category / spam based on labels or analysis status
-    const isNoWasteLabel = labels.includes("no_waste");
+    // Decide category / spam based on analysis result
     const hasWaste =
       labels.includes("with_waste") ||
       (analysis.wasteCount || 0) > 0 ||
       analysis.status === "DIRTY";
 
-    const newCategory: WasteCategory =
-      isNoWasteLabel || !hasWaste ? "no_waste" : "with_waste";
-    const shouldMarkSpam = newCategory === "no_waste";
+    const newCategory: WasteCategory = hasWaste ? "with_waste" : "no_waste";
+
+    // Resolve severity from the /analyze response or fall back to status-based logic
+    const rawSeverity = (analysis as any).severity as string | null | undefined;
+    const resolvedSeverity = (
+      rawSeverity && ["CRITICAL", "HIGH", "MODERATE", "SPAM"].includes(rawSeverity)
+        ? rawSeverity
+        : hasWaste ? "MODERATE" : "SPAM"
+    ) as "CRITICAL" | "HIGH" | "MODERATE" | "SPAM";
+
+    const shouldMarkSpam =
+      resolvedSeverity === "SPAM" || newCategory === "no_waste";
+
     const spamReason = shouldMarkSpam
-      ? "No visible waste or pollution detected in the submitted image."
+      ? ((analysis as any).spamReason as string | null) ??
+        "No visible waste or pollution detected in the submitted image."
       : null;
 
     const now = new Date();
@@ -342,6 +344,7 @@ export class ReportService {
             analysisWasteCount: analysis.wasteCount ?? null,
             analysisConfidence: analysis.confidence ?? null,
             analyzedAt: now,
+            severity: resolvedSeverity,
           },
         }),
         prisma.statusHistory.create({
@@ -350,7 +353,7 @@ export class ReportService {
             previousStatus: report.status,
             newStatus: report.status,
             changedById: report.reporterId || "system",
-            notes: `Auto analysis: ${shouldMarkSpam ? "marked as spam" : "detected waste"}`,
+            notes: `Auto analysis: ${shouldMarkSpam ? "marked as spam" : `severity=${resolvedSeverity}`}`,
           },
         }),
       ])
@@ -366,8 +369,8 @@ export class ReportService {
             : "Report Analysis Completed",
           message: shouldMarkSpam
             ? `Your report \"${report.title}\" was automatically marked as spam by the system.`
-            : `Your report \"${report.title}\" was analyzed and appears to contain waste.`,
-          type: shouldMarkSpam ? "SYSTEM" : "SYSTEM",
+            : `Your report \"${report.title}\" was analyzed — severity: ${resolvedSeverity}.`,
+          type: "SYSTEM",
           reportId,
         });
       } catch (error) {

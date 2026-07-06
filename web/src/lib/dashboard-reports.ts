@@ -20,6 +20,7 @@ type DashboardReportRow = {
   address: string | null;
   analysisConfidence: number | null;
   analysisStatus: string | null;
+  severity: string | null;
   reportedAt: Date;
   updatedAt: Date;
   imageUrl: string | null;
@@ -107,6 +108,7 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
     locationName: row.address?.trim() || row.title || "Unknown location",
     description: row.description?.trim() || null,
     status: mapDashboardStatus(row.status) as AdminReport["status"],
+    severity: (row.severity as AdminReport["severity"]) ?? null,
     reporterName: row.reporterName ?? null,
     reporterEmail: row.reporterEmail ?? null,
     assignedToId: row.assignedToId ?? null,
@@ -130,6 +132,7 @@ export async function getDashboardReports(limit: number) {
       r.address,
       r."analysisConfidence",
       r."analysisStatus",
+      r.severity,
       r."createdAt" AS "reportedAt",
       r."updatedAt",
       COALESCE(image."imageUrl", null) AS "imageUrl",
@@ -197,6 +200,7 @@ export async function getDashboardReportById(id: string) {
       r.address,
       r."analysisConfidence",
       r."analysisStatus",
+      r.severity,
       r."createdAt" AS "reportedAt",
       r."updatedAt",
       COALESCE(image."imageUrl", null) AS "imageUrl",

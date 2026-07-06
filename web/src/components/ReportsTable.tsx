@@ -11,6 +11,7 @@ import {
   type AdminReportStatus,
 } from "@/lib/admin-report";
 import { CategoryBadge } from "@/components/CategoryBadge";
+import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/providers/AuthProvider";
 import { useAssignWorker } from "@/hooks/useReports";
@@ -70,6 +71,9 @@ export function ReportsTable({
 
   const visibleReports = useMemo(() => {
     return reports.filter((report) => {
+      // SPAM severity reports are automatically routed to /dashboard/spam
+      if (report.severity === "SPAM") return false;
+
       if (categoryFilter && report.category !== categoryFilter) return false;
       if (statusFilter && report.status !== statusFilter) return false;
 
@@ -215,6 +219,9 @@ export function ReportsTable({
                 Category
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Severity
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Reporter
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -235,7 +242,7 @@ export function ReportsTable({
             {visibleReports.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-4 py-10 text-center text-sm text-slate-500"
                 >
                   No reports match the current filters.
@@ -253,6 +260,9 @@ export function ReportsTable({
                   </td>
                   <td className="px-4 py-3">
                     <CategoryBadge category={report.category} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <SeverityBadge severity={report.severity} />
                   </td>
                   <td className="px-4 py-3">
                     <p className="max-w-[240px] truncate text-sm font-semibold text-slate-900">

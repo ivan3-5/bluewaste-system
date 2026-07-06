@@ -84,6 +84,8 @@ class ReportRecord {
     required this.updatedAt,
     required this.images,
     this.address,
+    this.severity,
+    this.analysisConfidence,
   });
 
   final String id;
@@ -98,6 +100,10 @@ class ReportRecord {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<ReportImage> images;
+  /// Severity level from the hybrid pipeline (CRITICAL / HIGH / MODERATE / SPAM).
+  final String? severity;
+  /// Top confidence score from Cloud Vision (0.0 – 1.0).
+  final double? analysisConfidence;
 
   factory ReportRecord.fromJson(Map<String, dynamic> json) {
     double parseDouble(dynamic value, double fallback) {
@@ -130,6 +136,8 @@ class ReportRecord {
       createdAt: parseDate(json["createdAt"]),
       updatedAt: parseDate(json["updatedAt"]),
       images: imageList,
+      severity: json["severity"]?.toString(),
+      analysisConfidence: (json["analysisConfidence"] as num?)?.toDouble(),
     );
   }
 }

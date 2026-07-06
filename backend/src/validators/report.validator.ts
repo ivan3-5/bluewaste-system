@@ -6,12 +6,26 @@ export const createReportSchema = z.object({
     .string()
     .min(10, "Description must be at least 10 characters")
     .max(2000),
-  category: z.enum(["with_waste", "no_waste"]),
+  // Accept both legacy Flutter category names (PLASTIC_WASTE, ORGANIC_WASTE, etc.)
+  // and the canonical DB enum values (with_waste, no_waste).
+  // The category is also set/overridden by the YOLO analysis pipeline after upload.
+  category: z
+    .string()
+    .transform((v) => {
+      const lower = v.toLowerCase();
+      if (lower === "no_waste") return "no_waste" as const;
+      return "with_waste" as const;
+    })
+    .default("with_waste"),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   address: z.string().max(500).optional(),
   isAnonymous: z.boolean().default(false),
+  isSpamFlagged: z.boolean().optional(),
+  spamReason: z.string().max(500).optional(),
+  yoloConfidence: z.number().min(0).max(100).optional(),
 });
+
 
 export const updateStatusSchema = z.object({
   status: z.enum([

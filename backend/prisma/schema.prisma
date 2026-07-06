@@ -62,6 +62,13 @@ enum AnalysisStatus {
   CLEAN
 }
 
+enum Severity {
+  CRITICAL
+  HIGH
+  MODERATE
+  SPAM
+}
+
 // ==================== MODELS ====================
 
 model User {
@@ -123,6 +130,7 @@ model Report {
   analysisWasteCount Int?
   analysisConfidence Float?
   analyzedAt DateTime?
+  severity   Severity?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

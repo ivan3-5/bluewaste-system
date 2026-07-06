@@ -5,7 +5,7 @@ import base64
 import os
 from threading import Lock
 from time import perf_counter
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, List
 
 app = FastAPI(title="BlueWaste YOLO API", version="1.0.0")
 
@@ -66,6 +66,20 @@ DETECT_MODEL_PATH = os.getenv("DETECT_MODEL_PATH", "waste_model.pt")
 DETECT_CONFIDENCE_THRESHOLD = float(os.getenv("DETECT_CONF", "0.25"))
 _detect_model: Optional[Any] = None
 _detect_model_lock = Lock()
+
+# ── Hybrid /analyze pipeline constants ─────────────────────────────────────
+# Layer 1: minimum YOLO confidence to count an object as "present"
+ANALYZE_YOLO_MIN_CONF = float(os.getenv("ANALYZE_YOLO_MIN_CONF", "0.15"))
+# Layer 2: Cloud Vision waste keyword list
+WASTE_KEYWORDS = {
+    "waste", "garbage", "litter", "pollution", "debris", "trash",
+    "plastic", "rubbish", "dump", "contamination", "refuse",
+    "junk", "sewage", "landfill", "compost", "recycle",
+}
+# Severity thresholds (Cloud Vision top confidence, 0.0–1.0)
+SEVERITY_CRITICAL_THRESHOLD = 0.90
+SEVERITY_HIGH_THRESHOLD = 0.70
+SEVERITY_MODERATE_THRESHOLD = 0.50
 
 
 class BoundingBox(BaseModel):
@@ -592,4 +606,225 @@ async def detect(image: UploadFile = File(...)):
         has_waste=has_waste,
         message="Waste detected!" if has_waste else "No waste detected.",
         confidence=confidence_pct,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# HYBRID PIPELINE  —  /analyze
+# Layer 1: YOLOv8 (COCO) object pre-screening
+# Layer 2: Google Cloud Vision waste label classification
+# ═══════════════════════════════════════════════════════════════════════════
+
+class DetectedLabel(BaseModel):
+    label: str
+    confidence: float  # 0.0 – 1.0
+
+
+class AnalyzeResponse(BaseModel):
+    """
+    Response for the /analyze endpoint.
+
+    severity: CRITICAL | HIGH | MODERATE | SPAM
+    has_waste: True when Layer 2 found waste-related labels
+    confidence: top Cloud Vision label score (0.0 – 1.0); 0 for SPAM from Layer 1
+    labels: top Cloud Vision labels that matched waste keywords
+    all_labels: all Cloud Vision labels returned (for debugging / display)
+    layer1_passed: True when YOLO detected at least one object
+    spam_reason: human-readable reason when severity is SPAM
+    """
+    severity: Literal["CRITICAL", "HIGH", "MODERATE", "SPAM"]
+    has_waste: bool
+    confidence: float
+    labels: List[DetectedLabel]
+    all_labels: List[DetectedLabel]
+    layer1_passed: bool
+    spam_reason: Optional[str] = None
+    message: str
+
+
+def _score_to_severity(confidence: float) -> Literal["CRITICAL", "HIGH", "MODERATE", "SPAM"]:
+    """Map a top-confidence score (0.0–1.0) to a severity level."""
+    if confidence >= SEVERITY_CRITICAL_THRESHOLD:
+        return "CRITICAL"
+    if confidence >= SEVERITY_HIGH_THRESHOLD:
+        return "HIGH"
+    if confidence >= SEVERITY_MODERATE_THRESHOLD:
+        return "MODERATE"
+    return "SPAM"
+
+
+def _run_cloud_vision_labels(image_bytes: bytes) -> List[DetectedLabel]:
+    """
+    Call Google Cloud Vision label detection and return all labels sorted
+    by descending confidence.  Requires GOOGLE_APPLICATION_CREDENTIALS or
+    GOOGLE_CLOUD_API_KEY environment variable.
+    """
+    try:
+        from google.cloud import vision as gcv
+    except ImportError:
+        raise RuntimeError(
+            "google-cloud-vision is not installed. "
+            "Run: pip install google-cloud-vision"
+        )
+
+    api_key = os.getenv("GOOGLE_CLOUD_API_KEY", "").strip()
+    if api_key:
+        client = gcv.ImageAnnotatorClient(
+            client_options={"api_key": api_key}
+        )
+    else:
+        # Falls back to GOOGLE_APPLICATION_CREDENTIALS env var (service account JSON)
+        client = gcv.ImageAnnotatorClient()
+
+    image = gcv.Image(content=image_bytes)
+    response = client.label_detection(image=image, max_results=20)
+
+    if response.error.message:
+        raise RuntimeError(
+            f"Cloud Vision API error: {response.error.message}"
+        )
+
+    return [
+        DetectedLabel(
+            label=label.description.lower().strip(),
+            confidence=round(label.score, 4),
+        )
+        for label in response.label_annotations
+    ]
+
+
+@app.post("/analyze", response_model=AnalyzeResponse)
+async def analyze(image: UploadFile = File(...)):
+    """
+    Hybrid YOLOv8 + Google Cloud Vision waste analysis pipeline.
+
+    **Layer 1 — YOLOv8 COCO pre-screening**
+    Checks whether any object at all is visible in the image.
+    If nothing is detected (blurry / empty / featureless) → SPAM immediately.
+
+    **Layer 2 — Google Cloud Vision label detection**
+    Sends the image to Cloud Vision.  Returned labels are matched against a
+    curated waste keyword list.  If no waste-related labels are found
+    (selfie, indoor scene, unrelated content) → SPAM.
+
+    **Severity scoring** (based on top waste-label confidence):
+      90 – 100 % → CRITICAL  🔴
+      70 –  89 % → HIGH      🟠
+      50 –  69 % → MODERATE  🟡
+      Below 50 % → SPAM      ⚪
+    """
+    allowed_types = {"image/jpeg", "image/png", "image/webp"}
+    if image.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported image type '{image.content_type}'. "
+                "Use JPEG, PNG or WebP."
+            ),
+        )
+
+    image_bytes = await image.read()
+
+    # ── Decode to OpenCV frame (EXIF-corrected) ──────────────────────────────
+    try:
+        frame = _decode_uploaded_image(image_bytes)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or corrupt image.")
+
+    if frame is None:
+        raise HTTPException(status_code=400, detail="Could not decode image.")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # LAYER 1 — YOLOv8 COCO object presence check
+    # ══════════════════════════════════════════════════════════════════════════
+    try:
+        yolo_model = _get_model()
+        yolo_results = yolo_model.predict(
+            source=frame,
+            conf=ANALYZE_YOLO_MIN_CONF,
+            verbose=False,
+        )
+        detected_boxes = yolo_results[0].boxes if yolo_results else []
+        layer1_passed = len(detected_boxes) > 0
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"YOLO inference error: {exc}",
+        )
+
+    if not layer1_passed:
+        return AnalyzeResponse(
+            severity="SPAM",
+            has_waste=False,
+            confidence=0.0,
+            labels=[],
+            all_labels=[],
+            layer1_passed=False,
+            spam_reason=(
+                "No objects were detected in the image. "
+                "The photo may be blurry, empty, or too dark."
+            ),
+            message="No objects detected — image flagged as spam.",
+        )
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # LAYER 2 — Google Cloud Vision label detection
+    # ══════════════════════════════════════════════════════════════════════════
+    try:
+        all_labels = _run_cloud_vision_labels(image_bytes)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Cloud Vision error: {exc}",
+        )
+
+    # Filter labels that match any waste keyword
+    waste_labels = [
+        lbl for lbl in all_labels
+        if any(keyword in lbl.label for keyword in WASTE_KEYWORDS)
+    ]
+
+    if not waste_labels:
+        return AnalyzeResponse(
+            severity="SPAM",
+            has_waste=False,
+            confidence=0.0,
+            labels=[],
+            all_labels=all_labels,
+            layer1_passed=True,
+            spam_reason=(
+                "No waste-related content was found in the image. "
+                "The photo may show people, indoor scenes, or unrelated objects."
+            ),
+            message="No waste labels detected — image flagged as spam.",
+        )
+
+    # Highest confidence among matched waste labels
+    top_confidence = max(lbl.confidence for lbl in waste_labels)
+    severity = _score_to_severity(top_confidence)
+
+    severity_messages = {
+        "CRITICAL": "Critical waste detected — immediate cleanup required! 🔴",
+        "HIGH": "High-severity waste detected — schedule cleanup within 24 hours. 🟠",
+        "MODERATE": "Moderate waste detected — queued for cleanup. 🟡",
+        "SPAM": "Low confidence — report flagged for admin review. ⚪",
+    }
+
+    spam_reason = (
+        "Waste detected but confidence is too low for automatic validation."
+        if severity == "SPAM"
+        else None
+    )
+
+    return AnalyzeResponse(
+        severity=severity,
+        has_waste=True,
+        confidence=round(top_confidence, 4),
+        labels=waste_labels,
+        all_labels=all_labels,
+        layer1_passed=True,
+        spam_reason=spam_reason,
+        message=severity_messages[severity],
     )

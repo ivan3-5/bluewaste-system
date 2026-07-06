@@ -4,45 +4,158 @@ import "package:dio/dio.dart";
 
 import "../src/core/config/app_env.dart";
 
-/// Result from the FastAPI `/detect` endpoint.
+// ── Severity levels from the hybrid pipeline ────────────────────────────────
+enum WasteSeverity {
+  critical,
+  high,
+  moderate,
+  spam,
+  unknown;
+
+  /// Parse the server string value (case-insensitive).
+  static WasteSeverity fromString(String? value) {
+    switch (value?.toUpperCase()) {
+      case "CRITICAL":
+        return WasteSeverity.critical;
+      case "HIGH":
+        return WasteSeverity.high;
+      case "MODERATE":
+        return WasteSeverity.moderate;
+      case "SPAM":
+        return WasteSeverity.spam;
+      default:
+        return WasteSeverity.unknown;
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case WasteSeverity.critical:
+        return "Critical 🔴";
+      case WasteSeverity.high:
+        return "High 🟠";
+      case WasteSeverity.moderate:
+        return "Moderate 🟡";
+      case WasteSeverity.spam:
+        return "Spam ⚪";
+      case WasteSeverity.unknown:
+        return "Unknown";
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case WasteSeverity.critical:
+        return "Immediate cleanup required!";
+      case WasteSeverity.high:
+        return "Schedule cleanup within 24 hours.";
+      case WasteSeverity.moderate:
+        return "Queued for cleanup.";
+      case WasteSeverity.spam:
+        return "Flagged for admin review.";
+      case WasteSeverity.unknown:
+        return "";
+    }
+  }
+}
+
+// ── A single Cloud Vision label ──────────────────────────────────────────────
+class WasteLabel {
+  const WasteLabel({required this.label, required this.confidence});
+
+  final String label;
+  final double confidence; // 0.0 – 1.0
+
+  factory WasteLabel.fromJson(Map<String, dynamic> json) {
+    return WasteLabel(
+      label: (json["label"] ?? "").toString(),
+      confidence: (json["confidence"] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+/// Result from the FastAPI `/analyze` hybrid pipeline endpoint.
 class DetectResult {
   const DetectResult({
     required this.hasWaste,
     required this.message,
     required this.confidence,
+    required this.severity,
+    required this.layer1Passed,
+    this.labels = const [],
+    this.allLabels = const [],
+    this.spamReason,
   });
 
-  /// Whether at least one waste object was detected.
+  /// Whether waste-related labels were detected.
   final bool hasWaste;
 
   /// Human-readable result string from the server.
   final String message;
 
-  /// Top detection confidence as a percentage (0.0 – 100.0).
+  /// Top waste-label confidence as a fraction (0.0 – 1.0).
   final double confidence;
 
+  /// Severity level determined by the pipeline.
+  final WasteSeverity severity;
+
+  /// Whether YOLOv8 (Layer 1) detected any object at all.
+  final bool layer1Passed;
+
+  /// Waste-matched Cloud Vision labels.
+  final List<WasteLabel> labels;
+
+  /// All Cloud Vision labels returned (for display).
+  final List<WasteLabel> allLabels;
+
+  /// Human-readable spam reason, if spam-flagged.
+  final String? spamReason;
+
+  /// Confidence as a percentage string, e.g. "87.3%"
+  String get confidencePct =>
+      "${(confidence * 100).toStringAsFixed(1)}%";
+
   factory DetectResult.fromJson(Map<String, dynamic> json) {
+    List<WasteLabel> _parseLabels(dynamic raw) {
+      if (raw is! List) return const [];
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(WasteLabel.fromJson)
+          .toList(growable: false);
+    }
+
     return DetectResult(
       hasWaste: json["has_waste"] == true,
       message: (json["message"] ?? "").toString(),
+      // Server returns 0.0–1.0 fraction from /analyze
       confidence: (json["confidence"] as num?)?.toDouble() ?? 0.0,
+      severity: WasteSeverity.fromString(json["severity"]?.toString()),
+      layer1Passed: json["layer1_passed"] != false,
+      labels: _parseLabels(json["labels"]),
+      allLabels: _parseLabels(json["all_labels"]),
+      spamReason: json["spam_reason"]?.toString(),
     );
   }
 
-  /// A sentinel "no detection run" result — used when the server is down and
-  /// the user is blocked from submitting.
+  /// A sentinel "no detection run" result.
   factory DetectResult.unreachable() {
     return const DetectResult(
       hasWaste: false,
       message: "Detection server unreachable.",
       confidence: 0.0,
+      severity: WasteSeverity.unknown,
+      layer1Passed: false,
     );
   }
+
+  /// Whether the result requires admin review (SPAM severity).
+  bool get isSpam => severity == WasteSeverity.spam;
 }
 
 /// Thrown when the detection server cannot be reached (network/timeout).
 class DetectServerUnreachableException implements Exception {
-  const DetectServerUnreachableException([this.message = "The YOLO detection server is unreachable."]);
+  const DetectServerUnreachableException(
+      [this.message = "The YOLO detection server is unreachable."]);
   final String message;
   @override
   String toString() => message;
@@ -56,7 +169,7 @@ class DetectServerException implements Exception {
   String toString() => message;
 }
 
-/// HTTP client that calls the FastAPI `/detect` endpoint.
+/// HTTP client that calls the FastAPI `/analyze` hybrid endpoint.
 ///
 /// Usage:
 /// ```dart
@@ -74,7 +187,7 @@ class DetectService {
       BaseOptions(
         baseUrl: AppEnv.yoloBaseUrl,
         connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 45),
         sendTimeout: const Duration(seconds: 30),
       ),
     );
@@ -82,7 +195,7 @@ class DetectService {
 
   Dio get _client => _dio ??= _buildDio();
 
-  /// Sends [imageFile] to the `/detect` endpoint and returns a [DetectResult].
+  /// Sends [imageFile] to the `/analyze` endpoint and returns a [DetectResult].
   ///
   /// Throws:
   ///   [DetectServerUnreachableException] — network error, server down, timeout
@@ -99,7 +212,7 @@ class DetectService {
 
     try {
       final response = await _client.post<Map<String, dynamic>>(
-        "/detect",
+        "/analyze",
         data: formData,
         options: Options(
           headers: {"Accept": "application/json"},
@@ -108,7 +221,8 @@ class DetectService {
 
       final body = response.data;
       if (body == null) {
-        throw const DetectServerException("Empty response from detection server.");
+        throw const DetectServerException(
+            "Empty response from detection server.");
       }
 
       return DetectResult.fromJson(body);
