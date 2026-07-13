@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
   const reports = await prisma.report.findMany({
     where,
-    orderBy: { reportedAt: "desc" },
+    orderBy: { createdAt: "desc" },
   });
 
   return corsResponse(reports);
