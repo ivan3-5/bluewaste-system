@@ -98,6 +98,20 @@ export async function POST(request: NextRequest) {
   const totalStart = Date.now();
 
   try {
+    // ── 0. Early env var checks — fail fast with clear messages ───────────
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("[AI] GEMINI_API_KEY is not set in environment variables");
+      return jsonError(500, "Server misconfiguration: GEMINI_API_KEY is not set. Contact the administrator.");
+    }
+    if (!process.env.DATABASE_URL) {
+      console.error("[AI] DATABASE_URL is not set in environment variables");
+      return jsonError(500, "Server misconfiguration: DATABASE_URL is not set. Contact the administrator.");
+    }
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      console.error("[AI] Cloudinary env vars are not set in environment variables");
+      return jsonError(500, "Server misconfiguration: Cloudinary credentials are not set. Contact the administrator.");
+    }
+
     // ── 1. Parse multipart form data ──────────────────────────────────────
     let formData: FormData;
     try {
@@ -212,6 +226,10 @@ export async function POST(request: NextRequest) {
         if (err.code === "TIMEOUT" || err.code === "UNAVAILABLE") {
           return jsonError(503, "AI analysis service is temporarily unavailable. Please try again in a moment.");
         }
+        if (err.code === "MODEL_NOT_FOUND") {
+          console.error("[AI] Gemini model not found — GEMINI_MODEL env var may be set to an invalid model name");
+          return jsonError(500, "Server misconfiguration: Gemini model not found. Check GEMINI_MODEL environment variable (use gemini-2.5-flash).");
+        }
         if (err.code === "INVALID_JSON") {
           // Log the raw invalid output for admin review but do not expose it
           console.error("[AI] Gemini returned invalid JSON — logged for admin review. code:", err.code);
@@ -219,7 +237,7 @@ export async function POST(request: NextRequest) {
         }
       }
       console.error("[AI] Gemini unexpected error:", err);
-      return jsonError(500, "Unexpected error during AI analysis.");
+      return jsonError(500, `Unexpected error during AI analysis: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     const { result: rawResult, modelName, latencyMs, tokenUsage } = geminiResponse;
