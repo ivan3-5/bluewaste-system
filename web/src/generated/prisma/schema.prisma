@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ==================== ENUMS ====================
+
+enum Role {
+  CITIZEN
+  LGU_ADMIN
+  FIELD_WORKER
+}
+
+enum ReportStatus {
+  PENDING
+  VERIFIED
+  CLEANUP_SCHEDULED
+  IN_PROGRESS
+  CLEANED
+  REJECTED
+}
+
+enum WasteCategory {
+  with_waste
+  no_waste
+}
+
+enum ImageType {
+  REPORT
+  CLEANUP
+}
+
+enum NotificationType {
+  NEW_REPORT
+  STATUS_CHANGE
+  ASSIGNMENT
+  SYSTEM
+  CLEANUP_SCHEDULE
+}
+
+enum CleanupScheduleStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum WasteType {
+  PLASTIC
+  ORGANIC
+  GLASS
+  METAL
+  PAPER
+}
+
+enum AnalysisStatus {
+  DIRTY
+  CLEAN
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MODERATE
+  SPAM
+}
+
+// ==================== MODELS ====================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  phone     String?
+  address   String   @default("")
+  role      Role     @default(CITIZEN)
+  avatarUrl String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reports             Report[]                @relation("ReporterReports")
+  assignedReports     Report[]                @relation("AssignedReports")
+  statusChanges       StatusHistory[]
+  notifications       Notification[]
+  reportingZones      ReportingZone[]
+  createdSchedules    CleanupSchedule[]       @relation("ScheduleCreator")
+  verifiedSchedules   CleanupSchedule[]       @relation("ScheduleVerifier")
+  scheduleAssignments CleanupScheduleWorker[] @relation("AssignedSchedules")
+
+  @@index([role])
+  @@index([role, isActive])
+  @@index([email])
+}
+
+model Report {
+  id                 String          @id @default(uuid())
+  title              String
+  description        String
+  category           WasteCategory
+  status             ReportStatus    @default(PENDING)
+  latitude           Float
+  longitude          Float
+  address            String?
+  isAnonymous        Boolean         @default(false)
+  isDeleted          Boolean         @default(false)
+  isSpam             Boolean         @default(false)
+  spamMarkedAt       DateTime?
+  spamReason         String?
+  analysisStatus     AnalysisStatus?
+  analysisWasteCount Int?
+  analysisConfidence Float?
+  analyzedAt         DateTime?
+  severity           Severity?
+
+  // Gemini Vision AI fields
+  aiCategories   String[]
+  aiReason       String?
+  aiModel        String?
+  aiImageHash    String?
+  aiProcessingMs Int?
+  aiGeminiMs     Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reporterId String?
+  reporter   User?   @relation("ReporterReports", fields: [reporterId], references: [id])
+
+  assignedToId String?
+  assignedTo   User?   @relation("AssignedReports", fields: [assignedToId], references: [id])
+
+  cleanupScheduleId String?
+  cleanupSchedule   CleanupSchedule? @relation(fields: [cleanupScheduleId], references: [id], onDelete: SetNull)
+
+  images        ReportImage[]
+  statusHistory StatusHistory[]
+  notifications Notification[]
+
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+  @@index([reporterId])
+  @@index([assignedToId])
+  @@index([latitude, longitude])
+  @@index([isDeleted, createdAt])
+  @@index([isDeleted, status, createdAt])
+  @@index([isDeleted, category, createdAt])
+  @@index([isDeleted, reporterId, createdAt])
+  @@index([isDeleted, assignedToId, createdAt])
+  @@index([isDeleted, isSpam, createdAt])
+  @@index([isDeleted, isSpam, spamMarkedAt])
+  @@index([aiImageHash])
+}
+
+model ReportImage {
+  id        String    @id @default(uuid())
+  imageUrl  String
+  publicId  String
+  type      ImageType @default(REPORT)
+  createdAt DateTime  @default(now())
+
+  reportId String
+  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+model StatusHistory {
+  id             String        @id @default(uuid())
+  previousStatus ReportStatus?
+  newStatus      ReportStatus
+  notes          String?
+  createdAt      DateTime      @default(now())
+
+  reportId String
+  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  changedById String
+  changedBy   User   @relation(fields: [changedById], references: [id])
+
+  @@index([reportId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  reportId String?
+  report   Report? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+model ReportingZone {
+  id          String   @id @default(uuid())
+  name        String
+  coordinates Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  @@index([isActive])
+  @@index([createdById])
+}
+
+model CleanupSchedule {
+  id          String                @id @default(uuid())
+  title       String
+  description String
+  barangay    String
+  latitude    Float
+  longitude   Float
+  scheduledAt DateTime
+  status      CleanupScheduleStatus @default(UPCOMING)
+  notes       String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  createdById String
+  createdBy   User   @relation("ScheduleCreator", fields: [createdById], references: [id])
+
+  verifiedById String?
+  verifiedBy   User?     @relation("ScheduleVerifier", fields: [verifiedById], references: [id])
+  verifiedAt   DateTime?
+
+  workers   CleanupScheduleWorker[]
+  reports   Report[]
+  equipment String[]                @default([])
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([createdById])
+  @@index([barangay])
+}
+
+model CleanupScheduleWorker {
+  id         String   @id @default(uuid())
+  assignedAt DateTime @default(now())
+
+  scheduleId String
+  schedule   CleanupSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  workerId String
+  worker   User   @relation("AssignedSchedules", fields: [workerId], references: [id])
+
+  @@unique([scheduleId, workerId])
+  @@index([workerId])
+}
