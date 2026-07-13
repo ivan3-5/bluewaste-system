@@ -24,6 +24,13 @@ export interface AdminReport {
   assignedWorkerNames?: string | null;
   reportedAt: string | Date;
   updatedAt: string | Date;
+  // Gemini Vision AI fields
+  analyzedAt?: string | Date | null;
+  aiCategories?: string[] | null;
+  aiReason?: string | null;
+  aiModel?: string | null;
+  aiProcessingMs?: number | null;
+  aiGeminiMs?: number | null;
 }
 
 export const ADMIN_REPORT_CATEGORY_LABELS: Record<AdminReportCategory, string> =

@@ -1,10 +1,12 @@
 import { getDashboardReportById } from "@/lib/dashboard-reports";
 import { StatusBadge } from "@/components/StatusBadge";
+import { SeverityBadge } from "@/components/SeverityBadge";
 import MapView from "@/components/MapView";
 import { ReportStatusUpdater } from "@/components/ReportStatusUpdater";
 import Link from "next/link";
 import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
 import { getReverseGeocodedLocation } from "@/lib/utils";
+import { AiAnalysisPanel } from "@/components/AiAnalysisPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +156,20 @@ export default async function ReportDetailPage({ params }: PageProps) {
         </section>
 
         <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+          {/* Gemini AI Analysis Panel */}
+          <AiAnalysisPanel
+            reportId={report.id}
+            hasWaste={report.aiModel != null ? report.category !== "no_waste" : null}
+            aiCategories={report.aiCategories}
+            severity={report.severity as "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null}
+            confidence={report.confidence}
+            aiReason={report.aiReason}
+            aiModel={report.aiModel}
+            aiProcessingMs={report.aiProcessingMs}
+            aiGeminiMs={report.aiGeminiMs}
+            analyzedAt={report.analyzedAt}
+          />
+
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-xl font-bold text-slate-900">
               Report Information
@@ -181,6 +197,14 @@ export default async function ReportDetailPage({ params }: PageProps) {
                 </dt>
                 <dd className="mt-1 text-base font-semibold text-slate-900">
                   {report.latitude.toFixed(5)}, {report.longitude.toFixed(5)}
+                </dd>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs uppercase tracking-wide text-slate-500">
+                  Severity
+                </dt>
+                <dd className="mt-1">
+                  <SeverityBadge severity={report.severity} showFallback />
                 </dd>
               </div>
               <div className="rounded-xl bg-slate-50 p-3">

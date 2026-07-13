@@ -146,19 +146,18 @@ function normalizeDecision(payload: any): AnalyzeDecision {
 
 export async function POST(request: NextRequest) {
   try {
-    const yoloApiUrl = process.env.YOLO_API_URL;
+    const rawYoloUrl =
+      process.env.YOLO_API_URL || "https://bluewaste-system.onrender.com/analyze";
+    const yoloApiUrl =
+      rawYoloUrl.endsWith("/analyze") ||
+      rawYoloUrl.endsWith("/detect") ||
+      rawYoloUrl.endsWith("/predict")
+        ? rawYoloUrl
+        : `${rawYoloUrl.replace(/\/+$/, "")}/analyze`;
     const rawApiBase =
       process.env.BACKEND_API_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       "http://localhost:5000/api";
-
-    if (!yoloApiUrl) {
-      return toJsonError(
-        500,
-        "YOLO API URL is not configured",
-        "Set YOLO_API_URL in web/.env.local and restart the web server.",
-      );
-    }
 
     const authorization = request.headers.get("authorization");
     if (!authorization?.startsWith("Bearer ")) {
@@ -199,10 +198,18 @@ export async function POST(request: NextRequest) {
     const yoloJson = safeParseJson(yoloText);
 
     if (!yoloResponse.ok) {
+      if (yoloResponse.status === 502 || yoloResponse.status === 503 || yoloResponse.status === 504) {
+        return toJsonError(
+          503,
+          "AI detection service is currently unreachable or restarting",
+          "The Render free-tier server may be waking up from sleep or recovering from a timeout. Please wait 30 seconds and try again.",
+        );
+      }
+
       const yoloMessage =
         (yoloJson as any)?.message ||
         (yoloJson as any)?.error ||
-        (typeof yoloText === "string" && yoloText.length > 0
+        (typeof yoloText === "string" && yoloText.length > 0 && !yoloText.includes("<html")
           ? yoloText
           : "Unknown YOLO API error");
 
@@ -221,9 +228,18 @@ export async function POST(request: NextRequest) {
       toNonNegativeInt((yoloJson as any)?.waste_count) ??
       classification.detections.length;
     const topConfidence = toFiniteNumber((yoloJson as any)?.top_confidence);
-    const status: DecisionStatus =
-      normalizeDecisionStatus((yoloJson as any)?.status) ??
-      (wasteCount > 0 ? "DIRTY" : "CLEAN");
+
+    // has_waste is the authoritative field from the /analyze hybrid pipeline.
+    // The /analyze endpoint returns has_waste but NOT a status field, so we
+    // must use has_waste first before falling back to wasteCount.
+    const rawHasWaste = (yoloJson as any)?.has_waste;
+    const hasWaste: boolean =
+      typeof rawHasWaste === "boolean"
+        ? rawHasWaste
+        : normalizeDecisionStatus((yoloJson as any)?.status) === "DIRTY" ||
+          wasteCount > 0;
+
+    const status: DecisionStatus = hasWaste ? "DIRTY" : "CLEAN";
     const decision = normalizeDecision(yoloJson);
     const thresholds =
       yoloJson && typeof (yoloJson as any)?.thresholds === "object"
@@ -303,7 +319,7 @@ export async function POST(request: NextRequest) {
       dominantWaste: classification.dominantWaste,
       totalItems: classification.totalItems,
       severity: typeof (yoloJson as any)?.severity === "string" ? (yoloJson as any).severity : classification.severity,
-      has_waste: (yoloJson as any)?.has_waste ?? (wasteCount > 0),
+      has_waste: hasWaste,
       wasteCategory: classification.wasteCategory,
       confidence: typeof (yoloJson as any)?.confidence === "number" ? (yoloJson as any).confidence : classification.confidence,
       status,
@@ -319,7 +335,24 @@ export async function POST(request: NextRequest) {
       detections: classification.detections,
       report: savedReport,
     });
-  } catch {
-    return toJsonError(500, "Unexpected error while analyzing image");
+  } catch (error: any) {
+    const errMsg =
+      error instanceof Error ? error.message : String(error || "Unknown error");
+    const isNetworkError =
+      errMsg.includes("fetch failed") ||
+      errMsg.includes("ECONNREFUSED") ||
+      errMsg.includes("ECONNRESET") ||
+      errMsg.includes("timeout") ||
+      errMsg.includes("socket");
+
+    return toJsonError(
+      isNetworkError ? 503 : 500,
+      isNetworkError
+        ? "AI detection service is currently unreachable or restarting"
+        : `Unexpected error while analyzing image: ${errMsg}`,
+      isNetworkError
+        ? "The Render free-tier server may be waking up from sleep or restarting after a timeout. Please wait 30 seconds and try again."
+        : undefined,
+    );
   }
 }

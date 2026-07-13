@@ -113,6 +113,14 @@ export function useCreateReport() {
       longitude: number;
       address?: string;
       isAnonymous?: boolean;
+      /** Pre-computed severity from the client-side YOLO /analyze pipeline */
+      severity?: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
+      /** Pre-computed status from client-side analysis */
+      analysisStatus?: "DIRTY" | "CLEAN" | null;
+      /** Pre-computed confidence (0.0–1.0) from client-side analysis */
+      analysisConfidence?: number | null;
+      /** Number of waste items detected */
+      analysisWasteCount?: number | null;
     }) => {
       const { data } = await api.post("/reports", reportData);
       return data;

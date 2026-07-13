@@ -28,6 +28,7 @@ export interface Report {
   analysisWasteCount?: number | null;
   analysisConfidence?: number | null;
   analyzedAt?: string | null;
+  severity?: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
   reporterId?: string;
   reporter?: {
     id: string;
@@ -53,7 +54,14 @@ export interface Report {
 
 export type WasteType = "PLASTIC" | "ORGANIC" | "GLASS" | "METAL" | "PAPER";
 
-export type WasteSeverity = "low" | "medium" | "high";
+/**
+ * Severity levels used by the DB Severity enum and the SeverityBadge component.
+ * Values must match the Prisma `Severity` enum: CRITICAL | HIGH | MODERATE | SPAM
+ */
+export type WasteSeverity = "CRITICAL" | "HIGH" | "MODERATE" | "SPAM";
+
+/** @deprecated Old lowercase severity values — kept for legacy pages still using them */
+export type WasteSeverityLegacy = "low" | "medium" | "high";
 
 export interface WasteDetection {
   type: WasteType;
@@ -73,7 +81,7 @@ export interface WasteReport {
   detections: WasteDetection[];
   dominantWaste?: WasteType | null;
   totalItems: number;
-  severity: WasteSeverity;
+  severity: WasteSeverityLegacy;
   confidence: number;
   labels: string[];
   latitude?: number | null;
@@ -200,7 +208,9 @@ export type WasteCategory =
   | "ORGANIC_WASTE"
   | "GLASS_WASTE"
   | "METAL_WASTE"
-  | "PAPER_WASTE";
+  | "PAPER_WASTE"
+  | "with_waste"
+  | "no_waste";
 export type ReportStatus =
   | "PENDING"
   | "VERIFIED"
@@ -217,6 +227,8 @@ export const WASTE_CATEGORY_LABELS: Record<WasteCategory, string> = {
   GLASS_WASTE: "Glass Waste",
   METAL_WASTE: "Metal Waste",
   PAPER_WASTE: "Paper Waste",
+  with_waste: "With Waste",
+  no_waste: "No Waste",
 };
 
 export const WASTE_CATEGORY_COLORS: Record<WasteCategory, string> = {
@@ -225,6 +237,8 @@ export const WASTE_CATEGORY_COLORS: Record<WasteCategory, string> = {
   GLASS_WASTE: "#06b6d4",
   METAL_WASTE: "#f97316",
   PAPER_WASTE: "#8b5cf6",
+  with_waste: "#3b82f6",
+  no_waste: "#94a3b8",
 };
 
 export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {

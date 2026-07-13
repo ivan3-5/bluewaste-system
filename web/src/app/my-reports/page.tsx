@@ -8,7 +8,7 @@ import { useMyWasteReports } from "@/hooks/useWasteReports";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
-import type { WasteSeverity, WasteType } from "@/types";
+import type { WasteSeverityLegacy, WasteType } from "@/types";
 
 const WASTE_TYPE_STYLES: Record<WasteType, string> = {
   PLASTIC: "bg-blue-100 text-blue-800 border-blue-200",
@@ -26,7 +26,7 @@ const WASTE_TYPE_LABELS: Record<WasteType, string> = {
   PAPER: "Paper",
 };
 
-const SEVERITY_STYLES: Record<WasteSeverity, string> = {
+const SEVERITY_STYLES: Record<WasteSeverityLegacy, string> = {
   low: "bg-green-100 text-green-800 border-green-200",
   medium: "bg-amber-100 text-amber-800 border-amber-200",
   high: "bg-red-100 text-red-800 border-red-200",

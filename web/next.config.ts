@@ -20,6 +20,18 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: "./tsconfig.json",
   },
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        "localhost:3000",
+        "localhost:5000",
+        "bluewaste-system.onrender.com",
+        "*.onrender.com",
+        "*.vercel.app",
+      ],
+      bodySizeLimit: "10mb",
+    },
+  },
 };
 
 export default nextConfig;

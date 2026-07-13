@@ -24,6 +24,17 @@ export const createReportSchema = z.object({
   isSpamFlagged: z.boolean().optional(),
   spamReason: z.string().max(500).optional(),
   yoloConfidence: z.number().min(0).max(100).optional(),
+  /** Pre-computed severity from the client-side YOLO /analyze pipeline */
+  severity: z
+    .enum(["CRITICAL", "HIGH", "MODERATE", "SPAM"])
+    .nullable()
+    .optional(),
+  /** Pre-computed analysis status from the client-side YOLO pipeline */
+  analysisStatus: z.enum(["DIRTY", "CLEAN"]).nullable().optional(),
+  /** Pre-computed confidence (0.0–1.0) from the client-side YOLO pipeline */
+  analysisConfidence: z.number().min(0).max(1).nullable().optional(),
+  /** Number of waste items detected by client-side analysis */
+  analysisWasteCount: z.number().int().min(0).nullable().optional(),
 });
 
 

@@ -209,9 +209,16 @@ export class ReportService {
       "report-image.jpg",
     );
 
+    const targetYoloUrl =
+      env.YOLO_API_URL.endsWith("/analyze") ||
+      env.YOLO_API_URL.endsWith("/detect") ||
+      env.YOLO_API_URL.endsWith("/predict")
+        ? env.YOLO_API_URL
+        : `${env.YOLO_API_URL.replace(/\/+$/, "")}/analyze`;
+
     let yoloResponse: Response;
     try {
-      yoloResponse = await fetch(env.YOLO_API_URL, {
+      yoloResponse = await fetch(targetYoloUrl, {
         method: "POST",
         body: yoloBody,
       });
@@ -255,7 +262,11 @@ export class ReportService {
       : [];
     const labels: string[] = rawLabels
       .map((l: any) =>
-        typeof l?.label === "string" ? l.label.trim().toLowerCase() : "",
+        typeof l === "string"
+          ? l.trim().toLowerCase()
+          : typeof l?.label === "string"
+            ? l.label.trim().toLowerCase()
+            : "",
       )
       .filter((l: string) => l.length > 0);
 
@@ -310,12 +321,25 @@ export class ReportService {
 
     const newCategory: WasteCategory = hasWaste ? "with_waste" : "no_waste";
 
-    // Resolve severity from the /analyze response or fall back to status-based logic
+    // Resolve severity from the /analyze response or fall back to confidence/status logic
     const rawSeverity = (analysis as any).severity as string | null | undefined;
+    const conf = typeof (analysis as any).confidence === "number" ? (analysis as any).confidence : 0;
+    let computedSeverity: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null = null;
+    if (rawSeverity) {
+      const upper = String(rawSeverity).toUpperCase();
+      if (["CRITICAL", "HIGH", "MODERATE", "SPAM"].includes(upper)) {
+        computedSeverity = upper as any;
+      } else if (upper === "MEDIUM" || upper === "LOW") {
+        computedSeverity = "MODERATE";
+      }
+    }
+    if (!computedSeverity && hasWaste) {
+      if (conf >= 0.9) computedSeverity = "CRITICAL";
+      else if (conf >= 0.7) computedSeverity = "HIGH";
+      else if (conf >= 0.5) computedSeverity = "MODERATE";
+    }
     const resolvedSeverity = (
-      rawSeverity && ["CRITICAL", "HIGH", "MODERATE", "SPAM"].includes(rawSeverity)
-        ? rawSeverity
-        : hasWaste ? "MODERATE" : "SPAM"
+      computedSeverity ?? report.severity ?? (hasWaste ? "MODERATE" : "SPAM")
     ) as "CRITICAL" | "HIGH" | "MODERATE" | "SPAM";
 
     const shouldMarkSpam =
@@ -347,15 +371,19 @@ export class ReportService {
             severity: resolvedSeverity,
           },
         }),
-        prisma.statusHistory.create({
-          data: {
-            reportId,
-            previousStatus: report.status,
-            newStatus: report.status,
-            changedById: report.reporterId || "system",
-            notes: `Auto analysis: ${shouldMarkSpam ? "marked as spam" : `severity=${resolvedSeverity}`}`,
-          },
-        }),
+        ...(report.reporterId
+          ? [
+              prisma.statusHistory.create({
+                data: {
+                  reportId,
+                  previousStatus: report.status,
+                  newStatus: report.status,
+                  changedById: report.reporterId,
+                  notes: `Auto analysis: ${shouldMarkSpam ? "marked as spam" : `severity=${resolvedSeverity}`}`,
+                },
+              }),
+            ]
+          : []),
       ])
       .then((r) => r[0]);
 
@@ -421,6 +449,14 @@ export class ReportService {
     spamReason?: string;
     /** Top YOLOv8 confidence score (0.0 – 100.0) from the /detect endpoint. */
     yoloConfidence?: number;
+    /** Pre-computed severity from the client-side YOLO /analyze pipeline. */
+    severity?: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
+    /** Pre-computed analysis status (DIRTY / CLEAN) from the client-side YOLO. */
+    analysisStatus?: "DIRTY" | "CLEAN" | null;
+    /** Pre-computed confidence from the client-side YOLO /analyze pipeline (0.0–1.0). */
+    analysisConfidence?: number | null;
+    /** Number of waste items detected by the client-side analysis. */
+    analysisWasteCount?: number | null;
   }) {
     await this.purgeExpiredSpamIfDue();
 
@@ -452,7 +488,17 @@ export class ReportService {
           spamMarkedAt: isSpam ? new Date() : null,
           spamReason: resolvedSpamReason,
           // Persist the client-side YOLO confidence so the spam page can show it.
-          analysisConfidence: yoloConfidenceFraction,
+          analysisConfidence:
+            typeof data.analysisConfidence === "number" && data.analysisConfidence > 0
+              ? data.analysisConfidence
+              : yoloConfidenceFraction,
+          // Persist pre-computed analysis fields from the client-side /analyze pipeline.
+          ...(data.severity != null && {
+            severity: data.severity as any,
+            analysisStatus: data.analysisStatus as any ?? null,
+            analysisWasteCount: data.analysisWasteCount ?? null,
+            analyzedAt: new Date(),
+          }),
           reporterId: data.isAnonymous ? null : data.reporterId,
         },
         include: {

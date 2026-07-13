@@ -23,6 +23,7 @@ type DashboardReportRow = {
   severity: string | null;
   reportedAt: Date;
   updatedAt: Date;
+  analyzedAt: Date | null;
   imageUrl: string | null;
   images: Array<{
     id: string;
@@ -37,6 +38,12 @@ type DashboardReportRow = {
   assignedToId?: string | null;
   assignedToName?: string | null;
   assignedWorkerNames?: string | null;
+  // Gemini AI fields
+  aiCategories?: string[] | null;
+  aiReason?: string | null;
+  aiModel?: string | null;
+  aiProcessingMs?: number | null;
+  aiGeminiMs?: number | null;
 };
 
 type DashboardStatsRow = {
@@ -116,6 +123,12 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
     assignedWorkerNames: row.assignedWorkerNames ?? null,
     reportedAt: row.reportedAt,
     updatedAt: row.updatedAt,
+    analyzedAt: row.analyzedAt ?? null,
+    aiCategories: Array.isArray(row.aiCategories) ? row.aiCategories : null,
+    aiReason: row.aiReason ?? null,
+    aiModel: row.aiModel ?? null,
+    aiProcessingMs: row.aiProcessingMs ?? null,
+    aiGeminiMs: row.aiGeminiMs ?? null,
   };
 }
 
@@ -135,6 +148,12 @@ export async function getDashboardReports(limit: number) {
       r.severity,
       r."createdAt" AS "reportedAt",
       r."updatedAt",
+      r."analyzedAt",
+      r."aiCategories",
+      r."aiReason",
+      r."aiModel",
+      r."aiProcessingMs",
+      r."aiGeminiMs",
       COALESCE(image."imageUrl", null) AS "imageUrl",
       COALESCE(images.images, '[]'::json) AS images,
       r."reporterId",
@@ -203,6 +222,12 @@ export async function getDashboardReportById(id: string) {
       r.severity,
       r."createdAt" AS "reportedAt",
       r."updatedAt",
+      r."analyzedAt",
+      r."aiCategories",
+      r."aiReason",
+      r."aiModel",
+      r."aiProcessingMs",
+      r."aiGeminiMs",
       COALESCE(image."imageUrl", null) AS "imageUrl",
       COALESCE(images.images, '[]'::json) AS images,
       r."reporterId",

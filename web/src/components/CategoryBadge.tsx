@@ -5,6 +5,9 @@ import {
 
 export function CategoryBadge({ category }: { category: AdminReportCategory }) {
   const isWaste = category === "with_waste";
+  const label =
+    ADMIN_REPORT_CATEGORY_LABELS[category] ||
+    String(category).replace(/_/g, " ");
 
   return (
     <span
@@ -14,7 +17,7 @@ export function CategoryBadge({ category }: { category: AdminReportCategory }) {
           : "border-emerald-200 bg-emerald-50 text-emerald-700"
       }`}
     >
-      {ADMIN_REPORT_CATEGORY_LABELS[category]}
+      {label}
     </span>
   );
 }

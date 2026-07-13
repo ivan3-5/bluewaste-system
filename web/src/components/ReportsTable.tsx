@@ -262,7 +262,7 @@ export function ReportsTable({
                     <CategoryBadge category={report.category} />
                   </td>
                   <td className="px-4 py-3">
-                    <SeverityBadge severity={report.severity} />
+                    <SeverityBadge severity={report.severity} showFallback />
                   </td>
                   <td className="px-4 py-3">
                     <p className="max-w-[240px] truncate text-sm font-semibold text-slate-900">

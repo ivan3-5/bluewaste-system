@@ -364,6 +364,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
             ? (_detectResult?.spamReason ?? "No waste detected by YOLOv8")
             : null,
         yoloConfidence: (_detectedConfidence ?? 0.0) * 100,
+        severity: _detectResult?.severity.dbValue,
+        analysisStatus: _detectResult?.hasWaste == true ? "DIRTY" : "CLEAN",
+        analysisConfidence: _detectResult?.confidence,
+        analysisWasteCount: _detectResult?.hasWaste == true ? (_detectResult?.labels.length ?? 1) : 0,
       );
 
       if (_images.isNotEmpty) {

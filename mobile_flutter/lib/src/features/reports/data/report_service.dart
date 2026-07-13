@@ -76,6 +76,10 @@ class ReportService {
     bool isSpamFlagged = false,
     String? spamReason,
     double yoloConfidence = 0.0,
+    String? severity,
+    String? analysisStatus,
+    double? analysisConfidence,
+    int? analysisWasteCount,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -92,6 +96,10 @@ class ReportService {
           if (isSpamFlagged) "isSpamFlagged": true,
           if (isSpamFlagged && spamReason != null) "spamReason": spamReason,
           "yoloConfidence": yoloConfidence,
+          if (severity != null) "severity": severity,
+          if (analysisStatus != null) "analysisStatus": analysisStatus,
+          if (analysisConfidence != null) "analysisConfidence": analysisConfidence,
+          if (analysisWasteCount != null) "analysisWasteCount": analysisWasteCount,
         },
       );
 

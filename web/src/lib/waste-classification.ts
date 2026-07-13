@@ -19,6 +19,7 @@ export interface ClassificationResult {
   detectedObject: string;
   dominantWaste: WasteType | null;
   totalItems: number;
+  /** Severity in the DB enum format: CRITICAL | HIGH | MODERATE | SPAM */
   severity: WasteSeverity;
   wasteCategory: WasteCategory;
   confidence: number;
@@ -70,6 +71,8 @@ const CATEGORY_KEYWORDS: Record<WasteCategory, string[]> = {
   GLASS_WASTE: ["glass", "wine glass", "jar", "glass bottle"],
   METAL_WASTE: ["metal", "can", "tin", "aluminum", "steel"],
   PAPER_WASTE: ["paper", "cardboard", "carton", "newspaper", "box"],
+  with_waste: [],
+  no_waste: [],
 };
 
 const CATEGORY_MATCH_ORDER: WasteCategory[] = [
@@ -80,8 +83,19 @@ const CATEGORY_MATCH_ORDER: WasteCategory[] = [
   "PLASTIC_WASTE",
 ];
 
-function labelMatches(label: string, keywords: string[]) {
-  return keywords.some((keyword) => label.includes(keyword));
+function labelMatches(rawLabel: any, keywords: string[]) {
+  const label =
+    typeof rawLabel === "string"
+      ? rawLabel
+      : typeof rawLabel?.label === "string"
+        ? rawLabel.label
+        : typeof rawLabel?.class_name === "string"
+          ? rawLabel.class_name
+          : "";
+  if (!label) return false;
+  return keywords.some((keyword) =>
+    label.toLowerCase().includes(keyword.toLowerCase()),
+  );
 }
 
 function toNumber(value: unknown): number | null {
@@ -265,9 +279,9 @@ function mapLabelToWasteType(label: string): WasteType | null {
 }
 
 function toSeverity(totalItems: number): WasteSeverity {
-  if (totalItems >= 7) return "high";
-  if (totalItems >= 3) return "medium";
-  return "low";
+  if (totalItems >= 7) return "CRITICAL";
+  if (totalItems >= 3) return "HIGH";
+  return "MODERATE";
 }
 
 function toBbox(detection: DetectionBox): number[] {
@@ -329,7 +343,7 @@ function getDominantWaste(detections: WasteDetection[]): WasteType | null {
 }
 
 export function inferWasteCategory(
-  labels: string[],
+  labels: any[],
   dominantWaste?: WasteType | null,
 ): WasteCategory {
   if (dominantWaste) {

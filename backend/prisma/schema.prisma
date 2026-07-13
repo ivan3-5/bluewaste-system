@@ -131,6 +131,13 @@ model Report {
   analysisConfidence Float?
   analyzedAt DateTime?
   severity   Severity?
+  // Gemini Vision AI fields
+  aiCategories  String[]   // Array of detected waste categories from Gemini
+  aiReason      String?    // One-sentence explanation from Gemini
+  aiModel       String?    // Gemini model/version string
+  aiImageHash   String?    // SHA-256 of original image for deduplication
+  aiProcessingMs Int?      // Total request processing time (ms)
+  aiGeminiMs    Int?       // Gemini API latency (ms)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -164,7 +171,9 @@ model Report {
   @@index([isDeleted, assignedToId, createdAt])
   @@index([isDeleted, isSpam, createdAt])
   @@index([isDeleted, isSpam, spamMarkedAt])
+  @@index([aiImageHash])
 }
+
 
 model ReportImage {
   id        String    @id @default(uuid())

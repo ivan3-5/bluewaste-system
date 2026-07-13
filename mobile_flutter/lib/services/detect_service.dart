@@ -57,6 +57,21 @@ enum WasteSeverity {
         return "";
     }
   }
+
+  String? get dbValue {
+    switch (this) {
+      case WasteSeverity.critical:
+        return "CRITICAL";
+      case WasteSeverity.high:
+        return "HIGH";
+      case WasteSeverity.moderate:
+        return "MODERATE";
+      case WasteSeverity.spam:
+        return "SPAM";
+      case WasteSeverity.unknown:
+        return null;
+    }
+  }
 }
 
 // ── A single Cloud Vision label ──────────────────────────────────────────────
@@ -116,7 +131,7 @@ class DetectResult {
       "${(confidence * 100).toStringAsFixed(1)}%";
 
   factory DetectResult.fromJson(Map<String, dynamic> json) {
-    List<WasteLabel> _parseLabels(dynamic raw) {
+    List<WasteLabel> parseLabels(dynamic raw) {
       if (raw is! List) return const [];
       return raw
           .whereType<Map<String, dynamic>>()
@@ -131,8 +146,8 @@ class DetectResult {
       confidence: (json["confidence"] as num?)?.toDouble() ?? 0.0,
       severity: WasteSeverity.fromString(json["severity"]?.toString()),
       layer1Passed: json["layer1_passed"] != false,
-      labels: _parseLabels(json["labels"]),
-      allLabels: _parseLabels(json["all_labels"]),
+      labels: parseLabels(json["labels"]),
+      allLabels: parseLabels(json["all_labels"]),
       spamReason: json["spam_reason"]?.toString(),
     );
   }
