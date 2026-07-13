@@ -121,23 +121,125 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
+exports.Prisma.UserScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  password: 'password',
+  firstName: 'firstName',
+  lastName: 'lastName',
+  phone: 'phone',
+  address: 'address',
+  role: 'role',
+  avatarUrl: 'avatarUrl',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.ReportScalarFieldEnum = {
   id: 'id',
-  imageUrl: 'imageUrl',
+  title: 'title',
+  description: 'description',
   category: 'category',
-  confidence: 'confidence',
+  status: 'status',
   latitude: 'latitude',
   longitude: 'longitude',
-  locationName: 'locationName',
+  address: 'address',
+  isAnonymous: 'isAnonymous',
+  isDeleted: 'isDeleted',
+  isSpam: 'isSpam',
+  spamMarkedAt: 'spamMarkedAt',
+  spamReason: 'spamReason',
+  analysisStatus: 'analysisStatus',
+  analysisWasteCount: 'analysisWasteCount',
+  analysisConfidence: 'analysisConfidence',
+  analyzedAt: 'analyzedAt',
+  severity: 'severity',
+  aiCategories: 'aiCategories',
+  aiReason: 'aiReason',
+  aiModel: 'aiModel',
+  aiImageHash: 'aiImageHash',
+  aiProcessingMs: 'aiProcessingMs',
+  aiGeminiMs: 'aiGeminiMs',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  reporterId: 'reporterId',
+  assignedToId: 'assignedToId',
+  cleanupScheduleId: 'cleanupScheduleId'
+};
+
+exports.Prisma.ReportImageScalarFieldEnum = {
+  id: 'id',
+  imageUrl: 'imageUrl',
+  publicId: 'publicId',
+  type: 'type',
+  createdAt: 'createdAt',
+  reportId: 'reportId'
+};
+
+exports.Prisma.StatusHistoryScalarFieldEnum = {
+  id: 'id',
+  previousStatus: 'previousStatus',
+  newStatus: 'newStatus',
+  notes: 'notes',
+  createdAt: 'createdAt',
+  reportId: 'reportId',
+  changedById: 'changedById'
+};
+
+exports.Prisma.NotificationScalarFieldEnum = {
+  id: 'id',
+  title: 'title',
+  message: 'message',
+  type: 'type',
+  isRead: 'isRead',
+  createdAt: 'createdAt',
+  userId: 'userId',
+  reportId: 'reportId'
+};
+
+exports.Prisma.ReportingZoneScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  coordinates: 'coordinates',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  createdById: 'createdById'
+};
+
+exports.Prisma.CleanupScheduleScalarFieldEnum = {
+  id: 'id',
+  title: 'title',
   description: 'description',
+  barangay: 'barangay',
+  latitude: 'latitude',
+  longitude: 'longitude',
+  scheduledAt: 'scheduledAt',
   status: 'status',
-  reportedAt: 'reportedAt',
-  updatedAt: 'updatedAt'
+  notes: 'notes',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  createdById: 'createdById',
+  verifiedById: 'verifiedById',
+  verifiedAt: 'verifiedAt',
+  equipment: 'equipment'
+};
+
+exports.Prisma.CleanupScheduleWorkerScalarFieldEnum = {
+  id: 'id',
+  assignedAt: 'assignedAt',
+  scheduleId: 'scheduleId',
+  workerId: 'workerId'
 };
 
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
+};
+
+exports.Prisma.JsonNullValueInput = {
+  JsonNull: Prisma.JsonNull
 };
 
 exports.Prisma.QueryMode = {
@@ -150,9 +252,72 @@ exports.Prisma.NullsOrder = {
   last: 'last'
 };
 
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
+};
+exports.Role = exports.$Enums.Role = {
+  CITIZEN: 'CITIZEN',
+  LGU_ADMIN: 'LGU_ADMIN',
+  FIELD_WORKER: 'FIELD_WORKER'
+};
+
+exports.WasteCategory = exports.$Enums.WasteCategory = {
+  with_waste: 'with_waste',
+  no_waste: 'no_waste'
+};
+
+exports.ReportStatus = exports.$Enums.ReportStatus = {
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  CLEANUP_SCHEDULED: 'CLEANUP_SCHEDULED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  CLEANED: 'CLEANED',
+  REJECTED: 'REJECTED'
+};
+
+exports.AnalysisStatus = exports.$Enums.AnalysisStatus = {
+  DIRTY: 'DIRTY',
+  CLEAN: 'CLEAN'
+};
+
+exports.Severity = exports.$Enums.Severity = {
+  CRITICAL: 'CRITICAL',
+  HIGH: 'HIGH',
+  MODERATE: 'MODERATE',
+  SPAM: 'SPAM'
+};
+
+exports.ImageType = exports.$Enums.ImageType = {
+  REPORT: 'REPORT',
+  CLEANUP: 'CLEANUP'
+};
+
+exports.NotificationType = exports.$Enums.NotificationType = {
+  NEW_REPORT: 'NEW_REPORT',
+  STATUS_CHANGE: 'STATUS_CHANGE',
+  ASSIGNMENT: 'ASSIGNMENT',
+  SYSTEM: 'SYSTEM',
+  CLEANUP_SCHEDULE: 'CLEANUP_SCHEDULE'
+};
+
+exports.CleanupScheduleStatus = exports.$Enums.CleanupScheduleStatus = {
+  UPCOMING: 'UPCOMING',
+  ONGOING: 'ONGOING',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED'
+};
 
 exports.Prisma.ModelName = {
-  Report: 'Report'
+  User: 'User',
+  Report: 'Report',
+  ReportImage: 'ReportImage',
+  StatusHistory: 'StatusHistory',
+  Notification: 'Notification',
+  ReportingZone: 'ReportingZone',
+  CleanupSchedule: 'CleanupSchedule',
+  CleanupScheduleWorker: 'CleanupScheduleWorker'
 };
 
 /**
