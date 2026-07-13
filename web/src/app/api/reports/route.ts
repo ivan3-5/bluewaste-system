@@ -75,14 +75,21 @@ export async function POST(request: Request) {
 
     const report = await prisma.report.create({
       data: {
-        imageUrl,
-        category,
-        confidence,
+        title: locationName,
+        description: description || "",
+        category: category as "with_waste" | "no_waste",
+        analysisConfidence: confidence,
         latitude,
         longitude,
-        locationName,
-        description: description || null,
+        address: locationName,
+        images: {
+          create: {
+            imageUrl,
+            publicId: imageUrl,
+          },
+        },
       },
+      include: { images: true },
     });
 
     return corsResponse(report, { status: 201 });
