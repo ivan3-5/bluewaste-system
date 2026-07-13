@@ -93,125 +93,23 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
-exports.Prisma.UserScalarFieldEnum = {
-  id: 'id',
-  email: 'email',
-  password: 'password',
-  firstName: 'firstName',
-  lastName: 'lastName',
-  phone: 'phone',
-  address: 'address',
-  role: 'role',
-  avatarUrl: 'avatarUrl',
-  isActive: 'isActive',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
 exports.Prisma.ReportScalarFieldEnum = {
   id: 'id',
-  title: 'title',
-  description: 'description',
-  category: 'category',
-  status: 'status',
-  latitude: 'latitude',
-  longitude: 'longitude',
-  address: 'address',
-  isAnonymous: 'isAnonymous',
-  isDeleted: 'isDeleted',
-  isSpam: 'isSpam',
-  spamMarkedAt: 'spamMarkedAt',
-  spamReason: 'spamReason',
-  analysisStatus: 'analysisStatus',
-  analysisWasteCount: 'analysisWasteCount',
-  analysisConfidence: 'analysisConfidence',
-  analyzedAt: 'analyzedAt',
-  severity: 'severity',
-  aiCategories: 'aiCategories',
-  aiReason: 'aiReason',
-  aiModel: 'aiModel',
-  aiImageHash: 'aiImageHash',
-  aiProcessingMs: 'aiProcessingMs',
-  aiGeminiMs: 'aiGeminiMs',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  reporterId: 'reporterId',
-  assignedToId: 'assignedToId',
-  cleanupScheduleId: 'cleanupScheduleId'
-};
-
-exports.Prisma.ReportImageScalarFieldEnum = {
-  id: 'id',
   imageUrl: 'imageUrl',
-  publicId: 'publicId',
-  type: 'type',
-  createdAt: 'createdAt',
-  reportId: 'reportId'
-};
-
-exports.Prisma.StatusHistoryScalarFieldEnum = {
-  id: 'id',
-  previousStatus: 'previousStatus',
-  newStatus: 'newStatus',
-  notes: 'notes',
-  createdAt: 'createdAt',
-  reportId: 'reportId',
-  changedById: 'changedById'
-};
-
-exports.Prisma.NotificationScalarFieldEnum = {
-  id: 'id',
-  title: 'title',
-  message: 'message',
-  type: 'type',
-  isRead: 'isRead',
-  createdAt: 'createdAt',
-  userId: 'userId',
-  reportId: 'reportId'
-};
-
-exports.Prisma.ReportingZoneScalarFieldEnum = {
-  id: 'id',
-  name: 'name',
-  coordinates: 'coordinates',
-  isActive: 'isActive',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  createdById: 'createdById'
-};
-
-exports.Prisma.CleanupScheduleScalarFieldEnum = {
-  id: 'id',
-  title: 'title',
-  description: 'description',
-  barangay: 'barangay',
+  category: 'category',
+  confidence: 'confidence',
   latitude: 'latitude',
   longitude: 'longitude',
-  scheduledAt: 'scheduledAt',
+  locationName: 'locationName',
+  description: 'description',
   status: 'status',
-  notes: 'notes',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  createdById: 'createdById',
-  verifiedById: 'verifiedById',
-  verifiedAt: 'verifiedAt',
-  equipment: 'equipment'
-};
-
-exports.Prisma.CleanupScheduleWorkerScalarFieldEnum = {
-  id: 'id',
-  assignedAt: 'assignedAt',
-  scheduleId: 'scheduleId',
-  workerId: 'workerId'
+  reportedAt: 'reportedAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
-};
-
-exports.Prisma.JsonNullValueInput = {
-  JsonNull: Prisma.JsonNull
 };
 
 exports.Prisma.QueryMode = {
@@ -224,80 +122,9 @@ exports.Prisma.NullsOrder = {
   last: 'last'
 };
 
-exports.Prisma.JsonNullValueFilter = {
-  DbNull: Prisma.DbNull,
-  JsonNull: Prisma.JsonNull,
-  AnyNull: Prisma.AnyNull
-};
-exports.Role = exports.$Enums.Role = {
-  CITIZEN: 'CITIZEN',
-  LGU_ADMIN: 'LGU_ADMIN',
-  FIELD_WORKER: 'FIELD_WORKER'
-};
-
-exports.ReportStatus = exports.$Enums.ReportStatus = {
-  PENDING: 'PENDING',
-  VERIFIED: 'VERIFIED',
-  CLEANUP_SCHEDULED: 'CLEANUP_SCHEDULED',
-  IN_PROGRESS: 'IN_PROGRESS',
-  CLEANED: 'CLEANED',
-  REJECTED: 'REJECTED'
-};
-
-exports.WasteCategory = exports.$Enums.WasteCategory = {
-  with_waste: 'with_waste',
-  no_waste: 'no_waste'
-};
-
-exports.ImageType = exports.$Enums.ImageType = {
-  REPORT: 'REPORT',
-  CLEANUP: 'CLEANUP'
-};
-
-exports.NotificationType = exports.$Enums.NotificationType = {
-  NEW_REPORT: 'NEW_REPORT',
-  STATUS_CHANGE: 'STATUS_CHANGE',
-  ASSIGNMENT: 'ASSIGNMENT',
-  SYSTEM: 'SYSTEM',
-  CLEANUP_SCHEDULE: 'CLEANUP_SCHEDULE'
-};
-
-exports.CleanupScheduleStatus = exports.$Enums.CleanupScheduleStatus = {
-  UPCOMING: 'UPCOMING',
-  ONGOING: 'ONGOING',
-  COMPLETED: 'COMPLETED',
-  CANCELLED: 'CANCELLED'
-};
-
-exports.WasteType = exports.$Enums.WasteType = {
-  PLASTIC: 'PLASTIC',
-  ORGANIC: 'ORGANIC',
-  GLASS: 'GLASS',
-  METAL: 'METAL',
-  PAPER: 'PAPER'
-};
-
-exports.AnalysisStatus = exports.$Enums.AnalysisStatus = {
-  DIRTY: 'DIRTY',
-  CLEAN: 'CLEAN'
-};
-
-exports.Severity = exports.$Enums.Severity = {
-  CRITICAL: 'CRITICAL',
-  HIGH: 'HIGH',
-  MODERATE: 'MODERATE',
-  SPAM: 'SPAM'
-};
 
 exports.Prisma.ModelName = {
-  User: 'User',
-  Report: 'Report',
-  ReportImage: 'ReportImage',
-  StatusHistory: 'StatusHistory',
-  Notification: 'Notification',
-  ReportingZone: 'ReportingZone',
-  CleanupSchedule: 'CleanupSchedule',
-  CleanupScheduleWorker: 'CleanupScheduleWorker'
+  Report: 'Report'
 };
 /**
  * Create the Client
@@ -347,15 +174,22 @@ const config = {
       }
     }
   },
-  "inlineSchema": "generator client {\n  provider = \"prisma-client-js\"\n  output   = \"../src/generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env(\"DATABASE_URL\")\n}\n\n// ==================== ENUMS ====================\n\nenum Role {\n  CITIZEN\n  LGU_ADMIN\n  FIELD_WORKER\n}\n\nenum ReportStatus {\n  PENDING\n  VERIFIED\n  CLEANUP_SCHEDULED\n  IN_PROGRESS\n  CLEANED\n  REJECTED\n}\n\nenum WasteCategory {\n  with_waste\n  no_waste\n}\n\nenum ImageType {\n  REPORT\n  CLEANUP\n}\n\nenum NotificationType {\n  NEW_REPORT\n  STATUS_CHANGE\n  ASSIGNMENT\n  SYSTEM\n  CLEANUP_SCHEDULE\n}\n\nenum CleanupScheduleStatus {\n  UPCOMING\n  ONGOING\n  COMPLETED\n  CANCELLED\n}\n\nenum WasteType {\n  PLASTIC\n  ORGANIC\n  GLASS\n  METAL\n  PAPER\n}\n\nenum AnalysisStatus {\n  DIRTY\n  CLEAN\n}\n\nenum Severity {\n  CRITICAL\n  HIGH\n  MODERATE\n  SPAM\n}\n\n// ==================== MODELS ====================\n\nmodel User {\n  id        String   @id @default(uuid())\n  email     String   @unique\n  password  String\n  firstName String\n  lastName  String\n  phone     String?\n  address   String   @default(\"\")\n  role      Role     @default(CITIZEN)\n  avatarUrl String?\n  isActive  Boolean  @default(true)\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  reports             Report[]                @relation(\"ReporterReports\")\n  assignedReports     Report[]                @relation(\"AssignedReports\")\n  statusChanges       StatusHistory[]\n  notifications       Notification[]\n  reportingZones      ReportingZone[]\n  createdSchedules    CleanupSchedule[]       @relation(\"ScheduleCreator\")\n  verifiedSchedules   CleanupSchedule[]       @relation(\"ScheduleVerifier\")\n  scheduleAssignments CleanupScheduleWorker[] @relation(\"AssignedSchedules\")\n\n  @@index([role])\n  @@index([role, isActive])\n  @@index([email])\n}\n\nmodel Report {\n  id                 String          @id @default(uuid())\n  title              String\n  description        String\n  category           WasteCategory\n  status             ReportStatus    @default(PENDING)\n  latitude           Float\n  longitude          Float\n  address            String?\n  isAnonymous        Boolean         @default(false)\n  isDeleted          Boolean         @default(false)\n  isSpam             Boolean         @default(false)\n  spamMarkedAt       DateTime?\n  spamReason         String?\n  analysisStatus     AnalysisStatus?\n  analysisWasteCount Int?\n  analysisConfidence Float?\n  analyzedAt         DateTime?\n  severity           Severity?\n\n  // Gemini Vision AI fields\n  aiCategories   String[]\n  aiReason       String?\n  aiModel        String?\n  aiImageHash    String?\n  aiProcessingMs Int?\n  aiGeminiMs     Int?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  reporterId String?\n  reporter   User?   @relation(\"ReporterReports\", fields: [reporterId], references: [id])\n\n  assignedToId String?\n  assignedTo   User?   @relation(\"AssignedReports\", fields: [assignedToId], references: [id])\n\n  cleanupScheduleId String?\n  cleanupSchedule   CleanupSchedule? @relation(fields: [cleanupScheduleId], references: [id], onDelete: SetNull)\n\n  images        ReportImage[]\n  statusHistory StatusHistory[]\n  notifications Notification[]\n\n  @@index([status])\n  @@index([category])\n  @@index([createdAt])\n  @@index([reporterId])\n  @@index([assignedToId])\n  @@index([latitude, longitude])\n  @@index([isDeleted, createdAt])\n  @@index([isDeleted, status, createdAt])\n  @@index([isDeleted, category, createdAt])\n  @@index([isDeleted, reporterId, createdAt])\n  @@index([isDeleted, assignedToId, createdAt])\n  @@index([isDeleted, isSpam, createdAt])\n  @@index([isDeleted, isSpam, spamMarkedAt])\n  @@index([aiImageHash])\n}\n\nmodel ReportImage {\n  id        String    @id @default(uuid())\n  imageUrl  String\n  publicId  String\n  type      ImageType @default(REPORT)\n  createdAt DateTime  @default(now())\n\n  reportId String\n  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)\n\n  @@index([reportId])\n}\n\nmodel StatusHistory {\n  id             String        @id @default(uuid())\n  previousStatus ReportStatus?\n  newStatus      ReportStatus\n  notes          String?\n  createdAt      DateTime      @default(now())\n\n  reportId String\n  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)\n\n  changedById String\n  changedBy   User   @relation(fields: [changedById], references: [id])\n\n  @@index([reportId])\n  @@index([createdAt])\n}\n\nmodel Notification {\n  id        String           @id @default(uuid())\n  title     String\n  message   String\n  type      NotificationType\n  isRead    Boolean          @default(false)\n  createdAt DateTime         @default(now())\n\n  userId String\n  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  reportId String?\n  report   Report? @relation(fields: [reportId], references: [id], onDelete: SetNull)\n\n  @@index([userId, isRead])\n  @@index([userId, createdAt])\n  @@index([createdAt])\n}\n\nmodel ReportingZone {\n  id          String   @id @default(uuid())\n  name        String\n  coordinates Json\n  isActive    Boolean  @default(true)\n  createdAt   DateTime @default(now())\n  updatedAt   DateTime @updatedAt\n\n  createdById String\n  createdBy   User   @relation(fields: [createdById], references: [id])\n\n  @@index([isActive])\n  @@index([createdById])\n}\n\nmodel CleanupSchedule {\n  id          String                @id @default(uuid())\n  title       String\n  description String\n  barangay    String\n  latitude    Float\n  longitude   Float\n  scheduledAt DateTime\n  status      CleanupScheduleStatus @default(UPCOMING)\n  notes       String?\n  createdAt   DateTime              @default(now())\n  updatedAt   DateTime              @updatedAt\n\n  createdById String\n  createdBy   User   @relation(\"ScheduleCreator\", fields: [createdById], references: [id])\n\n  verifiedById String?\n  verifiedBy   User?     @relation(\"ScheduleVerifier\", fields: [verifiedById], references: [id])\n  verifiedAt   DateTime?\n\n  workers   CleanupScheduleWorker[]\n  reports   Report[]\n  equipment String[]                @default([])\n\n  @@index([status])\n  @@index([scheduledAt])\n  @@index([createdById])\n  @@index([barangay])\n}\n\nmodel CleanupScheduleWorker {\n  id         String   @id @default(uuid())\n  assignedAt DateTime @default(now())\n\n  scheduleId String\n  schedule   CleanupSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)\n\n  workerId String\n  worker   User   @relation(\"AssignedSchedules\", fields: [workerId], references: [id])\n\n  @@unique([scheduleId, workerId])\n  @@index([workerId])\n}\n",
-  "inlineSchemaHash": "92893415b41dd2b5c3f3eefa45d92c42224edaa83009dee2c1af37fb4af3a4fc",
-  "copyEngine": false
+  "inlineSchema": "generator client {\n  provider = \"prisma-client-js\"\n  output   = \"../src/generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env(\"DATABASE_URL\")\n}\n\nmodel Report {\n  id           String   @id @default(uuid())\n  imageUrl     String\n  category     String\n  confidence   Float\n  latitude     Float\n  longitude    Float\n  locationName String\n  description  String?\n  status       String   @default(\"pending\")\n  reportedAt   DateTime @default(now())\n  updatedAt    DateTime @updatedAt\n\n  @@index([category, status, reportedAt])\n  @@index([reportedAt])\n}\n",
+  "inlineSchemaHash": "def568ab228788b0558b1208f2dd5e4d350766217e9af6f4b42bd8778a6d64c0",
+  "copyEngine": true
 }
 config.dirname = '/'
 
-config.runtimeDataModel = JSON.parse("{\"models\":{\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"email\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"password\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"firstName\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"lastName\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"phone\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"address\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"role\",\"kind\":\"enum\",\"type\":\"Role\"},{\"name\":\"avatarUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"isActive\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"reports\",\"kind\":\"object\",\"type\":\"Report\",\"relationName\":\"ReporterReports\"},{\"name\":\"assignedReports\",\"kind\":\"object\",\"type\":\"Report\",\"relationName\":\"AssignedReports\"},{\"name\":\"statusChanges\",\"kind\":\"object\",\"type\":\"StatusHistory\",\"relationName\":\"StatusHistoryToUser\"},{\"name\":\"notifications\",\"kind\":\"object\",\"type\":\"Notification\",\"relationName\":\"NotificationToUser\"},{\"name\":\"reportingZones\",\"kind\":\"object\",\"type\":\"ReportingZone\",\"relationName\":\"ReportingZoneToUser\"},{\"name\":\"createdSchedules\",\"kind\":\"object\",\"type\":\"CleanupSchedule\",\"relationName\":\"ScheduleCreator\"},{\"name\":\"verifiedSchedules\",\"kind\":\"object\",\"type\":\"CleanupSchedule\",\"relationName\":\"ScheduleVerifier\"},{\"name\":\"scheduleAssignments\",\"kind\":\"object\",\"type\":\"CleanupScheduleWorker\",\"relationName\":\"AssignedSchedules\"}],\"dbName\":null},\"Report\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"title\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"description\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"category\",\"kind\":\"enum\",\"type\":\"WasteCategory\"},{\"name\":\"status\",\"kind\":\"enum\",\"type\":\"ReportStatus\"},{\"name\":\"latitude\",\"kind\":\"scalar\",\"type\":\"Float\"},{\"name\":\"longitude\",\"kind\":\"scalar\",\"type\":\"Float\"},{\"name\":\"address\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"isAnonymous\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"isDeleted\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"isSpam\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"spamMarkedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"spamReason\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"analysisStatus\",\"kind\":\"enum\",\"type\":\"AnalysisStatus\"},{\"name\":\"analysisWasteCount\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"analysisConfidence\",\"kind\":\"scalar\",\"type\":\"Float\"},{\"name\":\"analyzedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"severity\",\"kind\":\"enum\",\"type\":\"Severity\"},{\"name\":\"aiCategories\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"aiReason\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"aiModel\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"aiImageHash\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"aiProcessingMs\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"aiGeminiMs\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"reporterId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"reporter\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"ReporterReports\"},{\"name\":\"assignedToId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"assignedTo\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"AssignedReports\"},{\"name\":\"cleanupScheduleId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"cleanupSchedule\",\"kind\":\"object\",\"type\":\"CleanupSchedule\",\"relationName\":\"CleanupScheduleToReport\"},{\"name\":\"images\",\"kind\":\"object\",\"type\":\"ReportImage\",\"relationName\":\"ReportToReportImage\"},{\"name\":\"statusHistory\",\"kind\":\"object\",\"type\":\"StatusHistory\",\"relationName\":\"ReportToStatusHistory\"},{\"name\":\"notifications\",\"kind\":\"object\",\"type\":\"Notification\",\"relationName\":\"NotificationToReport\"}],\"dbName\":null},\"ReportImage\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"imageUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"publicId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"type\",\"kind\":\"enum\",\"type\":\"ImageType\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"reportId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"report\",\"kind\":\"object\",\"type\":\"Report\",\"relationName\":\"ReportToReportImage\"}],\"dbName\":null},\"StatusHistory\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"previousStatus\",\"kind\":\"enum\",\"type\":\"ReportStatus\"},{\"name\":\"newStatus\",\"kind\":\"enum\",\"type\":\"ReportStatus\"},{\"name\":\"notes\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"reportId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"report\",\"kind\":\"object\",\"type\":\"Report\",\"relationName\":\"ReportToStatusHistory\"},{\"name\":\"changedById\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"changedBy\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"StatusHistoryToUser\"}],\"dbName\":null},\"Notification\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"title\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"message\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"type\",\"kind\":\"enum\",\"type\":\"NotificationType\"},{\"name\":\"isRead\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"NotificationToUser\"},{\"name\":\"reportId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"report\",\"kind\":\"object\",\"type\":\"Report\",\"relationName\":\"NotificationToReport\"}],\"dbName\":null},\"ReportingZone\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"coordinates\",\"kind\":\"scalar\",\"type\":\"Json\"},{\"name\":\"isActive\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"createdById\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdBy\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"ReportingZoneToUser\"}],\"dbName\":null},\"CleanupSchedule\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"title\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"description\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"barangay\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"latitude\",\"kind\":\"scalar\",\"type\":\"Float\"},{\"name\":\"longitude\",\"kind\":\"scalar\",\"type\":\"Float\"},{\"name\":\"scheduledAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"status\",\"kind\":\"enum\",\"type\":\"CleanupScheduleStatus\"},{\"name\":\"notes\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"createdById\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdBy\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"ScheduleCreator\"},{\"name\":\"verifiedById\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"verifiedBy\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"ScheduleVerifier\"},{\"name\":\"verifiedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"workers\",\"kind\":\"object\",\"type\":\"CleanupScheduleWorker\",\"relationName\":\"CleanupScheduleToCleanupScheduleWorker\"},{\"name\":\"reports\",\"kind\":\"object\",\"type\":\"Report\",\"relationName\":\"CleanupScheduleToReport\"},{\"name\":\"equipment\",\"kind\":\"scalar\",\"type\":\"String\"}],\"dbName\":null},\"CleanupScheduleWorker\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"assignedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"scheduleId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"schedule\",\"kind\":\"object\",\"type\":\"CleanupSchedule\",\"relationName\":\"CleanupScheduleToCleanupScheduleWorker\"},{\"name\":\"workerId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"worker\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"AssignedSchedules\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
+config.runtimeDataModel = JSON.parse("{\"models\":{\"Report\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"imageUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"category\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"confidence\",\"kind\":\"scalar\",\"type\":\"Float\"},{\"name\":\"latitude\",\"kind\":\"scalar\",\"type\":\"Float\"},{\"name\":\"longitude\",\"kind\":\"scalar\",\"type\":\"Float\"},{\"name\":\"locationName\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"description\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"status\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"reportedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
 defineDmmfProperty(exports.Prisma, config.runtimeDataModel)
-config.engineWasm = undefined
+config.engineWasm = {
+  getRuntime: async () => require('./query_engine_bg.js'),
+  getQueryEngineWasmModule: async () => {
+    const loader = (await import('#wasm-engine-loader')).default
+    const engine = (await loader).default
+    return engine
+  }
+}
 config.compilerWasm = undefined
 
 config.injectableEdgeEnv = () => ({

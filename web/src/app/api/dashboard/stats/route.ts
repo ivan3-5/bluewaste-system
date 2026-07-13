@@ -16,8 +16,8 @@ export async function GET() {
     prisma.report.count(),
     prisma.report.count({ where: { category: "with_waste" } }),
     prisma.report.count({ where: { category: "no_waste" } }),
-    prisma.report.count({ where: { status: "pending" } }),
-    prisma.report.count({ where: { status: "resolved" } }),
+    prisma.report.count({ where: { status: "PENDING" } }),
+    prisma.report.count({ where: { status: "CLEANED" } }),
   ]);
 
   return corsResponse({
