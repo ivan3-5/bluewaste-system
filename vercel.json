@@ -19,6 +19,10 @@
       "dest": "/web/api/reports/[id]?nxtPid=$1"
     },
     {
+      "src": "/api/ai/(.*)",
+      "dest": "/web/api/ai/$1"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/[...path].ts"
     },
