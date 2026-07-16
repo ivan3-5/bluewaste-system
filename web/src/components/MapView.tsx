@@ -131,7 +131,8 @@ export default function MapView({
   const zonesQuery = useReportingZones
     ? useReportingZones(false)
     : { data: [] };
-  const zones = (zonesQuery && zonesQuery.data) || [];
+  const zonesData = zonesQuery?.data;
+  const zones = useMemo(() => zonesData || [], [zonesData]);
   const updateZoneMutation = useUpdateReportingZone
     ? useUpdateReportingZone()
     : null;

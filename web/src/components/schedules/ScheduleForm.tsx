@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   Dialog,
   DialogContent,
@@ -396,9 +397,11 @@ export function ScheduleForm({
                       className="rounded text-primary focus:ring-primary h-4 w-4 flex-shrink-0"
                     />
                     {report.images && report.images.length > 0 ? (
-                      <img
+                      <Image
                         src={report.images[0].imageUrl}
                         alt="report"
+                        width={40}
+                        height={40}
                         className="w-10 h-10 object-cover rounded-md flex-shrink-0"
                       />
                     ) : (

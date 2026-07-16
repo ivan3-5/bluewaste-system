@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useAuth } from "@/providers/AuthProvider";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -345,11 +346,15 @@ export default function ReportWastePage() {
             {/* Image Preview */}
             {previewUrl && (
               <div className="overflow-hidden rounded-lg border border-gray-200">
-                <img
-                  src={previewUrl}
-                  alt="Waste preview"
-                  className="w-full h-auto max-h-[28rem] object-contain bg-white"
-                />
+                <div className="relative w-full h-[28rem]">
+                  <Image
+                    src={previewUrl}
+                    alt="Waste preview"
+                    fill
+                    unoptimized
+                    className="object-contain bg-white"
+                  />
+                </div>
               </div>
             )}
 

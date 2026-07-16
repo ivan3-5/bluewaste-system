@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAssignedReports } from "@/hooks/useReports";
 import { StatusBadge } from "@/components/reports/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -170,11 +171,12 @@ export default function TasksPage() {
                   {/* Image Thumbnail */}
                   <div className="relative w-24 h-24 sm:w-28 sm:h-28 bg-gray-50 rounded-xl overflow-hidden shrink-0 border border-gray-100 shadow-inner">
                     {report.images && report.images.length > 0 ? (
-                      <img
+                      <Image
                         src={report.images[0].imageUrl}
                         alt="Report thumbnail"
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        loading="lazy"
+                        fill
+                        sizes="(max-width: 640px) 96px, 112px"
+                        className="object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 gap-1.5">

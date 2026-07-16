@@ -7,6 +7,7 @@ import Link from "next/link";
 import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
 import { getReverseGeocodedLocation } from "@/lib/utils";
 import { AiAnalysisPanel } from "@/components/AiAnalysisPanel";
+import Image from "next/image";
 
 export const dynamic = "force-dynamic";
 
@@ -89,11 +90,15 @@ export default async function ReportDetailPage({ params }: PageProps) {
                 <figcaption className="border-b border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                   Citizen Submission
                 </figcaption>
-                <img
-                  src={report.imageUrl}
-                  alt={report.locationName}
-                  className="h-72 w-full object-cover sm:h-80"
-                />
+                <div className="relative h-72 w-full sm:h-80">
+                  <Image
+                    src={report.imageUrl}
+                    alt={report.locationName}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover"
+                  />
+                </div>
               </figure>
 
               {cleanupImages.length > 0 ? (

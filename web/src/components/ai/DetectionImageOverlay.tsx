@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { DetectionBox } from "@/lib/waste-classification";
 
 type Props = {
@@ -101,11 +102,13 @@ export default function DetectionImageOverlay({
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         ref={imageRef}
         src={imageSrc}
         alt={alt}
+        width={1200}
+        height={800}
+        unoptimized
         className={imageClassName || "w-full h-auto object-contain"}
         onLoad={(event) => {
           setNaturalSize({

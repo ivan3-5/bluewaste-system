@@ -1,10 +1,12 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import morgan from "morgan";
+import pinoHttp from "pino-http";
 import compression from "compression";
+import cookieParser from "cookie-parser";
 
 import { env } from "./config/env";
+import { logger } from "./utils/logger";
 import { errorHandler } from "./middleware/errorHandler";
 import { generalLimiter } from "./middleware/rateLimiter";
 
@@ -106,9 +108,10 @@ app.use(compression());
 // Body parsing
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Logging
-app.use(morgan("dev"));
+app.use(pinoHttp({ logger }));
 
 // Rate limiting
 app.use(generalLimiter);
@@ -131,15 +134,35 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// API Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/reports", reportRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/upload", uploadRoutes);
-app.use("/api/reporting-zones", reportingZoneRoutes);
-app.use("/api/analytics", analyticsRoutes);
-app.use("/api/schedules", scheduleRoutes);
+// ---------------------------------------------------------------------------
+// API Routes — versioned primary endpoints (/api/v1/)
+// ---------------------------------------------------------------------------
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/reports", reportRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/upload", uploadRoutes);
+app.use("/api/v1/reporting-zones", reportingZoneRoutes);
+app.use("/api/v1/analytics", analyticsRoutes);
+app.use("/api/v1/schedules", scheduleRoutes);
+
+// ---------------------------------------------------------------------------
+// Backward-compatible aliases (/api/*) — kept so existing clients don't break.
+// Adds Deprecation header to signal clients should migrate to /api/v1/.
+// ---------------------------------------------------------------------------
+const deprecationMiddleware = (_req: any, res: any, next: any) => {
+  res.setHeader("Deprecation", "true");
+  res.setHeader("Link", '</api/v1/>; rel="successor-version"');
+  next();
+};
+app.use("/api/auth", deprecationMiddleware, authRoutes);
+app.use("/api/users", deprecationMiddleware, userRoutes);
+app.use("/api/reports", deprecationMiddleware, reportRoutes);
+app.use("/api/notifications", deprecationMiddleware, notificationRoutes);
+app.use("/api/upload", deprecationMiddleware, uploadRoutes);
+app.use("/api/reporting-zones", deprecationMiddleware, reportingZoneRoutes);
+app.use("/api/analytics", deprecationMiddleware, analyticsRoutes);
+app.use("/api/schedules", deprecationMiddleware, scheduleRoutes);
 
 // Error handler
 app.use(errorHandler);
@@ -147,7 +170,7 @@ app.use(errorHandler);
 // Start server (only in development, not in serverless)
 const PORT = parseInt(env.PORT, 10);
 
-if (env.NODE_ENV !== "production") {
+if (env.NODE_ENV !== "production" && env.NODE_ENV !== "test") {
   app.listen(PORT, () => {
     console.log(`🚀 BlueWaste API running on http://localhost:${PORT}`);
     console.log(`📊 Environment: ${env.NODE_ENV}`);

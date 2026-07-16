@@ -2,9 +2,12 @@ import "package:dio/dio.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:image_picker/image_picker.dart";
 
+import "package:connectivity_plus/connectivity_plus.dart";
+
 import "../../../core/network/api_exception.dart";
 import "../../../core/providers.dart";
 import "../domain/report_models.dart";
+import "offline_service.dart";
 
 class ReportService {
   ReportService(this._dio);
@@ -63,6 +66,85 @@ class ReportService {
     }
 
     return const [];
+  }
+
+  Future<void> createReportFromOffline(Map<String, dynamic> data, List<String> imagePaths) async {
+    final report = await createReport(
+      title: data["title"] as String,
+      description: data["description"] as String,
+      category: data["category"] as String,
+      latitude: (data["latitude"] as num).toDouble(),
+      longitude: (data["longitude"] as num).toDouble(),
+      address: data["address"] as String?,
+      isAnonymous: data["isAnonymous"] as bool? ?? false,
+      isSpamFlagged: data["isSpamFlagged"] as bool? ?? false,
+      spamReason: data["spamReason"] as String?,
+      yoloConfidence: (data["yoloConfidence"] as num?)?.toDouble() ?? 0.0,
+      severity: data["severity"] as String?,
+      analysisStatus: data["analysisStatus"] as String?,
+      analysisConfidence: (data["analysisConfidence"] as num?)?.toDouble(),
+      analysisWasteCount: data["analysisWasteCount"] as int?,
+    );
+
+    if (imagePaths.isNotEmpty) {
+      final xfiles = imagePaths.map((p) => XFile(p)).toList();
+      await uploadReportImages(reportId: report.id, images: xfiles);
+    }
+  }
+
+  Future<ReportRecord?> submitFullReport({
+    required Map<String, dynamic> data,
+    required List<XFile> images,
+    required OfflineService offlineService,
+  }) async {
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity == ConnectivityResult.none) {
+      final payload = OfflineReportPayload(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        data: data,
+        imagePaths: images.map((e) => e.path).toList(),
+      );
+      await offlineService.queueReport(payload);
+      return null; // Indicates it was queued offline
+    }
+
+    try {
+      final report = await createReport(
+        title: data["title"] as String,
+        description: data["description"] as String,
+        category: data["category"] as String,
+        latitude: (data["latitude"] as num).toDouble(),
+        longitude: (data["longitude"] as num).toDouble(),
+        address: data["address"] as String?,
+        isAnonymous: data["isAnonymous"] as bool? ?? false,
+        isSpamFlagged: data["isSpamFlagged"] as bool? ?? false,
+        spamReason: data["spamReason"] as String?,
+        yoloConfidence: (data["yoloConfidence"] as num?)?.toDouble() ?? 0.0,
+        severity: data["severity"] as String?,
+        analysisStatus: data["analysisStatus"] as String?,
+        analysisConfidence: (data["analysisConfidence"] as num?)?.toDouble(),
+        analysisWasteCount: data["analysisWasteCount"] as int?,
+      );
+
+      if (images.isNotEmpty) {
+        await uploadReportImages(reportId: report.id, images: images);
+      }
+      return report;
+    } on DioException catch (e) {
+      // If it's a network error during submission, queue it instead of failing
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.unknown) {
+        final payload = OfflineReportPayload(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          data: data,
+          imagePaths: images.map((img) => img.path).toList(),
+        );
+        await offlineService.queueReport(payload);
+        return null;
+      }
+      throw ApiException.fromDioError(e);
+    }
   }
 
   Future<ReportRecord> createReport({

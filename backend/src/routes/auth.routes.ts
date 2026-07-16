@@ -18,6 +18,13 @@ router.post(
   AuthController.register,
 );
 router.post("/login", authLimiter, validate(loginSchema), AuthController.login);
+
+// Refresh: read HttpOnly cookie, return new access token
+router.post("/refresh", AuthController.refresh);
+
+// Logout: clear the HttpOnly refresh_token cookie
+router.post("/logout", AuthController.logout);
+
 router.get("/me", authenticate, AuthController.getProfile);
 router.put(
   "/profile",

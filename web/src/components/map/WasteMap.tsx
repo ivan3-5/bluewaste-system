@@ -106,6 +106,7 @@ export default function WasteMap({
   const onMapReadyRef = useRef(onMapReady);
   const onDrawRectangleRef = useRef(onDrawRectangle);
   const centerRef = useRef(center);
+  const zoomRef = useRef(zoom);
 
   useEffect(() => {
     onMapReadyRef.current = onMapReady;
@@ -120,10 +121,14 @@ export default function WasteMap({
   }, [center]);
 
   useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, { zoomControl: false }).setView(
-      center,
-      zoom,
+      centerRef.current,
+      zoomRef.current,
     );
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {

@@ -11,6 +11,7 @@ import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../../../core/config/app_env.dart";
 import "../data/report_service.dart";
+import "../data/offline_service.dart";
 import "../domain/report_models.dart";
 import "../../../../services/detect_service.dart";
 
@@ -351,32 +352,29 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     setState(() => _isSubmitting = true);
     try {
       final reportService = ref.read(reportServiceProvider);
+      final offlineService = ref.read(offlineServiceProvider);
 
-      final report = await reportService.createReport(
-        title: title,
-        description: description,
-        category: _category,
-        latitude: _latitude!,
-        longitude: _longitude!,
-        isAnonymous: _isAnonymous,
-        isSpamFlagged: _isSpamFlagged,
-        spamReason: _isSpamFlagged
-            ? (_detectResult?.spamReason ?? "No waste detected by YOLOv8")
-            : null,
-        yoloConfidence: (_detectedConfidence ?? 0.0) * 100,
-        severity: _detectResult?.severity.dbValue,
-        analysisStatus: _detectResult?.hasWaste == true ? "DIRTY" : "CLEAN",
-        analysisConfidence: _detectResult?.confidence,
-        analysisWasteCount: _detectResult?.hasWaste == true ? (_detectResult?.labels.length ?? 1) : 0,
+      final report = await reportService.submitFullReport(
+        data: {
+          "title": title,
+          "description": description,
+          "category": _category,
+          "latitude": _latitude!,
+          "longitude": _longitude!,
+          "isAnonymous": _isAnonymous,
+          "isSpamFlagged": _isSpamFlagged,
+          "spamReason": _isSpamFlagged
+              ? (_detectResult?.spamReason ?? "No waste detected by YOLOv8")
+              : null,
+          "yoloConfidence": (_detectedConfidence ?? 0.0) * 100,
+          "severity": _detectResult?.severity.dbValue,
+          "analysisStatus": _detectResult?.hasWaste == true ? "DIRTY" : "CLEAN",
+          "analysisConfidence": _detectResult?.confidence,
+          "analysisWasteCount": _detectResult?.hasWaste == true ? (_detectResult?.labels.length ?? 1) : 0,
+        },
+        images: _images,
+        offlineService: offlineService,
       );
-
-      if (_images.isNotEmpty) {
-        await reportService.uploadReportImages(
-          reportId: report.id,
-          images: _images,
-          type: "REPORT",
-        );
-      }
 
       _titleController.clear();
       _descriptionController.clear();
@@ -392,7 +390,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       });
 
       if (submittedResult == null) {
-        _showMessage("Report submitted successfully.");
+        if (report == null) {
+          _showMessage("You are offline. Report queued and will sync later.");
+        } else {
+          _showMessage("Report submitted successfully.");
+        }
       }
     } catch (error) {
       _showMessage(error.toString());

@@ -14,8 +14,6 @@ const nextConfig: NextConfig = {
     // Ensure DATABASE_URL is available during build
     DATABASE_URL: process.env.DATABASE_URL,
   },
-  // Optimize for serverless environment
-  swcMinify: true,
   // Ensure proper TypeScript compilation
   typescript: {
     tsconfigPath: "./tsconfig.json",

@@ -1,6 +1,10 @@
 import prisma from "../config/database";
 import { hashPassword, comparePassword } from "../utils/password";
-import { generateToken } from "../utils/jwt";
+import {
+  generateToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from "../utils/jwt";
 import { Role } from "@prisma/client";
 
 export class AuthService {
@@ -45,21 +49,22 @@ export class AuthService {
     });
 
     const token = generateToken(user.id);
-    return { user, token };
+    const refreshToken = generateRefreshToken(user.id);
+    return { user, token, refreshToken };
   }
 
   static async login(email: string, password: string) {
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.isActive) {
-      throw new Error("Invalid email or password");
-    }
-
-    const isValid = await comparePassword(password, user.password);
-    if (!isValid) {
+    // Always run bcrypt compare to prevent timing-based email enumeration.
+    // Without this, a missing user returns instantly while a valid user takes
+    // ~100ms for bcrypt — leaking which emails are registered.
+    const isValid = user ? await comparePassword(password, user.password) : false;
+    if (!user || !user.isActive || !isValid) {
       throw new Error("Invalid email or password");
     }
 
     const token = generateToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
     return {
       user: {
         id: user.id,
@@ -72,7 +77,33 @@ export class AuthService {
         createdAt: user.createdAt,
       },
       token,
+      refreshToken,
     };
+  }
+
+  /**
+   * Verify a refresh token and issue a new short-lived access token.
+   * The refresh token itself is not rotated here — rotation can be added
+   * later when a `RefreshToken` table is introduced.
+   */
+  static async refreshAccessToken(refreshToken: string) {
+    let payload: { userId: string };
+    try {
+      payload = verifyRefreshToken(refreshToken);
+    } catch {
+      throw new Error("Invalid or expired refresh token");
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, isActive: true },
+    });
+
+    if (!user || !user.isActive) {
+      throw new Error("Invalid or expired refresh token");
+    }
+
+    return { token: generateToken(user.id) };
   }
 
   static async getProfile(userId: string) {

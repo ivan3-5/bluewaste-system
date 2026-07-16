@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import {
   ADMIN_REPORT_CATEGORY_LABELS,
   ADMIN_REPORT_STATUS_LABELS,
@@ -252,9 +253,11 @@ export function ReportsTable({
               visibleReports.map((report) => (
                 <tr key={report.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
-                    <img
+                    <Image
                       src={report.imageUrl}
                       alt={report.locationName}
+                      width={56}
+                      height={56}
                       className="h-14 w-14 rounded-xl object-cover"
                     />
                   </td>

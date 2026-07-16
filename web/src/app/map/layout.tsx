@@ -25,9 +25,11 @@ function UserProfileMenu({
         className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors focus:outline-none"
       >
         {user.avatarUrl ? (
-          <img
+          <Image
             src={user.avatarUrl}
             alt={`${user.firstName} ${user.lastName}`}
+            width={36}
+            height={36}
             className="rounded-full w-9 h-9 object-cover"
           />
         ) : (

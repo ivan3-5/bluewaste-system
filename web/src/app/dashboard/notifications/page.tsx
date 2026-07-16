@@ -90,9 +90,9 @@ export default function NotificationsPage() {
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
 
-  const notifications = data?.data || [];
+  const notifications = useMemo(() => data?.data || [], [data?.data]);
   const pagination = data?.pagination;
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
 
   /* ── Filtered notifications ── */
   const filtered = useMemo(() => {

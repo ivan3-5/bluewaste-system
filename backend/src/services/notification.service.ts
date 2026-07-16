@@ -1,9 +1,52 @@
 import prisma from "../config/database";
 import { NotificationType } from "@prisma/client";
+import { Response } from "express";
 import {
   getPaginationParams,
   buildPaginatedResponse,
 } from "../utils/pagination";
+
+// ---------------------------------------------------------------------------
+// SSE Client Registry
+// Tracks open Server-Sent Event connections per user.
+// ---------------------------------------------------------------------------
+const sseClients = new Map<string, Set<Response>>();
+
+/**
+ * Push a notification event to all open SSE connections for the given user.
+ * Called internally after every `prisma.notification.create()`.
+ */
+function notifySSE(userId: string, notification: object) {
+  const connections = sseClients.get(userId);
+  if (!connections || connections.size === 0) return;
+
+  const data = `data: ${JSON.stringify(notification)}\n\n`;
+  for (const res of connections) {
+    try {
+      res.write(data);
+    } catch {
+      // Connection was closed; cleanup handled by the "close" listener
+    }
+  }
+}
+
+/**
+ * Register an SSE response for a user and return a cleanup function.
+ */
+export function registerSSEClient(userId: string, res: Response): () => void {
+  if (!sseClients.has(userId)) {
+    sseClients.set(userId, new Set());
+  }
+  sseClients.get(userId)!.add(res);
+
+  return () => {
+    const set = sseClients.get(userId);
+    if (set) {
+      set.delete(res);
+      if (set.size === 0) sseClients.delete(userId);
+    }
+  };
+}
 
 export class NotificationService {
   static async create(data: {
@@ -13,7 +56,7 @@ export class NotificationService {
     type: string;
     reportId?: string;
   }) {
-    return prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: data.userId,
         title: data.title,
@@ -22,6 +65,11 @@ export class NotificationService {
         reportId: data.reportId,
       },
     });
+
+    // Push to any open SSE connections for this user
+    notifySSE(data.userId, notification);
+
+    return notification;
   }
 
   static async getUserNotifications(

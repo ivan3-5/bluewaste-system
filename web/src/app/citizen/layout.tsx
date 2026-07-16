@@ -120,9 +120,11 @@ export default function CitizenLayout({
               onMouseDown={(e) => e.preventDefault()}
             >
               {user.avatarUrl ? (
-                <img
+                <Image
                   src={user.avatarUrl}
                   alt={`${user.firstName} ${user.lastName}`}
+                  width={36}
+                  height={36}
                   className="rounded-full w-9 h-9 object-cover"
                 />
               ) : (
@@ -177,9 +179,11 @@ export default function CitizenLayout({
             </Link>
             <button className="p-1 rounded-full bg-blue-100 text-blue-700">
               {user.avatarUrl ? (
-                <img
+                <Image
                   src={user.avatarUrl}
                   alt={`${user.firstName} ${user.lastName}`}
+                  width={28}
+                  height={28}
                   className="rounded-full w-7 h-7 object-cover"
                 />
               ) : (

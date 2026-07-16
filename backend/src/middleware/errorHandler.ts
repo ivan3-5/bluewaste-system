@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { MulterError } from "multer";
 import { UploadValidationError } from "./upload";
 import { sendError } from "../utils/http";
+import { logger } from "../utils/logger";
 
 export const errorHandler = (
   err: Error,
@@ -9,11 +10,7 @@ export const errorHandler = (
   res: Response,
   next: NextFunction,
 ) => {
-  console.error("Error:", err.message);
-
-  if (process.env.NODE_ENV === "development") {
-    console.error(err.stack);
-  }
+  logger.error(err);
 
   // Prisma errors
   if (err.name === "PrismaClientKnownRequestError") {

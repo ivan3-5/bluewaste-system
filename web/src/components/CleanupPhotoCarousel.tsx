@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 type CleanupPhoto = {
   id: string;
@@ -28,11 +29,15 @@ export function CleanupPhotoCarousel({ images }: CleanupPhotoCarouselProps) {
 
   return (
     <div>
-      <img
-        src={currentImage.imageUrl}
-        alt={`Cleanup proof ${currentIndex + 1}`}
-        className="h-72 w-full object-cover sm:h-80"
-      />
+      <div className="relative h-72 w-full sm:h-80">
+        <Image
+          src={currentImage.imageUrl}
+          alt={`Cleanup proof ${currentIndex + 1}`}
+          fill
+          sizes="(max-width: 768px) 100vw, 50vw"
+          className="object-cover"
+        />
+      </div>
 
       {hasMultiple && (
         <div className="flex items-center justify-between gap-3 border-t border-emerald-200 bg-white px-3 py-2">

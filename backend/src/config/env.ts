@@ -47,6 +47,9 @@ const envSchema = z.object({
       "DATABASE_URL must be a postgresql:// URL. For Vercel, use sslmode=require",
     ),
   JWT_SECRET: z.string().min(10, "JWT_SECRET must be at least 10 characters"),
+  REFRESH_TOKEN_SECRET: z
+    .string()
+    .min(10, "REFRESH_TOKEN_SECRET must be at least 10 characters"),
   CLOUDINARY_CLOUD_NAME: z.string().min(1),
   CLOUDINARY_API_KEY: z.string().min(1),
   CLOUDINARY_API_SECRET: z.string().min(1),
@@ -59,6 +62,9 @@ const envSchema = z.object({
   ALLOWED_ORIGINS: z.string().optional(),
   YOLO_API_URL: z.string().url().default("https://bluewaste-system.onrender.com/analyze"),
   SPAM_RETENTION_DAYS: z.coerce.number().int().min(1).default(3),
+  // Upstash Redis for distributed rate limiting (optional — falls back to in-memory)
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

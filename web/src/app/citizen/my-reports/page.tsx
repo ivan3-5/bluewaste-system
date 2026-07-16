@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { useMyReports } from "@/hooks/useReports";
 import { StatusBadge } from "@/components/reports/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -84,12 +85,14 @@ export default function MyReportsPage() {
 
             {/* Image */}
             <div className="relative overflow-hidden rounded-xl shadow-2xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={lightbox.images[lightbox.index]}
-                alt={lightbox.title}
-                className="block max-h-[80vh] max-w-[85vw] object-contain lightbox-img"
-              />
+              <div className="relative h-[80vh] w-[85vw]">
+                <Image
+                  src={lightbox.images[lightbox.index]}
+                  alt={lightbox.title}
+                  fill
+                  className="block object-contain lightbox-img"
+                />
+              </div>
 
               {/* Prev / Next arrows — only shown when multiple images */}
               {lightbox.images.length > 1 && (
@@ -140,11 +143,12 @@ export default function MyReportsPage() {
                         : "border-transparent opacity-50 hover:opacity-80"
                     }`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src={src}
                       alt=""
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="48px"
+                      className="object-cover"
                     />
                   </button>
                 ))}
@@ -318,11 +322,12 @@ export default function MyReportsPage() {
                             }
                             className="group relative block h-16 w-16 overflow-hidden rounded-lg border border-gray-200 shadow-sm transition-all hover:scale-105 hover:border-blue-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400"
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <Image
                               src={reportImageUrls[0]}
                               alt="Report photo"
-                              className="h-full w-full object-cover"
+                              fill
+                              sizes="64px"
+                              className="object-cover"
                             />
                             <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
                               <ImageIcon className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" />
@@ -346,11 +351,12 @@ export default function MyReportsPage() {
                             }
                             className="group relative block h-16 w-16 overflow-hidden rounded-lg border border-emerald-200 shadow-sm transition-all hover:scale-105 hover:border-emerald-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400"
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <Image
                               src={cleanupImageUrls[0]}
                               alt="Cleanup photo"
-                              className="h-full w-full object-cover"
+                              fill
+                              sizes="64px"
+                              className="object-cover"
                             />
                             <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
                               <ImageIcon className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" />

@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
-import { ReportService } from "../services/report.service";
+import { ReportCrudService } from "../services/report-crud.service";
+import { ReportGeoService } from "../services/report-geo.service";
+import { ReportAnalysisService } from "../services/report-analysis.service";
+import { ReportSpamService } from "../services/report-spam.service";
 import { AuthRequest } from "../middleware/auth";
 import prisma from "../config/database";
 import { CloudinaryService } from "../services/cloudinary.service";
@@ -8,7 +11,7 @@ import { sendError } from "../utils/http";
 export class ReportController {
   static async create(req: AuthRequest, res: Response) {
     try {
-      const report = await ReportService.create({
+      const report = await ReportCrudService.create({
         ...req.body,
         reporterId: req.user?.id,
         // Forward YOLO spam-flag fields from the Flutter client payload
@@ -27,7 +30,7 @@ export class ReportController {
 
   static async findById(req: AuthRequest, res: Response) {
     try {
-      const report = await ReportService.findById(req.params.id, req.user);
+      const report = await ReportCrudService.findById(req.params.id, req.user);
       res.json(report);
     } catch (error: any) {
       if (error.message === "Report not found") {
@@ -43,7 +46,7 @@ export class ReportController {
   static async updateStatus(req: AuthRequest, res: Response) {
     try {
       const { status, notes } = req.body;
-      const report = await ReportService.updateStatus(
+      const report = await ReportCrudService.updateStatus(
         req.params.id,
         status,
         req.user!.id,
@@ -65,7 +68,7 @@ export class ReportController {
 
   static async getReports(req: AuthRequest, res: Response) {
     try {
-      const result = await ReportService.getReports(req.query as any);
+      const result = await ReportCrudService.getReports(req.query as any);
       res.json(result);
     } catch (error: any) {
       sendError(res, 500, "Failed to fetch reports", "REPORT_FETCH_FAILED");
@@ -75,7 +78,7 @@ export class ReportController {
   static async assignWorker(req: AuthRequest, res: Response) {
     try {
       const { assignedToId } = req.body;
-      const report = await ReportService.assignWorker(
+      const report = await ReportCrudService.assignWorker(
         req.params.id,
         assignedToId,
         req.user!.id,
@@ -97,7 +100,7 @@ export class ReportController {
 
   static async getMyReports(req: AuthRequest, res: Response) {
     try {
-      const result = await ReportService.getMyReports(
+      const result = await ReportCrudService.getMyReports(
         req.user!.id,
         req.query as any,
       );
@@ -109,7 +112,7 @@ export class ReportController {
 
   static async getAssignedReports(req: AuthRequest, res: Response) {
     try {
-      const result = await ReportService.getAssignedReports(
+      const result = await ReportCrudService.getAssignedReports(
         req.user!.id,
         req.query as any,
       );
@@ -126,8 +129,8 @@ export class ReportController {
 
   static async getMapData(req: AuthRequest, res: Response) {
     try {
-      const reports = await ReportService.getMapData(req.query as any);
-      res.setHeader("Cache-Control", "public, max-age=15");
+      const reports = await ReportGeoService.getMapData(req.query as any);
+      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
       res.json(reports);
     } catch (error: any) {
       sendError(res, 500, "Failed to fetch map data", "MAP_DATA_FETCH_FAILED");
@@ -136,8 +139,8 @@ export class ReportController {
 
   static async getHeatmapData(req: AuthRequest, res: Response) {
     try {
-      const data = await ReportService.getHeatmapData(req.query as any);
-      res.setHeader("Cache-Control", "public, max-age=15");
+      const data = await ReportGeoService.getHeatmapData(req.query as any);
+      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
       res.json(data);
     } catch (error: any) {
       sendError(
@@ -197,7 +200,7 @@ export class ReportController {
       const images = await Promise.all(uploadPromises);
       // Auto-run analysis on the report after images are uploaded
       try {
-        await ReportService.analyzeReport(id);
+        await ReportAnalysisService.analyzeReport(id);
       } catch (err) {
         console.warn("Auto analysis failed for report", id, err);
       }
@@ -209,7 +212,7 @@ export class ReportController {
 
   static async restoreSpam(req: AuthRequest, res: Response) {
     try {
-      const report = await ReportService.restoreSpam(req.params.id);
+      const report = await ReportSpamService.restoreSpam(req.params.id);
       res.json(report);
     } catch (error: any) {
       if (error.message === "Report not found") {
@@ -226,7 +229,7 @@ export class ReportController {
 
   static async delete(req: AuthRequest, res: Response) {
     try {
-      await ReportService.softDelete(req.params.id);
+      await ReportCrudService.softDelete(req.params.id);
       res.json({ message: "Report deleted successfully" });
     } catch (error: any) {
       if (error.message === "Report not found") {

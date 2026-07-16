@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import dynamic from "next/dynamic";
 import {
   useReport,
@@ -302,10 +303,12 @@ export default function TaskDetailPage() {
                     className="group relative aspect-square overflow-hidden rounded-2xl border border-slate-200/60 bg-slate-100 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/20"
                   >
                     <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                    <img
+                    <Image
                       src={img.imageUrl}
                       alt="Report evidence"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      fill
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                   </button>
                 ))}
@@ -335,10 +338,12 @@ export default function TaskDetailPage() {
                     className="group relative aspect-square overflow-hidden rounded-2xl border border-green-200/60 bg-green-50 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-green-500/20"
                   >
                     <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                    <img
+                    <Image
                       src={img.imageUrl}
                       alt="Cleanup proof"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      fill
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                   </button>
                 ))}
@@ -402,10 +407,12 @@ export default function TaskDetailPage() {
                   <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
                     {cleanupPhotos.map((file, i) => (
                       <div key={i} className="group relative aspect-square overflow-hidden rounded-2xl border border-slate-200/60 bg-slate-50 shadow-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-md">
-                        <img
+                        <Image
                           src={URL.createObjectURL(file)}
                           alt={`Cleanup photo ${i + 1}`}
-                          className="h-full w-full object-cover"
+                          fill
+                          unoptimized
+                          className="object-cover"
                         />
                         <button
                           type="button"
@@ -586,12 +593,14 @@ export default function TaskDetailPage() {
           >
             <X className="h-5 w-5 text-white" />
           </button>
-          <img
-            src={lightboxImage}
-            alt="Full size"
-            className="max-h-[90vh] max-w-full rounded-xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="relative h-[90vh] w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <Image
+              src={lightboxImage}
+              alt="Full size"
+              fill
+              className="rounded-xl object-contain"
+            />
+          </div>
         </div>
       )}
     </div>

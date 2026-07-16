@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
@@ -98,12 +99,15 @@ export default function MyWasteReportsPage() {
                 </CardHeader>
                 <CardContent className="grid gap-4 p-4 md:grid-cols-[220px,1fr]">
                   <div className="overflow-hidden rounded-md border border-gray-200">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={report.imageUrl}
-                      alt={report.detectedObject}
-                      className="h-44 w-full object-cover"
-                    />
+                    <div className="relative h-44 w-full">
+                      <Image
+                        src={report.imageUrl}
+                        alt={report.detectedObject}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        className="object-cover"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-3">

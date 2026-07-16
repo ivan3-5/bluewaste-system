@@ -90,11 +90,20 @@ npm run db:migrate
 npm run db:seed
 ```
 
-Default seed accounts:
+Before seeding, set the three seed password env vars in `backend/.env` (they are
+**never** hardcoded in source and the seed will abort if they are missing):
 
-- Admin: `admin@bluewaste.ph` / `@Admin123*`
-- Worker: `worker@bluewaste.ph` / `worker123`
-- Citizen: `citizen@bluewaste.ph` / `citizen123`
+```dotenv
+SEED_ADMIN_PASSWORD="YourStrongAdminPass!"
+SEED_WORKER_PASSWORD="YourStrongWorkerPass!"
+SEED_CITIZEN_PASSWORD="YourStrongCitizenPass!"
+```
+
+Seed accounts (passwords are whatever you set above):
+
+- Admin:   `admin@bluewaste.ph`
+- Workers: `worker1-4@bluewaste.ph`
+- Citizen: `citizen@bluewaste.ph`
 
 ## 4) Run the Apps
 

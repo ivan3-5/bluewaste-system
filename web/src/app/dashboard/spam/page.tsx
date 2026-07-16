@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import { useReports, useDeleteSpamReport } from "@/hooks/useReports";
 import { Button } from "@/components/ui/button";
 import { WASTE_CATEGORY_LABELS } from "@/types";
@@ -51,7 +52,7 @@ export default function SpamReportsPage() {
 
   const deleteSpam = useDeleteSpamReport();
 
-  const reports = data?.data || [];
+  const reports = useMemo(() => data?.data || [], [data?.data]);
   const pagination = data?.pagination;
 
   const pendingAction = deleteSpam.isPending;
@@ -142,9 +143,11 @@ export default function SpamReportsPage() {
                   <tr key={report.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       {report.images?.[0]?.imageUrl ? (
-                        <img
+                        <Image
                           src={report.images[0].imageUrl}
                           alt={report.title}
+                          width={56}
+                          height={56}
                           className="h-14 w-14 rounded-md border border-gray-200 object-cover"
                         />
                       ) : (

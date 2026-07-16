@@ -1,7 +1,6 @@
-import "dart:convert";
 import "dart:io";
 
-import "package:http/http.dart" as http;
+import "package:dio/dio.dart";
 
 // ── Result types ──────────────────────────────────────────────────────────────
 
@@ -101,8 +100,8 @@ class GeminiAnalysisResult {
 // ── ApiService ────────────────────────────────────────────────────────────────
 
 class ApiService {
-  ApiService({http.Client? client, String? baseUrl})
-      : _client = client ?? http.Client(),
+  ApiService({Dio? client, String? baseUrl})
+      : _client = client ?? Dio(),
         baseUrl = (baseUrl ??
                 const String.fromEnvironment(
                   "API_BASE_URL",
@@ -110,7 +109,7 @@ class ApiService {
                 ))
             .replaceAll(RegExp(r"/$"), "");
 
-  final http.Client _client;
+  final Dio _client;
   final String baseUrl;
 
   /// Derives the Next.js web app base (strips /api suffix for AI endpoints)
@@ -130,41 +129,35 @@ class ApiService {
     String? citizenId,
     String? description,
   }) async {
-    final uri = Uri.parse("$_webBase/api/ai/analyze-report");
+    final uri = "$_webBase/api/ai/analyze-report";
 
     try {
-      final request = http.MultipartRequest("POST", uri);
-
-      // Image
       final fileName = imageFile.path.split(Platform.pathSeparator).last;
-      request.files.add(
-        await http.MultipartFile.fromPath("image", imageFile.path, filename: fileName),
+      
+      final formData = FormData.fromMap({
+        "image": await MultipartFile.fromFile(imageFile.path, filename: fileName),
+        "latitude": latitude.toString(),
+        "longitude": longitude.toString(),
+        if (citizenId != null && citizenId.isNotEmpty) "citizenId": citizenId,
+        if (description != null && description.trim().isNotEmpty) "description": description.trim(),
+      });
+
+      final response = await _client.post<Map<String, dynamic>>(
+        uri,
+        data: formData,
+        options: Options(
+          sendTimeout: const Duration(seconds: 60),
+          receiveTimeout: const Duration(seconds: 60),
+        ),
       );
 
-      // Required fields
-      request.fields["latitude"] = latitude.toString();
-      request.fields["longitude"] = longitude.toString();
-
-      // Optional fields
-      if (citizenId != null && citizenId.isNotEmpty) {
-        request.fields["citizenId"] = citizenId;
-      }
-      if (description != null && description.trim().isNotEmpty) {
-        request.fields["description"] = description.trim();
-      }
-
-      final streamedResponse = await _client.send(request).timeout(
-        const Duration(seconds: 60),
-      );
-      final response = await http.Response.fromStream(streamedResponse);
-      final body = _decodeBody(response.body);
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        final errorMsg = _extractMessage(body) ?? "Analysis failed (HTTP ${response.statusCode}).";
-        return GeminiAnalysisResult.error(errorMsg);
-      }
-
+      final body = response.data ?? <String, dynamic>{};
       return GeminiAnalysisResult.fromJson(body);
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final errorMsg = (data is Map<String, dynamic> ? _extractMessage(data) : null) 
+          ?? "Analysis failed (HTTP ${e.response?.statusCode}).";
+      return GeminiAnalysisResult.error(errorMsg);
     } on Exception catch (e) {
       return GeminiAnalysisResult.error(
         e.toString().replaceFirst("Exception: ", ""),
@@ -175,33 +168,34 @@ class ApiService {
   // ── Legacy endpoints ──────────────────────────────────────────────────────
 
   Future<String> uploadImage(File imageFile) async {
-    final uri = Uri.parse("$baseUrl/upload");
-    final request = http.MultipartRequest("POST", uri);
+    final uri = "$baseUrl/upload";
     final fileName = imageFile.path.split(Platform.pathSeparator).last;
-    request.files.add(
-      await http.MultipartFile.fromPath(
-        "image",
-        imageFile.path,
-        filename: fileName,
-      ),
-    );
 
-    final streamedResponse = await _client.send(request);
-    final response = await http.Response.fromStream(streamedResponse);
-    final body = _decodeBody(response.body);
+    try {
+      final formData = FormData.fromMap({
+        "image": await MultipartFile.fromFile(imageFile.path, filename: fileName),
+      });
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final response = await _client.post<Map<String, dynamic>>(
+        uri,
+        data: formData,
+      );
+
+      final body = response.data ?? <String, dynamic>{};
+      final imageUrl = body["imageUrl"]?.toString();
+      
+      if (imageUrl == null || imageUrl.isEmpty) {
+        throw Exception("Image upload succeeded without a returned URL.");
+      }
+
+      return imageUrl;
+    } on DioException catch (e) {
+      final data = e.response?.data;
       throw Exception(
-        _extractMessage(body) ?? "Failed to upload image.",
+        (data is Map<String, dynamic> ? _extractMessage(data) : null) ?? 
+        "Failed to upload image.",
       );
     }
-
-    final imageUrl = body["imageUrl"]?.toString();
-    if (imageUrl == null || imageUrl.isEmpty) {
-      throw Exception("Image upload succeeded without a returned URL.");
-    }
-
-    return imageUrl;
   }
 
   Future<ApiSubmissionResult> submitReport({
@@ -213,52 +207,41 @@ class ApiService {
     required String locationName,
     String? description,
   }) async {
-    final uri = Uri.parse("$baseUrl/reports");
-    final response = await _client.post(
-      uri,
-      headers: const <String, String>{"Content-Type": "application/json"},
-      body: jsonEncode(<String, dynamic>{
-        "imageUrl": imageUrl,
-        "category": category,
-        "confidence": confidence,
-        "latitude": latitude,
-        "longitude": longitude,
-        "locationName": locationName,
-        if (description != null && description.trim().isNotEmpty)
-          "description": description.trim(),
-      }),
-    );
+    final uri = "$baseUrl/reports";
+    
+    try {
+      final response = await _client.post<Map<String, dynamic>>(
+        uri,
+        data: {
+          "imageUrl": imageUrl,
+          "category": category,
+          "confidence": confidence,
+          "latitude": latitude,
+          "longitude": longitude,
+          "locationName": locationName,
+          if (description != null && description.trim().isNotEmpty)
+            "description": description.trim(),
+        },
+      );
 
-    final body = _decodeBody(response.body);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final body = response.data ?? <String, dynamic>{};
+      return ApiSubmissionResult(
+        success: true,
+        message: _extractMessage(body) ?? "Report submitted successfully.",
+        data: body,
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final body = data is Map<String, dynamic> ? data : <String, dynamic>{};
       return ApiSubmissionResult(
         success: false,
         message: _extractMessage(body) ?? "Failed to submit report.",
         data: body,
       );
     }
-
-    return ApiSubmissionResult(
-      success: true,
-      message: _extractMessage(body) ?? "Report submitted successfully.",
-      data: body,
-    );
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-
-  Map<String, dynamic> _decodeBody(String raw) {
-    if (raw.trim().isEmpty) {
-      return <String, dynamic>{};
-    }
-
-    final decoded = jsonDecode(raw);
-    if (decoded is Map<String, dynamic>) {
-      return decoded;
-    }
-
-    return <String, dynamic>{"data": decoded};
-  }
 
   String? _extractMessage(Map<String, dynamic> body) {
     final message = body["message"] ?? body["error"] ?? body["detail"];

@@ -26,7 +26,7 @@ export default function FieldWorkerDashboard() {
   });
   const { data: unreadData } = useUnreadCount();
 
-  const allReports = allData?.data || [];
+  const allReports = useMemo(() => allData?.data || [], [allData?.data]);
   const totalAssigned = allData?.pagination?.total || 0;
   const inProgressCount = inProgressData?.pagination?.total || 0;
   const completedCount = allReports.filter(
