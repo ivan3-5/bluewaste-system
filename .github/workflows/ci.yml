@@ -30,6 +30,13 @@ jobs:
       - name: Run Integration Tests
         working-directory: ./backend
         run: npm test
+        env:
+          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          JWT_SECRET: dummy_jwt_secret_key_123
+          REFRESH_TOKEN_SECRET: dummy_refresh_secret_key_123
+          CLOUDINARY_CLOUD_NAME: dummy_cloud
+          CLOUDINARY_API_KEY: dummy_key
+          CLOUDINARY_API_SECRET: dummy_secret
 
   web-typecheck:
     name: Web App Typecheck
