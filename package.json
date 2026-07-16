@@ -22,6 +22,7 @@
     "clean:deep:dry": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup-deep.ps1 -DryRun",
     "backend:build": "npm run build --workspace=backend",
     "web:build": "npm run build --workspace=web",
+    "postinstall": "prisma generate --schema=backend/prisma/schema.prisma && prisma generate --schema=web/prisma/schema.prisma",
     "db:migrate": "npm run migrate --workspace=backend",
     "db:seed": "npm run seed --workspace=backend",
     "db:studio": "npm run studio --workspace=backend",

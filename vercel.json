@@ -9,7 +9,13 @@
       "src": "api/[...path].ts",
       "use": "@vercel/node",
       "config": {
-        "maxDuration": 60
+        "maxDuration": 60,
+        "includeFiles": [
+          "node_modules/.prisma/client/**",
+          "node_modules/@prisma/client/**",
+          "backend/node_modules/.prisma/client/**",
+          "backend/node_modules/@prisma/client/**"
+        ]
       }
     }
   ],
