@@ -39,10 +39,17 @@ export class AuthController {
       res.json(result);
     } catch (error: any) {
       console.error("Login Error Details:", error);
-      if (error.message === "Invalid email or password") {
-        return res.status(401).json({ error: error.message });
+      if (error?.message === "Invalid email or password") {
+        return res.status(401).json({ 
+          error: { code: "UNAUTHORIZED", message: error.message } 
+        });
       }
-      res.status(500).json({ error: "Login failed", details: error.message });
+      res.status(500).json({ 
+        error: { 
+          code: "INTERNAL_SERVER_ERROR", 
+          message: error?.message || "An unexpected error occurred during login" 
+        } 
+      });
     }
   }
 

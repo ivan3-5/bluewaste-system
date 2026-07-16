@@ -66,7 +66,14 @@ export default function LoginPage() {
         }
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || "Login failed. Please try again.");
+      const apiError = err.response?.data?.error;
+      const errorMessage =
+        typeof apiError === "string"
+          ? apiError
+          : apiError?.message
+            ? apiError.message
+            : "Login failed. Please try again.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -165,7 +172,7 @@ export default function LoginPage() {
                     role="alert"
                     aria-live="polite"
                   >
-                    {error}
+                    {typeof error === "string" ? error : "An unexpected error occurred. Please try again."}
                   </div>
                 )}
 
