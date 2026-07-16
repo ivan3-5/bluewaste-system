@@ -36,6 +36,8 @@ describe('Auth Integration Tests', () => {
         role: 'LGU_ADMIN',
         isActive: true,
         phone: null,
+        address: '',
+        avatarUrl: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -67,6 +69,8 @@ describe('Auth Integration Tests', () => {
         role: 'LGU_ADMIN',
         isActive: true,
         phone: null,
+        address: '',
+        avatarUrl: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
