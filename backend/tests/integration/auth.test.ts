@@ -80,7 +80,8 @@ describe('Auth Integration Tests', () => {
 
       expect(res.status).toBe(401)
       expect(res.body).toHaveProperty('error')
-      expect(res.body.error).toContain('Invalid email or password')
+      expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED')
+      expect(res.body.error).toHaveProperty('message', 'Invalid email or password')
     })
   })
 })
