@@ -10,6 +10,7 @@ import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../data/report_service.dart";
 import "../domain/report_models.dart";
+import "worker_route_screen.dart";
 
 class WorkerTasksScreen extends ConsumerStatefulWidget {
   const WorkerTasksScreen({super.key});
@@ -121,6 +122,23 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
     }
   }
 
+  void _openRouteMap() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            title: const Text("Route Map"),
+            backgroundColor: AppColors.card,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+          ),
+          body: const WorkerRouteScreen(),
+        ),
+      ),
+    );
+  }
+
   List<_TaskAction> _actionsForStatus(String status) {
     switch (status) {
       case "VERIFIED":
@@ -165,186 +183,235 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
 
     return RefreshIndicator(
       onRefresh: _loadTasks,
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.sm,
-          AppSpacing.md,
-          AppSpacing.md,
-        ),
-        itemCount: _tasks.length,
-        itemBuilder: (context, index) {
-          final task = _tasks[index];
-          final actions = _actionsForStatus(task.status);
-          final statusColor = AppColors.statusColor(task.status);
-          final categoryColor = AppColors.categoryColor(task.category);
-          final cleanupCount =
-              task.images.where((image) => image.type == "CLEANUP").length;
-          final needsCleanupPhoto =
-              task.status == "IN_PROGRESS" && cleanupCount == 0;
+      child: Stack(
+        children: [
+          ListView.builder(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              // Extra bottom padding so the FAB doesn't cover the last card
+              88,
+            ),
+            itemCount: _tasks.length,
+            itemBuilder: (context, index) {
+              final task = _tasks[index];
+              final actions = _actionsForStatus(task.status);
+              final statusColor = AppColors.statusColor(task.status);
+              final categoryColor = AppColors.categoryColor(task.category);
+              final cleanupCount =
+                  task.images.where((image) => image.type == "CLEANUP").length;
+              final needsCleanupPhoto =
+                  task.status == "IN_PROGRESS" && cleanupCount == 0;
 
-          return Card(
-            margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task.title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(task.description,
-                      maxLines: 3, overflow: TextOverflow.ellipsis),
-                  if (task.images.where((i) => i.type == "REPORT").isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    SizedBox(
-                      height: 80,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: task.images.where((i) => i.type == "REPORT").length,
-                        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
-                        itemBuilder: (context, index) {
-                          final image = task.images
-                              .where((i) => i.type == "REPORT")
-                              .elementAt(index);
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(AppSpacing.xs),
-                            child: Image.network(
-                              image.imageUrl,
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                width: 80,
-                                height: 80,
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.broken_image, color: Colors.grey),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: AppSpacing.sm),
-                  Wrap(
-                    spacing: AppSpacing.xs,
-                    runSpacing: AppSpacing.xs,
+              return Card(
+                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      AppStatusPill(
-                        label: statusLabels[task.status] ?? task.status,
-                        color: statusColor,
+                      Text(
+                        task.title,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
-                      AppStatusPill(
-                        label:
-                            wasteCategoryLabels[task.category] ?? task.category,
-                        color: categoryColor,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    "Created: ${_dateFormat.format(task.createdAt)}",
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.mutedForeground,
-                        ),
-                  ),
-                  if ((task.address ?? "").isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      "Address: ${task.address}",
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                  if (actions.isNotEmpty || task.status == "IN_PROGRESS")
-                    const SizedBox(height: AppSpacing.sm),
-                  if (actions.isNotEmpty)
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      children: actions.map(
-                        (action) {
-                          final isDisabled =
-                              action.requiresCleanupPhoto && cleanupCount == 0;
-                          return FilledButton.tonal(
-                            onPressed: isDisabled
-                                ? null
-                                : () => _updateStatus(
-                                      task,
-                                      action.nextStatus,
-                                    ),
-                            child: Text(action.label),
-                          );
-                        },
-                      ).toList(growable: false),
-                    ),
-                  if (task.status == "IN_PROGRESS") ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      cleanupCount == 0
-                          ? "Cleanup photos: none yet"
-                          : "Cleanup photos: $cleanupCount",
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cleanupCount == 0
-                                ? AppColors.mutedForeground
-                                : AppColors.success,
-                          ),
-                    ),
-                    if (cleanupCount > 0) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      SizedBox(
-                        height: 80,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: cleanupCount,
-                          separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
-                          itemBuilder: (context, index) {
-                            final image = task.images
-                                .where((i) => i.type == "CLEANUP")
-                                .elementAt(index);
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(AppSpacing.xs),
-                              child: Image.network(
-                                image.imageUrl,
-                                width: 80,
-                                height: 80,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(task.description,
+                          maxLines: 3, overflow: TextOverflow.ellipsis),
+                      // Report images
+                      if (task.images
+                          .where((i) => i.type == "REPORT")
+                          .isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        SizedBox(
+                          height: 80,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: task.images
+                                .where((i) => i.type == "REPORT")
+                                .length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: AppSpacing.xs),
+                            itemBuilder: (context, idx) {
+                              final image = task.images
+                                  .where((i) => i.type == "REPORT")
+                                  .elementAt(idx);
+                              return ClipRRect(
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.xs),
+                                child: Image.network(
+                                  image.imageUrl,
                                   width: 80,
                                   height: 80,
-                                  color: Colors.grey[200],
-                                  child: const Icon(Icons.broken_image, color: Colors.grey),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 80,
+                                    height: 80,
+                                    color: Colors.grey[200],
+                                    child: const Icon(Icons.broken_image,
+                                        color: Colors.grey),
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
+                      ],
+                      const SizedBox(height: AppSpacing.sm),
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          AppStatusPill(
+                            label: statusLabels[task.status] ?? task.status,
+                            color: statusColor,
+                          ),
+                          AppStatusPill(
+                            label: wasteCategoryLabels[task.category] ??
+                                task.category,
+                            color: categoryColor,
+                          ),
+                        ],
                       ),
-                    ],
-                    if (needsCleanupPhoto) ...[
-                      const SizedBox(height: AppSpacing.xs),
+                      const SizedBox(height: AppSpacing.sm),
                       Text(
-                        "Upload a cleanup photo to mark as cleaned.",
+                        "Created: ${_dateFormat.format(task.createdAt)}",
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.mutedForeground,
                             ),
                       ),
+                      if ((task.address ?? "").isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_outlined,
+                                size: 13, color: AppColors.mutedForeground),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                task.address!,
+                                style: Theme.of(context).textTheme.bodySmall,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      // Status action buttons
+                      if (actions.isNotEmpty || task.status == "IN_PROGRESS")
+                        const SizedBox(height: AppSpacing.sm),
+                      if (actions.isNotEmpty)
+                        Wrap(
+                          spacing: AppSpacing.xs,
+                          children: actions.map(
+                            (action) {
+                              final isDisabled =
+                                  action.requiresCleanupPhoto &&
+                                      cleanupCount == 0;
+                              return FilledButton.tonal(
+                                onPressed: isDisabled
+                                    ? null
+                                    : () => _updateStatus(
+                                          task,
+                                          action.nextStatus,
+                                        ),
+                                child: Text(action.label),
+                              );
+                            },
+                          ).toList(growable: false),
+                        ),
+                      // Cleanup section
+                      if (task.status == "IN_PROGRESS") ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          cleanupCount == 0
+                              ? "Cleanup photos: none yet"
+                              : "Cleanup photos: $cleanupCount",
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: cleanupCount == 0
+                                        ? AppColors.mutedForeground
+                                        : AppColors.success,
+                                  ),
+                        ),
+                        if (cleanupCount > 0) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          SizedBox(
+                            height: 80,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: cleanupCount,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: AppSpacing.xs),
+                              itemBuilder: (context, idx) {
+                                final image = task.images
+                                    .where((i) => i.type == "CLEANUP")
+                                    .elementAt(idx);
+                                return ClipRRect(
+                                  borderRadius:
+                                      BorderRadius.circular(AppSpacing.xs),
+                                  child: Image.network(
+                                    image.imageUrl,
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 80,
+                                      height: 80,
+                                      color: Colors.grey[200],
+                                      child: const Icon(Icons.broken_image,
+                                          color: Colors.grey),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                        if (needsCleanupPhoto) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            "Upload a cleanup photo to mark as cleaned.",
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColors.mutedForeground,
+                                    ),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.xs),
+                        OutlinedButton.icon(
+                          onPressed: () => _uploadCleanupPhoto(task.id),
+                          icon: const Icon(Icons.photo_camera_outlined),
+                          label: const Text("Upload Cleanup Photo"),
+                        ),
+                      ],
                     ],
-                    const SizedBox(height: AppSpacing.xs),
-                    OutlinedButton.icon(
-                      onPressed: () => _uploadCleanupPhoto(task.id),
-                      icon: const Icon(Icons.photo_camera_outlined),
-                      label: const Text("Upload Cleanup Photo"),
-                    ),
-                  ],
-                ],
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // ── Route Map FAB ──────────────────────────────────────────────────
+          Positioned(
+            bottom: AppSpacing.md,
+            right: AppSpacing.md,
+            child: FloatingActionButton.extended(
+              heroTag: "worker_route_fab",
+              onPressed: _openRouteMap,
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.route_outlined),
+              label: const Text(
+                "Route Map",
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

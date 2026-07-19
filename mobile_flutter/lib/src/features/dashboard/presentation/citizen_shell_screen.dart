@@ -10,7 +10,7 @@ import "../../notifications/presentation/notification_providers.dart";
 import "../../notifications/presentation/notifications_screen.dart";
 import "../../profile/presentation/profile_screen.dart";
 import "../../reports/presentation/citizen_home_screen.dart";
-import "../../../../screens/camera_screen.dart";
+import "../../reports/presentation/report_create_screen.dart";
 import "../../reports/presentation/reports_map_screen.dart";
 
 class CitizenShellScreen extends ConsumerStatefulWidget {
@@ -83,7 +83,7 @@ class _CitizenShellScreenState extends ConsumerState<CitizenShellScreen> {
       CitizenHomeScreen(
         onSelectTab: (tab) => setState(() => _index = tab),
       ),
-      const CameraScreen(),
+      const ReportCreateScreen(),
       const ReportsMapScreen(),
       const NotificationsScreen(),
     ];
