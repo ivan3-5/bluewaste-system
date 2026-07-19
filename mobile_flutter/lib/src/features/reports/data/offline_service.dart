@@ -1,4 +1,5 @@
 import "dart:convert";
+import "package:flutter/foundation.dart";
 import "package:hive/hive.dart";
 import "package:connectivity_plus/connectivity_plus.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
@@ -45,12 +46,20 @@ class OfflineService {
   Future<List<OfflineReportPayload>> getQueuedReports() async {
     final box = await Hive.openBox<String>(boxName);
     final reports = <OfflineReportPayload>[];
-    for (final value in box.values) {
-      try {
-        reports.add(OfflineReportPayload.fromJson(jsonDecode(value)));
-      } catch (e) {
-        // Corrupted entry
+    final keysToDelete = <dynamic>[];
+    for (final key in box.keys) {
+      final value = box.get(key);
+      if (value != null) {
+        try {
+          reports.add(OfflineReportPayload.fromJson(jsonDecode(value)));
+        } catch (e) {
+          debugPrint("[OfflineService] Deleting corrupted entry for key: $key ($e)");
+          keysToDelete.add(key);
+        }
       }
+    }
+    if (keysToDelete.isNotEmpty) {
+      await box.deleteAll(keysToDelete);
     }
     return reports;
   }
@@ -79,6 +88,7 @@ class OfflineService {
           );
           await removeQueuedReport(report.id);
         } catch (e) {
+          debugPrint("[OfflineService] Failed to sync report ${report.id}: $e");
           // If a single report fails, keep it in the queue and try the rest.
         }
       }

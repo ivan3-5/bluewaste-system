@@ -4,6 +4,7 @@ import { analyzeImageWithGemini, GeminiError } from "@/lib/ai/gemini";
 import { validateGeminiResult } from "@/lib/ai/validator";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import prisma from "@/lib/prisma";
+import { persistAiReportAndNotify } from "@/lib/services/ai-report-service";
 
 export const runtime = "nodejs";
 
@@ -62,24 +63,7 @@ async function compressIfNeeded(
   }
 }
 
-/**
- * Map Gemini AI severity (Low/Medium/High/Critical/None)
- * to the DB Severity enum (CRITICAL/HIGH/MODERATE/SPAM)
- */
-function mapSeverityToDb(
-  aiSeverity: string,
-  hasWaste: boolean,
-): string {
-  if (!hasWaste) return "SPAM";
-  const map: Record<string, string> = {
-    Critical: "CRITICAL",
-    High: "HIGH",
-    Medium: "MODERATE",
-    Low: "MODERATE",
-    None: "SPAM",
-  };
-  return map[aiSeverity] ?? "MODERATE";
-}
+
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 
@@ -276,90 +260,20 @@ export async function POST(request: NextRequest) {
       tokenUsage,
     });
 
-    // ── 11. Persist to DB (backend schema via raw SQL) ────────────────────
-    const isSpam = !aiResult.hasWaste;
-    const dbSeverity = mapSeverityToDb(aiResult.severity, aiResult.hasWaste);
-    const analysisStatus = aiResult.hasWaste ? "DIRTY" : "CLEAN";
-    const reportStatus = isSpam ? "REJECTED" : "PENDING";
-    const reportId = crypto.randomUUID();
-    const locationName = `Waste Report @ ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-
-    await prisma.$executeRaw`
-      INSERT INTO "Report" (
-        id, title, description, category, status, latitude, longitude, address,
-        "isAnonymous", "isDeleted", "isSpam", "spamMarkedAt", "spamReason",
-        "analysisStatus", "analysisConfidence",
-        "aiCategories", "aiReason", "aiModel", "aiImageHash",
-        "aiProcessingMs", "aiGeminiMs",
-        "analyzedAt", severity, "reporterId",
-        "createdAt", "updatedAt"
-      )
-      VALUES (
-        ${reportId},
-        ${locationName},
-        ${description ?? "Submitted via AI analysis."},
-        ${"with_waste"}::"WasteCategory",
-        ${reportStatus}::"ReportStatus",
-        ${latitude},
-        ${longitude},
-        ${locationName},
-        false,
-        false,
-        ${isSpam},
-        ${isSpam ? new Date() : null},
-        ${isSpam ? "No waste detected by Gemini AI" : null},
-        ${analysisStatus}::"AnalysisStatus",
-        ${aiResult.confidence},
-        ${aiResult.categories},
-        ${aiResult.reason},
-        ${modelName},
-        ${imageHash},
-        ${totalMs},
-        ${latencyMs},
-        NOW(),
-        ${dbSeverity}::"Severity",
-        ${citizenId},
-        NOW(),
-        NOW()
-      )
-    `;
-
-    // Insert image into ReportImage table
-    const imageRowId = crypto.randomUUID();
-    await prisma.$executeRaw`
-      INSERT INTO "ReportImage" (id, "imageUrl", "publicId", type, "createdAt", "reportId")
-      VALUES (${imageRowId}, ${imageUrl}, ${cloudinaryPublicId}, 'REPORT'::"ImageType", NOW(), ${reportId})
-    `;
-
-    // ── 12. Trigger admin notification ────────────────────────────────────
-    if (!isSpam) {
-      try {
-        // Notify all LGU_ADMIN users
-        const admins = await prisma.$queryRaw<{ id: string }[]>`
-          SELECT id FROM "User" WHERE role = 'LGU_ADMIN'::"Role" AND "isActive" = true LIMIT 20
-        `;
-
-        for (const admin of admins) {
-          const notifId = crypto.randomUUID();
-          await prisma.$executeRaw`
-            INSERT INTO "Notification" (id, "userId", title, message, type, "reportId", "isRead", "createdAt")
-            VALUES (
-              ${notifId},
-              ${admin.id},
-              ${"New AI-Analyzed Waste Report"},
-              ${`A new waste report has been submitted and analyzed by AI. Severity: ${aiResult.severity}. Categories: ${aiResult.categories.join(", ") || "None"}.`},
-              'NEW_REPORT'::"NotificationType",
-              ${reportId},
-              false,
-              NOW()
-            )
-          `;
-        }
-      } catch (notifErr) {
-        // Non-fatal — log but don't fail the request
-        console.warn("[AI] Failed to insert admin notifications:", notifErr);
-      }
-    }
+    // ── 11. Persist to DB & Notify Admins via Service ─────────────────────
+    const { reportId, reportStatus, isSpam } = await persistAiReportAndNotify({
+      latitude,
+      longitude,
+      description,
+      citizenId,
+      imageHash,
+      imageUrl,
+      cloudinaryPublicId,
+      aiResult,
+      modelName,
+      totalMs,
+      latencyMs,
+    });
 
     // ── 13. Return response ───────────────────────────────────────────────
     return NextResponse.json(

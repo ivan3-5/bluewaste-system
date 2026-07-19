@@ -46,7 +46,7 @@ function toFiniteNumberOrNull(value: unknown): number | null {
   return null;
 }
 
-function toSafeJson(text: string) {
+function toSafeJson(text: string): unknown {
   if (!text) return null;
   try {
     return JSON.parse(text);
@@ -195,8 +195,8 @@ export class ReportAnalysisService {
     const newCategory: WasteCategory = hasWaste ? "with_waste" : "no_waste";
 
     // Resolve severity from the /analyze response or fall back to confidence/status logic
-    const rawSeverity = (analysis as YoloApiResponse).severity as string | null | undefined;
-    const conf: number = typeof (analysis as YoloApiResponse).confidence === "number" ? (analysis as YoloApiResponse).confidence! : 0;
+    const rawSeverity = analysis.severity;
+    const conf: number = typeof analysis.confidence === "number" ? analysis.confidence : 0;
     let computedSeverity: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null = null;
     if (rawSeverity) {
       const upper = String(rawSeverity).toUpperCase();
@@ -219,7 +219,7 @@ export class ReportAnalysisService {
       resolvedSeverity === "SPAM" || newCategory === "no_waste";
 
     const spamReason = shouldMarkSpam
-      ? ((analysis as YoloApiResponse).spam_reason as string | null) ??
+      ? analysis.spamReason ??
         "No visible waste or pollution detected in the submitted image."
       : null;
 

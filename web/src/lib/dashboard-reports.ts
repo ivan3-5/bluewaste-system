@@ -355,75 +355,99 @@ export async function getDashboardCategoryDistribution() {
   }));
 }
 
+type PrismaTransactionClient = Omit<
+  typeof prisma,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
+
+async function notifyReporterStatusChange(
+  tx: PrismaTransactionClient,
+  reporterId: string,
+  title: string,
+  reportId: string,
+  status: string,
+) {
+  const message = `Your report "${title}" status changed to ${status.replace(/_/g, " ")}`;
+  const nid = randomUUID();
+
+  await tx.$executeRaw`
+    INSERT INTO "Notification" (id, "userId", title, message, type, "reportId")
+    VALUES (
+      ${nid},
+      ${reporterId},
+      ${"Report Status Updated"},
+      ${message},
+      ${"STATUS_CHANGE"}::"NotificationType",
+      ${reportId}
+    )
+  `;
+}
+
+async function tryAutoCompleteCleanupSchedule(
+  tx: PrismaTransactionClient,
+  cleanupScheduleId: string,
+) {
+  const totals = await tx.$queryRaw<
+    { total: bigint; cleaned: bigint }[]
+  >`
+    SELECT
+      COUNT(*) AS total,
+      COUNT(*) FILTER (WHERE status = 'CLEANED') AS cleaned
+    FROM "Report"
+    WHERE "cleanupScheduleId" = ${cleanupScheduleId}
+      AND "isDeleted" = false
+  `;
+
+  const total = Number(totals?.[0]?.total ?? 0);
+  const cleaned = Number(totals?.[0]?.cleaned ?? 0);
+
+  if (total > 0 && cleaned === total) {
+    await tx.$executeRaw`
+      UPDATE "CleanupSchedule"
+      SET status = 'COMPLETED'::"CleanupScheduleStatus",
+          "verifiedAt" = NOW()
+      WHERE id = ${cleanupScheduleId}
+        AND status != 'COMPLETED'
+    `;
+  }
+}
+
 export async function updateDashboardReportStatus(
   id: string,
   status: AdminReport["status"],
 ) {
-  // Read reporter id, title, and cleanupScheduleId first (avoid Prisma model mismatches)
-  const rows = await prisma.$queryRaw<
-    { reporterId: string | null; title: string; cleanupScheduleId: string | null }[]
-  >`
-    SELECT r."reporterId", r.title, r."cleanupScheduleId"
-    FROM "Report" r
-    WHERE r.id = ${id}
-    LIMIT 1
-  `;
-
-  const reporterId = rows?.[0]?.reporterId ?? null;
-  const title = rows?.[0]?.title ?? "";
-  const cleanupScheduleId = rows?.[0]?.cleanupScheduleId ?? null;
-
-  // Update status (cast to DB enum)
-  await prisma.$executeRaw`
-    UPDATE "Report"
-    SET status = ${status}::"ReportStatus"
-    WHERE id = ${id}
-  `;
-
-  // Create a notification for the reporter if they exist
-  if (reporterId) {
-    const message = `Your report "${title}" status changed to ${status.replace(/_/g, " ")}`;
-    const nid = randomUUID();
-
-    await prisma.$executeRaw`
-      INSERT INTO "Notification" (id, "userId", title, message, type, "reportId")
-      VALUES (
-        ${nid},
-        ${reporterId},
-        ${"Report Status Updated"},
-        ${message},
-        ${"STATUS_CHANGE"}::"NotificationType",
-        ${id}
-      )
-    `;
-  }
-
-  // Auto-complete the linked CleanupSchedule if ALL its reports are now CLEANED
-  if (status === "CLEANED" && cleanupScheduleId) {
-    const totals = await prisma.$queryRaw<
-      { total: bigint; cleaned: bigint }[]
+  await prisma.$transaction(async (tx) => {
+    // Read reporter id, title, and cleanupScheduleId first (avoid Prisma model mismatches)
+    const rows = await tx.$queryRaw<
+      { reporterId: string | null; title: string; cleanupScheduleId: string | null }[]
     >`
-      SELECT
-        COUNT(*) AS total,
-        COUNT(*) FILTER (WHERE status = 'CLEANED') AS cleaned
-      FROM "Report"
-      WHERE "cleanupScheduleId" = ${cleanupScheduleId}
-        AND "isDeleted" = false
+      SELECT r."reporterId", r.title, r."cleanupScheduleId"
+      FROM "Report" r
+      WHERE r.id = ${id}
+      LIMIT 1
     `;
 
-    const total = Number(totals?.[0]?.total ?? 0);
-    const cleaned = Number(totals?.[0]?.cleaned ?? 0);
+    const reporterId = rows?.[0]?.reporterId ?? null;
+    const title = rows?.[0]?.title ?? "";
+    const cleanupScheduleId = rows?.[0]?.cleanupScheduleId ?? null;
 
-    if (total > 0 && cleaned === total) {
-      await prisma.$executeRaw`
-        UPDATE "CleanupSchedule"
-        SET status = 'COMPLETED'::"CleanupScheduleStatus",
-            "verifiedAt" = NOW()
-        WHERE id = ${cleanupScheduleId}
-          AND status != 'COMPLETED'
-      `;
+    // Update status (cast to DB enum)
+    await tx.$executeRaw`
+      UPDATE "Report"
+      SET status = ${status}::"ReportStatus"
+      WHERE id = ${id}
+    `;
+
+    // Create a notification for the reporter if they exist
+    if (reporterId) {
+      await notifyReporterStatusChange(tx, reporterId, title, id, status);
     }
-  }
+
+    // Auto-complete the linked CleanupSchedule if ALL its reports are now CLEANED
+    if (status === "CLEANED" && cleanupScheduleId) {
+      await tryAutoCompleteCleanupSchedule(tx, cleanupScheduleId);
+    }
+  });
 
   return getDashboardReportById(id);
 }

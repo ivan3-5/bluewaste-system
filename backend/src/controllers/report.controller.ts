@@ -1,12 +1,10 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { ReportCrudService } from "../services/report-crud.service";
 import { ReportGeoService } from "../services/report-geo.service";
-import { ReportAnalysisService } from "../services/report-analysis.service";
 import { ReportSpamService } from "../services/report-spam.service";
+import { ReportImageService } from "../services/report-image.service";
 import { AuthRequest } from "../middleware/auth";
-import prisma from "../config/database";
-import { CloudinaryService } from "../services/cloudinary.service";
-import { sendError } from "../utils/http";
+import { handleControllerError, QueryFilters } from "../utils/http";
 
 export class ReportController {
   static async create(req: AuthRequest, res: Response) {
@@ -23,8 +21,8 @@ export class ReportController {
             : undefined,
       });
       res.status(201).json(report);
-    } catch (error: any) {
-      sendError(res, 500, "Failed to create report", "REPORT_CREATE_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to create report", "REPORT_CREATE_FAILED");
     }
   }
 
@@ -32,14 +30,8 @@ export class ReportController {
     try {
       const report = await ReportCrudService.findById(req.params.id, req.user);
       res.json(report);
-    } catch (error: any) {
-      if (error.message === "Report not found") {
-        return sendError(res, 404, error.message, "REPORT_NOT_FOUND");
-      }
-      if (error.message === "Insufficient permissions.") {
-        return sendError(res, 403, error.message, "FORBIDDEN");
-      }
-      sendError(res, 500, "Failed to fetch report", "REPORT_FETCH_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to fetch report", "REPORT_FETCH_FAILED");
     }
   }
 
@@ -53,13 +45,10 @@ export class ReportController {
         notes,
       );
       res.json(report);
-    } catch (error: any) {
-      if (error.message === "Report not found") {
-        return sendError(res, 404, error.message, "REPORT_NOT_FOUND");
-      }
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to update status",
         "REPORT_STATUS_UPDATE_FAILED",
       );
@@ -68,10 +57,11 @@ export class ReportController {
 
   static async getReports(req: AuthRequest, res: Response) {
     try {
-      const result = await ReportCrudService.getReports(req.query as any);
+      const query = (req.query || {}) as QueryFilters;
+      const result = await ReportCrudService.getReports(query);
       res.json(result);
-    } catch (error: any) {
-      sendError(res, 500, "Failed to fetch reports", "REPORT_FETCH_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to fetch reports", "REPORT_FETCH_FAILED");
     }
   }
 
@@ -84,43 +74,30 @@ export class ReportController {
         req.user!.id,
       );
       res.json(report);
-    } catch (error: any) {
-      if (error.message === "Report not found") {
-        return sendError(res, 404, error.message, "REPORT_NOT_FOUND");
-      }
-      if (error.message === "Field worker not found") {
-        return sendError(res, 404, error.message, "WORKER_NOT_FOUND");
-      }
-      if (error.message === "Report is marked as spam") {
-        return sendError(res, 400, error.message, "REPORT_SPAM");
-      }
-      sendError(res, 500, "Failed to assign worker", "REPORT_ASSIGN_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to assign worker", "REPORT_ASSIGN_FAILED");
     }
   }
 
   static async getMyReports(req: AuthRequest, res: Response) {
     try {
-      const result = await ReportCrudService.getMyReports(
-        req.user!.id,
-        req.query as any,
-      );
+      const query = (req.query || {}) as QueryFilters;
+      const result = await ReportCrudService.getMyReports(req.user!.id, query);
       res.json(result);
-    } catch (error: any) {
-      sendError(res, 500, "Failed to fetch reports", "REPORT_FETCH_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to fetch reports", "REPORT_FETCH_FAILED");
     }
   }
 
   static async getAssignedReports(req: AuthRequest, res: Response) {
     try {
-      const result = await ReportCrudService.getAssignedReports(
-        req.user!.id,
-        req.query as any,
-      );
+      const query = (req.query || {}) as QueryFilters;
+      const result = await ReportCrudService.getAssignedReports(req.user!.id, query);
       res.json(result);
-    } catch (error: any) {
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to fetch assigned reports",
         "ASSIGNED_REPORT_FETCH_FAILED",
       );
@@ -129,23 +106,25 @@ export class ReportController {
 
   static async getMapData(req: AuthRequest, res: Response) {
     try {
-      const reports = await ReportGeoService.getMapData(req.query as any);
+      const query = (req.query || {}) as QueryFilters;
+      const reports = await ReportGeoService.getMapData(query);
       res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
       res.json(reports);
-    } catch (error: any) {
-      sendError(res, 500, "Failed to fetch map data", "MAP_DATA_FETCH_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to fetch map data", "MAP_DATA_FETCH_FAILED");
     }
   }
 
   static async getHeatmapData(req: AuthRequest, res: Response) {
     try {
-      const data = await ReportGeoService.getHeatmapData(req.query as any);
+      const query = (req.query || {}) as QueryFilters;
+      const data = await ReportGeoService.getHeatmapData(query);
       res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
       res.json(data);
-    } catch (error: any) {
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to fetch heatmap data",
         "HEATMAP_FETCH_FAILED",
       );
@@ -155,58 +134,11 @@ export class ReportController {
   static async addImages(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;
-      const files = req.files as Express.Multer.File[];
-
-      if (!files || files.length === 0) {
-        return sendError(res, 400, "No files uploaded", "NO_FILES_UPLOADED");
-      }
-
-      const report = await prisma.report.findUnique({
-        where: { id },
-        select: {
-          id: true,
-          reporterId: true,
-          assignedToId: true,
-        },
-      });
-      if (!report) {
-        return sendError(res, 404, "Report not found", "REPORT_NOT_FOUND");
-      }
-
-      const requesterId = req.user?.id;
-      const requesterRole = req.user?.role;
-
-      const canUpload =
-        requesterRole === "LGU_ADMIN" ||
-        report.reporterId === requesterId ||
-        report.assignedToId === requesterId;
-
-      if (!canUpload) {
-        return sendError(res, 403, "Insufficient permissions.", "FORBIDDEN");
-      }
-
-      const uploadPromises = files.map(async (file) => {
-        const result = await CloudinaryService.uploadImage(file.buffer);
-        return prisma.reportImage.create({
-          data: {
-            reportId: id,
-            imageUrl: result.url,
-            publicId: result.publicId,
-            type: req.body.type || "REPORT",
-          },
-        });
-      });
-
-      const images = await Promise.all(uploadPromises);
-      // Auto-run analysis on the report after images are uploaded
-      try {
-        await ReportAnalysisService.analyzeReport(id);
-      } catch (err) {
-        console.warn("Auto analysis failed for report", id, err);
-      }
+      const files = req.files as Express.Multer.File[] | undefined;
+      const images = await ReportImageService.addImagesToReport(id, files, req.user, req.body.type);
       res.status(201).json(images);
-    } catch (error: any) {
-      sendError(res, 500, "Failed to upload images", "IMAGE_UPLOAD_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to upload images", "IMAGE_UPLOAD_FAILED");
     }
   }
 
@@ -214,13 +146,10 @@ export class ReportController {
     try {
       const report = await ReportSpamService.restoreSpam(req.params.id);
       res.json(report);
-    } catch (error: any) {
-      if (error.message === "Report not found") {
-        return sendError(res, 404, error.message, "REPORT_NOT_FOUND");
-      }
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to restore spam report",
         "REPORT_RESTORE_FAILED",
       );
@@ -231,11 +160,8 @@ export class ReportController {
     try {
       await ReportCrudService.softDelete(req.params.id);
       res.json({ message: "Report deleted successfully" });
-    } catch (error: any) {
-      if (error.message === "Report not found") {
-        return sendError(res, 404, error.message, "REPORT_NOT_FOUND");
-      }
-      sendError(res, 500, "Failed to delete report", "REPORT_DELETE_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to delete report", "REPORT_DELETE_FAILED");
     }
   }
 }

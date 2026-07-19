@@ -1,17 +1,19 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { NotificationService, registerSSEClient } from "../services/notification.service";
 import { AuthRequest } from "../middleware/auth";
+import { handleControllerError, QueryFilters } from "../utils/http";
 
 export class NotificationController {
   static async getUserNotifications(req: AuthRequest, res: Response) {
     try {
+      const query = (req.query || {}) as QueryFilters;
       const result = await NotificationService.getUserNotifications(
         req.user!.id,
-        req.query as any,
+        query,
       );
       res.json(result);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch notifications" });
+      handleControllerError(res, error, "Failed to fetch notifications", "NOTIFICATION_FETCH_FAILED");
     }
   }
 
@@ -20,7 +22,7 @@ export class NotificationController {
       await NotificationService.markAsRead(req.params.id, req.user!.id);
       res.json({ message: "Notification marked as read" });
     } catch (error) {
-      res.status(500).json({ error: "Failed to mark notification as read" });
+      handleControllerError(res, error, "Failed to mark notification as read", "NOTIFICATION_READ_FAILED");
     }
   }
 
@@ -29,7 +31,7 @@ export class NotificationController {
       await NotificationService.markAllAsRead(req.user!.id);
       res.json({ message: "All notifications marked as read" });
     } catch (error) {
-      res.status(500).json({ error: "Failed to mark notifications as read" });
+      handleControllerError(res, error, "Failed to mark notifications as read", "NOTIFICATION_READ_ALL_FAILED");
     }
   }
 
@@ -38,7 +40,7 @@ export class NotificationController {
       const count = await NotificationService.getUnreadCount(req.user!.id);
       res.json({ count });
     } catch (error) {
-      res.status(500).json({ error: "Failed to get unread count" });
+      handleControllerError(res, error, "Failed to get unread count", "NOTIFICATION_COUNT_FAILED");
     }
   }
 

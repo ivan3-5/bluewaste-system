@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
-import { sendError } from "../utils/http";
+import { handleControllerError } from "../utils/http";
 import { ReportingZoneService } from "../services/reportingZone.service";
 
 export class ReportingZoneController {
@@ -9,10 +9,10 @@ export class ReportingZoneController {
       const activeOnly = req.query.all !== "true";
       const zones = await ReportingZoneService.list(activeOnly);
       res.json(zones);
-    } catch {
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to fetch reporting zones",
         "ZONE_FETCH_FAILED",
       );
@@ -26,16 +26,10 @@ export class ReportingZoneController {
         createdById: req.user!.id,
       });
       res.status(201).json(zone);
-    } catch (error: any) {
-      if (
-        error.message === "Zone name is required" ||
-        error.message?.startsWith("A zone needs")
-      ) {
-        return sendError(res, 400, error.message, "ZONE_VALIDATION_FAILED");
-      }
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to create reporting zone",
         "ZONE_CREATE_FAILED",
       );
@@ -46,16 +40,10 @@ export class ReportingZoneController {
     try {
       const zone = await ReportingZoneService.update(req.params.id, req.body);
       res.json(zone);
-    } catch (error: any) {
-      if (error.message === "Reporting zone not found") {
-        return sendError(res, 404, error.message, "ZONE_NOT_FOUND");
-      }
-      if (error.message?.startsWith("A zone needs")) {
-        return sendError(res, 400, error.message, "ZONE_VALIDATION_FAILED");
-      }
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to update reporting zone",
         "ZONE_UPDATE_FAILED",
       );
@@ -66,13 +54,10 @@ export class ReportingZoneController {
     try {
       await ReportingZoneService.delete(req.params.id);
       res.json({ message: "Reporting zone deleted successfully" });
-    } catch (error: any) {
-      if (error.message === "Reporting zone not found") {
-        return sendError(res, 404, error.message, "ZONE_NOT_FOUND");
-      }
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to delete reporting zone",
         "ZONE_DELETE_FAILED",
       );

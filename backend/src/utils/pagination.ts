@@ -13,12 +13,15 @@ export interface PaginatedResponse<T> {
   };
 }
 
-export const getPaginationParams = (query: {
-  page?: string;
-  limit?: string;
+export const getPaginationParams = (query: Record<string, unknown> | {
+  page?: unknown;
+  limit?: unknown;
 }): PaginationParams => {
-  const parsedPage = Number.parseInt(query.page ?? "1", 10);
-  const parsedLimit = Number.parseInt(query.limit ?? "20", 10);
+  const pageRaw = query.page !== undefined && query.page !== null ? String(query.page) : "1";
+  const limitRaw = query.limit !== undefined && query.limit !== null ? String(query.limit) : "20";
+
+  const parsedPage = Number.parseInt(pageRaw, 10);
+  const parsedLimit = Number.parseInt(limitRaw, 10);
 
   const page = Number.isNaN(parsedPage) ? 1 : Math.max(1, parsedPage);
   const limit = Number.isNaN(parsedLimit)

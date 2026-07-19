@@ -4,6 +4,7 @@ import { env } from "../config/env";
 import prisma from "../config/database";
 import { sendError } from "../utils/http";
 import { Redis } from "@upstash/redis";
+import { logger } from "../utils/logger";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -13,6 +14,15 @@ export interface AuthRequest extends Request {
     firstName: string;
     lastName: string;
   };
+}
+
+export interface CachedUserData {
+  id: string;
+  email: string;
+  role: string;
+  firstName: string;
+  lastName: string;
+  isActive: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -29,16 +39,17 @@ const redisClient =
     : null;
 
 // In-memory fallback for local dev without Redis
-const fallbackCache = new Map<string, { expiresAt: number; data: any }>();
+const fallbackCache = new Map<string, { expiresAt: number; data: CachedUserData }>();
 
 const AuthCache = {
-  async get(userId: string) {
+  async get(userId: string): Promise<CachedUserData | null> {
     const key = `bluewaste:auth:${userId}`;
     if (redisClient) {
       try {
-        const raw = await redisClient.get<string>(key);
-        return raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;
-      } catch {
+        const raw = await redisClient.get<string | CachedUserData>(key);
+        return raw ? (typeof raw === "string" ? (JSON.parse(raw) as CachedUserData) : raw) : null;
+      } catch (error) {
+        logger.debug({ error, userId }, "Redis get failed in AuthCache; falling back");
         return null;
       }
     } else {
@@ -51,15 +62,19 @@ const AuthCache = {
     }
   },
 
-  async set(userId: string, data: any) {
+  async set(userId: string, data: CachedUserData): Promise<void> {
     const key = `bluewaste:auth:${userId}`;
     if (redisClient) {
       try {
         await redisClient.set(key, JSON.stringify(data), {
           ex: AUTH_CACHE_TTL_SECONDS,
         });
-      } catch {
-        /* ignore */
+      } catch (error) {
+        logger.debug({ error, userId }, "Redis set failed in AuthCache; using memory fallback");
+        fallbackCache.set(key, {
+          expiresAt: Date.now() + AUTH_CACHE_TTL_SECONDS * 1000,
+          data,
+        });
       }
     } else {
       fallbackCache.set(key, {
@@ -69,10 +84,15 @@ const AuthCache = {
     }
   },
   
-  async invalidate(userId: string) {
+  async invalidate(userId: string): Promise<void> {
     const key = `bluewaste:auth:${userId}`;
     if (redisClient) {
-      try { await redisClient.del(key); } catch { /* ignore */ }
+      try {
+        await redisClient.del(key);
+      } catch (error) {
+        logger.debug({ error, userId }, "Redis del failed in AuthCache");
+        fallbackCache.delete(key);
+      }
     } else {
       fallbackCache.delete(key);
     }

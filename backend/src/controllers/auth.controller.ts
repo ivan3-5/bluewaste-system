@@ -21,9 +21,10 @@ export class AuthController {
       const { refreshToken, ...result } = await AuthService.register(req.body);
       res.cookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions);
       res.status(201).json(result);
-    } catch (error: any) {
-      if (error.message === "Email already registered") {
-        return res.status(409).json({ error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Registration failed";
+      if (message === "Email already registered") {
+        return res.status(409).json({ error: message });
       }
       res.status(500).json({ error: "Registration failed" });
     }
@@ -33,21 +34,20 @@ export class AuthController {
     try {
       const { email, password } = req.body;
       const { refreshToken, ...result } = await AuthService.login(email, password);
-      // Set the refresh token as an HttpOnly cookie — it never appears in the
-      // response body, so client-side JS cannot read or steal it.
       res.cookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions);
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login Error Details:", error);
-      if (error?.message === "Invalid email or password") {
+      const message = error instanceof Error ? error.message : "An unexpected error occurred during login";
+      if (message === "Invalid email or password") {
         return res.status(401).json({ 
-          error: { code: "UNAUTHORIZED", message: error.message } 
+          error: { code: "UNAUTHORIZED", message } 
         });
       }
       res.status(500).json({ 
         error: { 
           code: "INTERNAL_SERVER_ERROR", 
-          message: error?.message || "An unexpected error occurred during login" 
+          message 
         } 
       });
     }
@@ -66,7 +66,7 @@ export class AuthController {
       }
       const result = await AuthService.refreshAccessToken(token);
       res.json(result);
-    } catch (error: any) {
+    } catch {
       return res.status(401).json({ error: "Invalid or expired refresh token" });
     }
   }
@@ -90,8 +90,9 @@ export class AuthController {
     try {
       const user = await AuthService.getProfile(req.user!.id);
       res.json(user);
-    } catch (error: any) {
-      res.status(404).json({ error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Profile not found";
+      res.status(404).json({ error: message });
     }
   }
 
@@ -99,7 +100,7 @@ export class AuthController {
     try {
       const user = await AuthService.updateProfile(req.user!.id, req.body);
       res.json(user);
-    } catch (error: any) {
+    } catch {
       res.status(500).json({ error: "Profile update failed" });
     }
   }

@@ -34,7 +34,12 @@ export interface GeminiResponse {
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 const MAX_ATTEMPTS = 3;
 const BASE_DELAY_MS = 500;
+const MAX_RAW_LOG_LENGTH = 500;
 
+/**
+ * Removes code block formatting (e.g. ```json ... ```) that generative models
+ * occasionally include around raw JSON payloads.
+ */
 function stripMarkdownFences(raw: string): string {
   // Remove ```json ... ``` or ``` ... ``` wrappers Gemini may accidentally emit
   return raw
@@ -44,6 +49,11 @@ function stripMarkdownFences(raw: string): string {
     .trim();
 }
 
+/**
+ * Evaluates unknown errors thrown during Gemini API requests and categorizes them
+ * into typed error codes (`TIMEOUT`, `UNAVAILABLE`, `RATE_LIMIT`, `MODEL_NOT_FOUND`, `UNKNOWN`),
+ * indicating whether exponential backoff retries should apply.
+ */
 function classifyError(err: unknown): GeminiError {
   const msg = err instanceof Error ? err.message : String(err ?? "");
   const lower = msg.toLowerCase();
@@ -87,6 +97,9 @@ function classifyError(err: unknown): GeminiError {
   return new GeminiError(msg || "Unknown Gemini error", "UNKNOWN", false);
 }
 
+/**
+ * Pauses asynchronous execution for the specified duration in milliseconds.
+ */
 async function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
@@ -140,7 +153,7 @@ export async function analyzeImageWithGemini(
         parsed = JSON.parse(cleanedText);
       } catch {
         // JSON parse failures are NOT retried — log raw output for admin review
-        console.error("[Gemini] Invalid JSON response (raw):", rawText.slice(0, 500));
+        console.error("[Gemini] Invalid JSON response (raw):", rawText.slice(0, MAX_RAW_LOG_LENGTH));
         throw new GeminiError(
           "Gemini returned unparseable JSON",
           "INVALID_JSON",

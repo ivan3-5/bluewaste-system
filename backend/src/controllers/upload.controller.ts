@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { CloudinaryService } from "../services/cloudinary.service";
 import { AuthRequest } from "../middleware/auth";
-import { sendError } from "../utils/http";
+import { handleControllerError, sendError } from "../utils/http";
 
 export class UploadController {
   static async uploadImage(req: AuthRequest, res: Response) {
@@ -12,8 +12,8 @@ export class UploadController {
 
       const result = await CloudinaryService.uploadImage(req.file.buffer);
       res.status(201).json(result);
-    } catch (error: any) {
-      sendError(res, 500, "Failed to upload image", "IMAGE_UPLOAD_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to upload image", "IMAGE_UPLOAD_FAILED");
     }
   }
 }

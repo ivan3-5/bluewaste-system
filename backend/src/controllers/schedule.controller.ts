@@ -1,20 +1,17 @@
 import { Response } from "express";
 import { ScheduleService } from "../services/schedule.service";
 import { AuthRequest } from "../middleware/auth";
-import { sendError } from "../utils/http";
+import { handleControllerError, QueryFilters } from "../utils/http";
 
 export class ScheduleController {
   static async create(req: AuthRequest, res: Response) {
     try {
       const schedule = await ScheduleService.create(req.body, req.user!.id);
       res.status(201).json(schedule);
-    } catch (error: any) {
-      if (error.message === "One or more worker IDs are invalid") {
-        return sendError(res, 400, error.message, "INVALID_WORKER_IDS");
-      }
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to create schedule",
         "SCHEDULE_CREATE_FAILED",
       );
@@ -25,11 +22,8 @@ export class ScheduleController {
     try {
       const schedule = await ScheduleService.findById(req.params.id);
       res.json(schedule);
-    } catch (error: any) {
-      if (error.message === "Schedule not found") {
-        return sendError(res, 404, error.message, "SCHEDULE_NOT_FOUND");
-      }
-      sendError(res, 500, "Failed to fetch schedule", "SCHEDULE_FETCH_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to fetch schedule", "SCHEDULE_FETCH_FAILED");
     }
   }
 
@@ -41,16 +35,10 @@ export class ScheduleController {
         req.user!.id,
       );
       res.json(schedule);
-    } catch (error: any) {
-      if (error.message === "Schedule not found") {
-        return sendError(res, 404, error.message, "SCHEDULE_NOT_FOUND");
-      }
-      if (error.message === "One or more worker IDs are invalid") {
-        return sendError(res, 400, error.message, "INVALID_WORKER_IDS");
-      }
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to update schedule",
         "SCHEDULE_UPDATE_FAILED",
       );
@@ -67,13 +55,10 @@ export class ScheduleController {
         notes,
       );
       res.json(schedule);
-    } catch (error: any) {
-      if (error.message === "Schedule not found") {
-        return sendError(res, 404, error.message, "SCHEDULE_NOT_FOUND");
-      }
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to update schedule status",
         "SCHEDULE_STATUS_UPDATE_FAILED",
       );
@@ -84,13 +69,10 @@ export class ScheduleController {
     try {
       await ScheduleService.delete(req.params.id);
       res.json({ message: "Schedule deleted successfully" });
-    } catch (error: any) {
-      if (error.message === "Schedule not found") {
-        return sendError(res, 404, error.message, "SCHEDULE_NOT_FOUND");
-      }
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to delete schedule",
         "SCHEDULE_DELETE_FAILED",
       );
@@ -99,10 +81,11 @@ export class ScheduleController {
 
   static async getSchedules(req: AuthRequest, res: Response) {
     try {
-      const result = await ScheduleService.getSchedules(req.query as any);
+      const query = (req.query || {}) as QueryFilters;
+      const result = await ScheduleService.getSchedules(query);
       res.json(result);
-    } catch (error: any) {
-      sendError(res, 500, "Failed to fetch schedules", "SCHEDULE_FETCH_FAILED");
+    } catch (error) {
+      handleControllerError(res, error, "Failed to fetch schedules", "SCHEDULE_FETCH_FAILED");
     }
   }
 
@@ -110,10 +93,10 @@ export class ScheduleController {
     try {
       const schedules = await ScheduleService.getUpcomingPublic();
       res.json(schedules);
-    } catch (error: any) {
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to fetch upcoming schedules",
         "SCHEDULE_UPCOMING_FAILED",
       );
@@ -122,15 +105,16 @@ export class ScheduleController {
 
   static async getMySchedules(req: AuthRequest, res: Response) {
     try {
+      const query = (req.query || {}) as QueryFilters;
       const result = await ScheduleService.getWorkerSchedules(
         req.user!.id,
-        req.query as any,
+        query,
       );
       res.json(result);
-    } catch (error: any) {
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to fetch assigned schedules",
         "SCHEDULE_MY_FETCH_FAILED",
       );

@@ -16,19 +16,43 @@ type AnalyzeDecision = {
   capture_tips: string[];
 };
 
-function toNumberOrUndefined(
-  value: FormDataEntryValue | null,
-): number | undefined {
-  if (typeof value !== "string" || value.trim() === "") {
-    return undefined;
-  }
+interface YoloApiResponse {
+  message?: string;
+  error?: string;
+  count?: unknown;
+  waste_count?: unknown;
+  top_confidence?: unknown;
+  has_waste?: unknown;
+  status?: unknown;
+  decision?: unknown;
+  thresholds?: unknown;
+  model?: unknown;
+  severity?: unknown;
+  confidence?: unknown;
+  labels?: unknown;
+  all_labels?: unknown;
+  [key: string]: unknown;
+}
 
-  const parsed = Number(value);
-  if (Number.isNaN(parsed)) {
-    return undefined;
+function parseNumeric(
+  value: unknown,
+  options?: { min?: number; integer?: boolean; asUndefined?: boolean },
+): number | null | undefined {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
+    return options?.asUndefined ? undefined : null;
   }
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    return options?.asUndefined ? undefined : null;
+  }
+  if (options?.min !== undefined && parsed < options.min) {
+    return options?.asUndefined ? undefined : null;
+  }
+  return options?.integer ? Math.trunc(parsed) : parsed;
+}
 
-  return parsed;
+function toNumberOrUndefined(value: FormDataEntryValue | null): number | undefined {
+  return parseNumeric(value, { asUndefined: true }) as number | undefined;
 }
 
 function normalizeBaseApiUrl(url: string) {
@@ -36,18 +60,7 @@ function normalizeBaseApiUrl(url: string) {
 }
 
 function toFiniteNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim().length > 0) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-
-  return null;
+  return parseNumeric(value) as number | null;
 }
 
 function toBooleanOrNull(value: unknown): boolean | null {
@@ -75,28 +88,20 @@ function toJsonError(status: number, message: string, details?: string) {
   );
 }
 
-function safeParseJson(text: string) {
+function safeParseJson(text: string): YoloApiResponse | null {
   if (!text) return null;
   try {
-    return JSON.parse(text);
+    const parsed = JSON.parse(text);
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as YoloApiResponse)
+      : null;
   } catch {
     return null;
   }
 }
 
 function toNonNegativeInt(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-    return Math.trunc(value);
-  }
-
-  if (typeof value === "string" && value.trim().length > 0) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      return Math.trunc(parsed);
-    }
-  }
-
-  return null;
+  return parseNumeric(value, { min: 0, integer: true }) as number | null;
 }
 
 function normalizeDecisionStatus(value: unknown): DecisionStatus | null {
@@ -112,23 +117,29 @@ function normalizeDecisionStatus(value: unknown): DecisionStatus | null {
   return null;
 }
 
-function normalizeDecision(payload: any): AnalyzeDecision {
-  const decision = payload?.decision ?? {};
-  const isUncertain = toBooleanOrNull(decision?.is_uncertain) ?? false;
+function normalizeDecision(payload: unknown): AnalyzeDecision {
+  const data = (payload !== null && typeof payload === "object" && !Array.isArray(payload))
+    ? (payload as Record<string, unknown>)
+    : {};
+  const decision = (data.decision !== null && typeof data.decision === "object" && !Array.isArray(data.decision))
+    ? (data.decision as Record<string, unknown>)
+    : {};
+
+  const isUncertain = toBooleanOrNull(decision.is_uncertain) ?? false;
   const retakeRecommended =
-    toBooleanOrNull(decision?.retake_recommended) ?? isUncertain;
+    toBooleanOrNull(decision.retake_recommended) ?? isUncertain;
 
   const reason =
-    typeof decision?.reason === "string" && decision.reason.trim().length > 0
+    typeof decision.reason === "string" && decision.reason.trim().length > 0
       ? decision.reason.trim()
       : null;
 
   const message =
-    typeof decision?.message === "string" && decision.message.trim().length > 0
+    typeof decision.message === "string" && decision.message.trim().length > 0
       ? decision.message.trim()
       : null;
 
-  const captureTips = Array.isArray(decision?.capture_tips)
+  const captureTips = Array.isArray(decision.capture_tips)
     ? decision.capture_tips
         .filter((tip: unknown): tip is string => typeof tip === "string")
         .map((tip: string) => tip.trim())
@@ -196,6 +207,7 @@ export async function POST(request: NextRequest) {
 
     const yoloText = await yoloResponse.text();
     const yoloJson = safeParseJson(yoloText);
+    const yoloData: YoloApiResponse = yoloJson ?? {};
 
     if (!yoloResponse.ok) {
       if (yoloResponse.status === 502 || yoloResponse.status === 503 || yoloResponse.status === 504) {
@@ -207,8 +219,8 @@ export async function POST(request: NextRequest) {
       }
 
       const yoloMessage =
-        (yoloJson as any)?.message ||
-        (yoloJson as any)?.error ||
+        yoloData.message ||
+        yoloData.error ||
         (typeof yoloText === "string" && yoloText.length > 0 && !yoloText.includes("<html")
           ? yoloText
           : "Unknown YOLO API error");
@@ -222,32 +234,32 @@ export async function POST(request: NextRequest) {
 
     const classification = classifyYoloPayload(yoloJson);
     const rawCount =
-      toNonNegativeInt((yoloJson as any)?.count) ??
+      toNonNegativeInt(yoloData.count) ??
       classification.detections.length;
     const wasteCount =
-      toNonNegativeInt((yoloJson as any)?.waste_count) ??
+      toNonNegativeInt(yoloData.waste_count) ??
       classification.detections.length;
-    const topConfidence = toFiniteNumber((yoloJson as any)?.top_confidence);
+    const topConfidence = toFiniteNumber(yoloData.top_confidence);
 
     // has_waste is the authoritative field from the /analyze hybrid pipeline.
     // The /analyze endpoint returns has_waste but NOT a status field, so we
     // must use has_waste first before falling back to wasteCount.
-    const rawHasWaste = (yoloJson as any)?.has_waste;
+    const rawHasWaste = yoloData.has_waste;
     const hasWaste: boolean =
       typeof rawHasWaste === "boolean"
         ? rawHasWaste
-        : normalizeDecisionStatus((yoloJson as any)?.status) === "DIRTY" ||
+        : normalizeDecisionStatus(yoloData.status) === "DIRTY" ||
           wasteCount > 0;
 
     const status: DecisionStatus = hasWaste ? "DIRTY" : "CLEAN";
     const decision = normalizeDecision(yoloJson);
     const thresholds =
-      yoloJson && typeof (yoloJson as any)?.thresholds === "object"
-        ? (yoloJson as any).thresholds
+      yoloJson && typeof yoloData.thresholds === "object"
+        ? yoloData.thresholds
         : null;
     const modelInfo =
-      yoloJson && typeof (yoloJson as any)?.model === "object"
-        ? (yoloJson as any).model
+      yoloJson && typeof yoloData.model === "object"
+        ? yoloData.model
         : null;
 
     const saveIfDirtyEntry = formData.get("saveIfDirty");
@@ -318,10 +330,10 @@ export async function POST(request: NextRequest) {
       detectedObject: classification.detectedObject,
       dominantWaste: classification.dominantWaste,
       totalItems: classification.totalItems,
-      severity: typeof (yoloJson as any)?.severity === "string" ? (yoloJson as any).severity : classification.severity,
+      severity: typeof yoloData.severity === "string" ? yoloData.severity : classification.severity,
       has_waste: hasWaste,
       wasteCategory: classification.wasteCategory,
-      confidence: typeof (yoloJson as any)?.confidence === "number" ? (yoloJson as any).confidence : classification.confidence,
+      confidence: typeof yoloData.confidence === "number" ? yoloData.confidence : classification.confidence,
       status,
       waste_count: wasteCount,
       count: rawCount,
@@ -330,12 +342,12 @@ export async function POST(request: NextRequest) {
       thresholds,
       model: modelInfo,
       imageUrl: uploadedImageUrl,
-      labels: Array.isArray((yoloJson as any)?.labels) ? (yoloJson as any).labels : classification.labels,
-      all_labels: Array.isArray((yoloJson as any)?.all_labels) ? (yoloJson as any).all_labels : [],
+      labels: Array.isArray(yoloData.labels) ? yoloData.labels : classification.labels,
+      all_labels: Array.isArray(yoloData.all_labels) ? yoloData.all_labels : [],
       detections: classification.detections,
       report: savedReport,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errMsg =
       error instanceof Error ? error.message : String(error || "Unknown error");
     const isNetworkError =

@@ -83,13 +83,17 @@ const CATEGORY_MATCH_ORDER: WasteCategory[] = [
   "PLASTIC_WASTE",
 ];
 
-function labelMatches(rawLabel: any, keywords: string[]) {
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return val !== null && typeof val === "object" && !Array.isArray(val);
+}
+
+function labelMatches(rawLabel: unknown, keywords: string[]) {
   const label =
     typeof rawLabel === "string"
       ? rawLabel
-      : typeof rawLabel?.label === "string"
+      : isRecord(rawLabel) && typeof rawLabel.label === "string"
         ? rawLabel.label
-        : typeof rawLabel?.class_name === "string"
+        : isRecord(rawLabel) && typeof rawLabel.class_name === "string"
           ? rawLabel.class_name
           : "";
   if (!label) return false;
@@ -118,8 +122,9 @@ function toLabel(value: unknown): string {
   return value.toLowerCase().trim();
 }
 
-function pickArray(payload: any): any[] {
+function pickArray(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
 
   const directKeys = [
     "detections",
@@ -127,17 +132,20 @@ function pickArray(payload: any): any[] {
     "results",
     "objects",
     "items",
-  ];
+  ] as const;
   for (const key of directKeys) {
-    if (Array.isArray(payload?.[key])) {
-      return payload[key];
+    const val = payload[key];
+    if (Array.isArray(val)) {
+      return val;
     }
   }
 
-  const nested = payload?.data;
-  for (const key of directKeys) {
-    if (Array.isArray(nested?.[key])) {
-      return nested[key];
+  if (isRecord(payload.data)) {
+    for (const key of directKeys) {
+      const val = payload.data[key];
+      if (Array.isArray(val)) {
+        return val;
+      }
     }
   }
 
@@ -219,17 +227,19 @@ function parseBoxFromObject(raw: Record<string, unknown>): {
   };
 }
 
-function parseDetection(entry: any): DetectionBox | null {
+function parseDetection(entry: unknown): DetectionBox | null {
+  if (!isRecord(entry)) return null;
+
   const className = toLabel(
-    entry?.class_name ??
-      entry?.class ??
-      entry?.label ??
-      entry?.name ??
-      entry?.detectedObject,
+    entry.class_name ??
+      entry.class ??
+      entry.label ??
+      entry.name ??
+      entry.detectedObject,
   );
 
   const confidence =
-    toNumber(entry?.confidence ?? entry?.score ?? entry?.probability) ?? 0;
+    toNumber(entry.confidence ?? entry.score ?? entry.probability) ?? 0;
 
   let box: {
     x: number;
@@ -239,17 +249,17 @@ function parseDetection(entry: any): DetectionBox | null {
   } | null = null;
 
   const rawBox =
-    entry?.bbox ?? entry?.box ?? entry?.bounding_box ?? entry?.bounds ?? null;
+    entry.bbox ?? entry.box ?? entry.bounding_box ?? entry.bounds ?? null;
 
   if (Array.isArray(rawBox)) {
     box = parseBoxFromArray(rawBox);
-  } else if (rawBox && typeof rawBox === "object") {
-    box = parseBoxFromObject(rawBox as Record<string, unknown>);
-  } else if (Array.isArray(entry?.xyxy)) {
+  } else if (isRecord(rawBox)) {
+    box = parseBoxFromObject(rawBox);
+  } else if (Array.isArray(entry.xyxy)) {
     box = parseBoxFromArray(entry.xyxy);
   } else {
     // Some providers return x/y/width/height (or x/y/w/h) directly on the detection object.
-    box = parseBoxFromObject(entry as Record<string, unknown>);
+    box = parseBoxFromObject(entry);
   }
 
   if (!className || !box) {
@@ -343,7 +353,7 @@ function getDominantWaste(detections: WasteDetection[]): WasteType | null {
 }
 
 export function inferWasteCategory(
-  labels: any[],
+  labels: unknown[],
   dominantWaste?: WasteType | null,
 ): WasteCategory {
   if (dominantWaste) {

@@ -12,8 +12,12 @@ import "../../../core/ui/app_components.dart";
 import "../../../core/config/app_env.dart";
 import "../data/report_service.dart";
 import "../data/offline_service.dart";
+import "../data/detect_service.dart";
 import "../domain/report_models.dart";
-import "../../../../services/detect_service.dart";
+import "widgets/report_result_card.dart";
+import "widgets/report_step_indicator.dart";
+
+enum _NoWasteAction { retake, submitAnyway }
 
 class ReportCreateScreen extends ConsumerStatefulWidget {
   const ReportCreateScreen({super.key});
@@ -438,7 +442,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       children: [
         // ── Submission result card (shown after successful submit) ────────────
         if (_showResultCard && _submittedResult != null)
-          _SubmissionResultCard(
+          ReportResultCard(
             result: _submittedResult!,
             onDismiss: () {
               setState(() {
@@ -478,7 +482,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _FormSectionHeader(
+              ReportFormSectionHeader(
                 icon: Icons.edit_note,
                 title: "Submit Waste Report",
                 subtitle:
@@ -489,9 +493,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
                 children: const [
-                  _StepChip(number: "1", label: "Details"),
-                  _StepChip(number: "2", label: "Location"),
-                  _StepChip(number: "3", label: "Photos"),
+                  ReportStepChip(number: "1", label: "Details"),
+                  ReportStepChip(number: "2", label: "Location"),
+                  ReportStepChip(number: "3", label: "Photos"),
                 ],
               ),
             ],
@@ -584,7 +588,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _FormSectionHeader(
+              ReportFormSectionHeader(
                 icon: Icons.my_location,
                 title: "Location",
                 subtitle: _hasLocation
@@ -649,7 +653,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _FormSectionHeader(
+              ReportFormSectionHeader(
                 icon: Icons.photo_library_outlined,
                 title: "Photos",
                 subtitle: "Attach one clear photo (required). Detection runs automatically.",
@@ -744,7 +748,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 // ── Confidence badge ───────────────────────────────────────
                 if (_detectedConfidence != null) ...[
                   const SizedBox(height: AppSpacing.xs),
-                  _ConfidenceBadge(
+                  ConfidenceBadge(
                     confidence: _detectedConfidence!,
                     hasWaste: _detectedConfidence! > 0,
                     isSpamFlagged: _isSpamFlagged,
@@ -795,351 +799,3 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   }
 }
 
-class _FormSectionHeader extends StatelessWidget {
-  const _FormSectionHeader({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        CircleAvatar(
-          radius: 15,
-          backgroundColor: AppColors.tint(AppColors.primary),
-          child: Icon(icon, size: 16, color: AppColors.primary),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.mutedForeground,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StepChip extends StatelessWidget {
-  const _StepChip({required this.number, required this.label});
-
-  final String number;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: AppSpacing.xxs,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.secondary,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 18,
-            height: 18,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.tint(AppColors.primary),
-            ),
-            child: Text(
-              number,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.secondaryForeground,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Actions available in the "No Waste Detected" dialog.
-enum _NoWasteAction { retake, submitAnyway }
-
-/// Small badge shown below the selected photo preview with the YOLO confidence.
-class _ConfidenceBadge extends StatelessWidget {
-  const _ConfidenceBadge({
-    required this.confidence,
-    required this.hasWaste,
-    required this.isSpamFlagged,
-  });
-
-  final double confidence;
-  final bool hasWaste;
-  final bool isSpamFlagged;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color color;
-    final IconData icon;
-    final String label;
-
-    if (!hasWaste) {
-      color = isSpamFlagged ? AppColors.destructive : Colors.orange;
-      icon = isSpamFlagged ? Icons.warning_amber_rounded : Icons.help_outline;
-      label = isSpamFlagged
-          ? "Spam flagged — no waste detected"
-          : "No waste detected (${confidence.toStringAsFixed(1)}%)";
-    } else {
-      color = confidence >= 75
-          ? const Color(0xFF2ECC71)
-          : confidence >= 40
-              ? const Color(0xFFF39C12)
-              : Colors.orange;
-      icon = Icons.check_circle_outline;
-      label = "Waste detected — confidence ${confidence.toStringAsFixed(1)}%";
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xxs,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Submission result card ────────────────────────────────────────────────────
-/// Displayed after a successful report submission. Shows:
-///   • Waste detected / No waste badge
-///   • Severity badge (color-coded)
-///   • Confidence percentage + bar
-///   • Detected waste labels
-///   • "Submit Another Report" dismiss button
-class _SubmissionResultCard extends StatelessWidget {
-  const _SubmissionResultCard({
-    required this.result,
-    required this.onDismiss,
-  });
-
-  final DetectResult result;
-  final VoidCallback onDismiss;
-
-  Color _severityColor() {
-    switch (result.severity) {
-      case WasteSeverity.critical:
-        return const Color(0xFFE74C3C);
-      case WasteSeverity.high:
-        return const Color(0xFFE67E22);
-      case WasteSeverity.moderate:
-        return const Color(0xFFF1C40F);
-      case WasteSeverity.spam:
-        return const Color(0xFF95A5A6);
-      default:
-        return const Color(0xFF7F8C8D);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _severityColor();
-    final confidencePct = (result.confidence * 100).clamp(0.0, 100.0);
-
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: color.withValues(alpha: 0.5), width: 1.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ─ Header row ──────────────────────────────────────────────────
-            Row(
-              children: [
-                Icon(
-                  result.hasWaste
-                      ? Icons.check_circle_rounded
-                      : Icons.cancel_rounded,
-                  color: result.hasWaste
-                      ? const Color(0xFF27AE60)
-                      : const Color(0xFFE74C3C),
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    result.hasWaste ? "Waste Detected" : "No Waste Detected",
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                ),
-                // Severity badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border:
-                        Border.all(color: color.withValues(alpha: 0.5)),
-                  ),
-                  child: Text(
-                    result.severity.label,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: color,
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-
-            // ─ Confidence bar ──────────────────────────────────────────────
-            Row(
-              children: [
-                Text(
-                  "Confidence",
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelMedium
-                      ?.copyWith(color: Colors.grey[600]),
-                ),
-                const Spacer(),
-                Text(
-                  "${confidencePct.toStringAsFixed(1)}%",
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: color,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: confidencePct / 100,
-                minHeight: 8,
-                backgroundColor: color.withValues(alpha: 0.15),
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-              ),
-            ),
-            const SizedBox(height: 6),
-
-            // ─ Severity description ────────────────────────────────────────
-            Text(
-              result.severity.description,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.grey[600]),
-            ),
-
-            // ─ Detected labels ─────────────────────────────────────────────
-            if (result.labels.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                "Detected Labels",
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: result.labels.map((lbl) {
-                  final pct = (lbl.confidence * 100);
-                  return Chip(
-                    label: Text(
-                      "${lbl.label}  ${pct.toStringAsFixed(0)}%",
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    backgroundColor:
-                        AppColors.primary.withValues(alpha: 0.1),
-                    side: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.3)),
-                    labelPadding:
-                        const EdgeInsets.symmetric(horizontal: 4),
-                    visualDensity: VisualDensity.compact,
-                  );
-                }).toList(),
-              ),
-            ],
-
-            const SizedBox(height: AppSpacing.md),
-
-            // ─ Dismiss / submit another ────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: onDismiss,
-                icon: const Icon(Icons.add_photo_alternate_outlined,
-                    size: 18),
-                label: const Text("Submit Another Report"),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

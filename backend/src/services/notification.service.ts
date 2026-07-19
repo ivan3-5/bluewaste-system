@@ -136,7 +136,7 @@ export class NotificationService {
           userId: admin.id,
           title,
           message,
-          type: (type || "SYSTEM") as any,
+          type: type || "SYSTEM",
           reportId,
         }),
       ),

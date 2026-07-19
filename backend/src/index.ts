@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
@@ -150,7 +150,7 @@ app.use("/api/v1/schedules", scheduleRoutes);
 // Backward-compatible aliases (/api/*) — kept so existing clients don't break.
 // Adds Deprecation header to signal clients should migrate to /api/v1/.
 // ---------------------------------------------------------------------------
-const deprecationMiddleware = (_req: any, res: any, next: any) => {
+const deprecationMiddleware = (_req: Request, res: Response, next: NextFunction) => {
   res.setHeader("Deprecation", "true");
   res.setHeader("Link", '</api/v1/>; rel="successor-version"');
   next();

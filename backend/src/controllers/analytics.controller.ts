@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { AnalyticsService } from "../services/analytics.service";
-import { sendError } from "../utils/http";
+import { handleControllerError } from "../utils/http";
 
 export class AnalyticsController {
   static async getDashboardOverview(req: Request, res: Response) {
@@ -11,10 +11,10 @@ export class AnalyticsController {
       const result = await AnalyticsService.getDashboardOverview(days);
       res.setHeader("Cache-Control", "private, max-age=15");
       res.json(result);
-    } catch (error: any) {
-      sendError(
+    } catch (error) {
+      handleControllerError(
         res,
-        500,
+        error,
         "Failed to fetch dashboard analytics",
         "ANALYTICS_DASHBOARD_FAILED",
       );

@@ -20,10 +20,12 @@ class ApiException implements Exception {
     }
 
     if (payload is Map<String, dynamic>) {
-      final message =
-          payload["message"] ?? payload["error"] ?? payload["detail"];
-      if (message is String && message.trim().isNotEmpty) {
-        return ApiException(message.trim(), statusCode: status);
+      dynamic raw = payload["message"] ?? payload["error"] ?? payload["detail"];
+      if (raw is Map) {
+        raw = raw["message"] ?? raw["error"] ?? raw["detail"];
+      }
+      if (raw is String && raw.trim().isNotEmpty) {
+        return ApiException(raw.trim(), statusCode: status);
       }
     }
 
