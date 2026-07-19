@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
         }
         if (err.code === "MODEL_NOT_FOUND") {
           console.error("[AI] Gemini model not found — GEMINI_MODEL env var may be set to an invalid model name");
-          return jsonError(500, "Server misconfiguration: Gemini model not found. Check GEMINI_MODEL environment variable (use gemini-2.5-flash).");
+          return jsonError(500, "Server misconfiguration: Gemini model not found. Check GEMINI_MODEL environment variable.");
         }
         if (err.code === "INVALID_JSON") {
           // Log the raw invalid output for admin review but do not expose it

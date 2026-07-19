@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export async function GET() {
   const checks = {
     GEMINI_API_KEY: !!process.env.GEMINI_API_KEY,
-    GEMINI_MODEL: process.env.GEMINI_MODEL || "(not set — will default to gemini-2.5-flash)",
+    GEMINI_MODEL: process.env.GEMINI_MODEL || "(not set — will default to gemini-3.5-flash)",
     DATABASE_URL: !!process.env.DATABASE_URL,
     CLOUDINARY_CLOUD_NAME: !!process.env.CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY: !!process.env.CLOUDINARY_API_KEY,
