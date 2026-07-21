@@ -100,13 +100,43 @@ export class ReportCrudService {
     });
 
     try {
-      await NotificationService.notifyAdmins(
-        "New Waste Report",
-        `A new ${data.category.replace("_", " ").toLowerCase()} report has been submitted: "${data.title}"`,
-        report.id,
-      );
+      if (isSpam) {
+        await NotificationService.notifyAdmins(
+          "New Spam Report",
+          `A new report flagged as spam has been submitted: "${data.title}"`,
+          report.id,
+          NotificationType.SYSTEM,
+        );
+      } else {
+        await NotificationService.notifyAdmins(
+          "New Waste Report",
+          `A new ${data.category.replace("_", " ").toLowerCase()} report has been submitted: "${data.title}"`,
+          report.id,
+          NotificationType.NEW_REPORT,
+        );
+      }
+
+      if (report.reporterId) {
+        if (isSpam) {
+          await NotificationService.create({
+            userId: report.reporterId,
+            title: "Report Marked as Spam",
+            message: `Your report "${report.title}" was flagged as spam (${resolvedSpamReason ?? "No visible waste detected"}).`,
+            type: NotificationType.SYSTEM,
+            reportId: report.id,
+          });
+        } else {
+          await NotificationService.create({
+            userId: report.reporterId,
+            title: "Report Submitted",
+            message: `Your report "${report.title}" has been successfully submitted and is pending verification.`,
+            type: NotificationType.NEW_REPORT,
+            reportId: report.id,
+          });
+        }
+      }
     } catch (error) {
-      console.warn("Failed to notify admins for new report:", report.id, error);
+      console.warn("Failed to notify admins/reporter for new report:", report.id, error);
     }
 
     await GeoCache.invalidateAll();
