@@ -1,3 +1,4 @@
+import "dart:async";
 import "dart:io";
 
 import "package:flutter/material.dart";
@@ -10,12 +11,15 @@ import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../../../core/config/app_env.dart";
+import "../../../core/network/api_exception.dart";
+import "../../../core/providers.dart";
 import "../data/report_service.dart";
 import "../data/offline_service.dart";
 import "../data/detect_service.dart";
 import "../domain/report_models.dart";
 import "widgets/report_result_card.dart";
 import "widgets/report_step_indicator.dart";
+import "my_reports_screen.dart";
 
 enum _NoWasteAction { retake, submitAnyway }
 
@@ -27,20 +31,19 @@ class ReportCreateScreen extends ConsumerStatefulWidget {
 }
 
 class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
-  final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   final List<XFile> _images = <XFile>[];
   final ImagePicker _picker = ImagePicker();
 
-  String _category = "PLASTIC_WASTE";
+  String _category = "with_waste";
   bool _isAnonymous = false;
   double? _latitude;
   double? _longitude;
   bool _isSubmitting = false;
   bool _isOutsideZone = false;
 
-  // ── YOLO detection state ──────────────────────────────────────────────────
+  // ── AI analysis state ───────────────────────────────────────────────────
   bool _isDetecting = false;
   double? _detectedConfidence; // null = not yet run; 0.0 = no waste
   bool _isSpamFlagged = false;
@@ -49,15 +52,15 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   // Submission result card state
   bool _showResultCard = false;
   DetectResult? _submittedResult;
+  bool _isSubmittedSuccess = false;
+  int _countdownSeconds = 3;
+  Timer? _redirectTimer;
 
   bool get _hasLocation => _latitude != null && _longitude != null;
 
   /// Detection must have run successfully before submission is allowed.
   bool get _detectionReady =>
       _detectedConfidence != null && !_detectionFailed;
-
-  int get _remainingImageSlots => 1 - _images.length;
-
   // ── helpers ───────────────────────────────────────────────────────────────
 
   /// Resets all detection state to pristine (call when image is removed).
@@ -66,18 +69,25 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     _isSpamFlagged = false;
     _detectionFailed = false;
     _detectResult = null;
+    _category = "with_waste";
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
   }
 
   @override
   void dispose() {
-    _titleController.dispose();
+    _redirectTimer?.cancel();
     _descriptionController.dispose();
     super.dispose();
   }
 
   // ── Detection ─────────────────────────────────────────────────────────────
 
-  /// Calls the FastAPI /detect endpoint and handles the result in-place.
+  /// Calls the backend /ai/analyze-report endpoint and handles the result in-place.
   /// Always called after a new image is picked.
   Future<void> _runDetection(XFile pickedFile) async {
     if (!mounted) return;
@@ -92,36 +102,49 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     String? errorMessage;
 
     try {
-      result = await DetectService.instance.detect(File(pickedFile.path));
-    } on DetectServerUnreachableException catch (e) {
-      errorMessage = e.message;
-    } on DetectServerException catch (e) {
+      final detectService = ref.read(detectServiceProvider);
+      final userJson = await ref.read(sessionStorageProvider).readUserJson();
+      final citizenId = userJson?["id"]?.toString() ?? "citizen";
+
+      result = await detectService.detect(
+        imageFile: File(pickedFile.path),
+        latitude: _latitude ?? 0.0,
+        longitude: _longitude ?? 0.0,
+        description: _descriptionController.text.trim().isNotEmpty
+            ? _descriptionController.text.trim()
+            : null,
+        citizenId: citizenId,
+      );
+    } on ApiException catch (e) {
       errorMessage = e.message;
     } catch (e) {
-      errorMessage = "Detection failed unexpectedly. Please try again.";
+      errorMessage = "Photo analysis failed unexpectedly. Please try again.";
     }
 
     if (!mounted) return;
 
     if (errorMessage != null) {
-      // Server unreachable — remove the image and block submission.
+      // Server error/unreachable — remove the image and block submission.
       setState(() {
         _images.clear();
         _isDetecting = false;
         _detectionFailed = true;
       });
-      _showMessage("❌ Detection error: $errorMessage");
+      _showMessage("❌ Analysis error: $errorMessage");
       return;
     }
 
+    final detectedResult = result!;
+    final detectedCategory = detectedResult.hasWaste ? "with_waste" : "no_waste";
     setState(() {
       _isDetecting = false;
-      _detectedConfidence = result!.confidence;
-      _detectResult = result;
+      _detectedConfidence = detectedResult.confidence;
+      _detectResult = detectedResult;
+      _category = detectedCategory;
       _isSpamFlagged = false; // may be updated by dialog below
     });
 
-    if (!result!.hasWaste || result.isSpam) {
+    if (!detectedResult.hasWaste || detectedResult.isSpam) {
       await _showNoWasteDialog();
     }
   }
@@ -259,7 +282,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
     if (outside) {
       _showMessage(
-        "Reporting is only allowed within designated coastal zones.",
+        "Notice: Location outside coastal zone (Submission allowed for testing demonstration).",
       );
     }
   }
@@ -317,16 +340,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   }
 
   Future<void> _submitReport() async {
-    final title = _titleController.text.trim();
-    final description = _descriptionController.text.trim();
+    final rawDescription = _descriptionController.text.trim();
 
-    if (title.length < 5) {
-      _showMessage("Title must be at least 5 characters.");
-      return;
-    }
-
-    if (description.length < 20) {
-      _showMessage("Description must be at least 20 characters.");
+    if (rawDescription.isNotEmpty && rawDescription.length < 10) {
+      _showMessage("Description must be at least 10 characters when provided.");
       return;
     }
 
@@ -345,18 +362,25 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       return;
     }
 
-    // Hard zone guard — catches any state mismatch
-    if (_isOutsideZone) {
-      _showMessage(
-        "Reporting is only allowed within the designated coastal zone.",
-      );
-      return;
-    }
+    // Hard zone guard — temporarily bypassed for testing demonstration
+    // if (_isOutsideZone) {
+    //   _showMessage(
+    //     "Reporting is only allowed within the designated coastal zone.",
+    //   );
+    //   return;
+    // }
 
     setState(() => _isSubmitting = true);
     try {
       final reportService = ref.read(reportServiceProvider);
       final offlineService = ref.read(offlineServiceProvider);
+
+      final categoryLabel = wasteCategoryLabels[_category] ??
+          (_category == "with_waste" ? "With Waste" : "No Waste");
+      final title = "Waste report - $categoryLabel";
+      final description = rawDescription.isNotEmpty
+          ? rawDescription
+          : "Waste report submitted via mobile capture. Category: $categoryLabel.";
 
       final report = await reportService.submitFullReport(
         data: {
@@ -368,9 +392,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           "isAnonymous": _isAnonymous,
           "isSpamFlagged": _isSpamFlagged,
           "spamReason": _isSpamFlagged
-              ? (_detectResult?.spamReason ?? "No waste detected by YOLOv8")
+              ? (_detectResult?.spamReason ?? "No visible waste detected during photo analysis")
               : null,
-          "yoloConfidence": (_detectedConfidence ?? 0.0) * 100,
           "severity": _detectResult?.severity.dbValue,
           "analysisStatus": _detectResult?.hasWaste == true ? "DIRTY" : "CLEAN",
           "analysisConfidence": _detectResult?.confidence,
@@ -380,25 +403,22 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         offlineService: offlineService,
       );
 
-      _titleController.clear();
       _descriptionController.clear();
 
       final submittedResult = _detectResult;
       setState(() {
         _images.clear();
         _isAnonymous = false;
-        _category = "PLASTIC_WASTE";
+        _category = "with_waste";
         _resetDetection();
         _showResultCard = submittedResult != null;
         _submittedResult = submittedResult;
       });
 
-      if (submittedResult == null) {
-        if (report == null) {
-          _showMessage("You are offline. Report queued and will sync later.");
-        } else {
-          _showMessage("Report submitted successfully.");
-        }
+      if (report == null && submittedResult == null) {
+        _showMessage("You are offline. Report queued and will sync later.");
+      } else {
+        _startSuccessCountdown();
       }
     } catch (error) {
       _showMessage(error.toString());
@@ -419,12 +439,76 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     );
   }
 
+  void _startSuccessCountdown() {
+    _redirectTimer?.cancel();
+    setState(() {
+      _isSubmittedSuccess = true;
+      _countdownSeconds = 3;
+    });
+
+    _redirectTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_countdownSeconds <= 1) {
+        timer.cancel();
+        _navigateToMyReports();
+      } else {
+        setState(() => _countdownSeconds--);
+      }
+    });
+  }
+
+  void _navigateToMyReports() {
+    _redirectTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _isSubmittedSuccess = false;
+      _showResultCard = false;
+      _submittedResult = null;
+      _countdownSeconds = 3;
+    });
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text("My Reports")),
+          body: const SafeArea(
+            child: MyReportsScreen(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGuidelineRow(BuildContext context, IconData icon, Color color, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.secondaryForeground,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final categories = wasteCategoryLabels.entries.toList(growable: false);
+    final categories = const [
+      MapEntry("with_waste", "With Waste"),
+      MapEntry("no_waste", "No Waste"),
+    ];
+    final rawDescription = _descriptionController.text.trim();
     final missingRequirements = <String>[
-      if (_titleController.text.trim().length < 5) "Title",
-      if (_descriptionController.text.trim().length < 20) "Description",
+      if (rawDescription.isNotEmpty && rawDescription.length < 10)
+        "Description (10+ characters)",
       if (!_hasLocation) "Location",
     ];
     if (_images.isEmpty) missingRequirements.add("Photo");
@@ -434,14 +518,280 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     final canSubmit = !_isSubmitting &&
         !_isDetecting &&
         missingRequirements.isEmpty &&
-        !_isOutsideZone &&
         _images.isNotEmpty;
+
+    if (_isSubmittedSuccess) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: AppSpacing.screen,
+          child: AppSectionCard(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    color: AppColors.success,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  "Report Submitted Successfully!",
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  "Thank you for helping protect our coastal areas. Your waste report has been received and queued for review.",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.mutedForeground,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Text(
+                    "Redirecting to My Reports in $_countdownSeconds seconds…",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _navigateToMyReports,
+                    child: const Text("Go to My Reports Now"),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      _redirectTimer?.cancel();
+                      setState(() {
+                        _isSubmittedSuccess = false;
+                        _showResultCard = false;
+                        _submittedResult = null;
+                      });
+                    },
+                    child: const Text("Submit Another Report"),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_images.isEmpty) {
+      return ListView(
+        padding: AppSpacing.screen,
+        children: [
+          if (_showResultCard && _submittedResult != null) ...[
+            ReportResultCard(
+              result: _submittedResult!,
+              onDismiss: () {
+                setState(() {
+                  _showResultCard = false;
+                  _submittedResult = null;
+                });
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          AppSectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: AppSpacing.md),
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppColors.tint(AppColors.primary, opacity: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.add_a_photo_rounded,
+                    size: 40,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  "Step 1: Capture Waste Photo",
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  "Take a clear photo of coastal waste or upload one from your gallery. The system will automatically detect waste and classify the category.",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.mutedForeground,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: _isDetecting ? null : _pickFromCamera,
+                    icon: const Icon(Icons.photo_camera_rounded, size: 22),
+                    label: const Text(
+                      "Take a Photo (Camera)",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: _isDetecting ? null : _pickFromGallery,
+                    icon: const Icon(Icons.photo_library_rounded, size: 22),
+                    label: const Text(
+                      "Choose from Gallery",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppSectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ReportFormSectionHeader(
+                  icon: Icons.my_location_rounded,
+                  title: "GPS Location Status",
+                  subtitle: _hasLocation
+                      ? "Location captured automatically. Ready for report."
+                      : "Locating your position within coastal reporting zones...",
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: _hasLocation
+                        ? AppColors.tint(AppColors.success, opacity: 0.1)
+                        : AppColors.secondary,
+                    border: Border.all(
+                      color: _hasLocation ? AppColors.success : AppColors.border,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        _hasLocation
+                            ? Icons.check_circle_outline
+                            : Icons.location_searching_rounded,
+                        color: _hasLocation
+                            ? AppColors.success
+                            : AppColors.mutedForeground,
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          _hasLocation
+                              ? "${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}"
+                              : "Acquiring coastal coordinates...",
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: _hasLocation
+                                    ? AppColors.success
+                                    : AppColors.mutedForeground,
+                                fontWeight: _hasLocation
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_isOutsideZone) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    "⚠️ Location outside designated coastal zone (Allowed for testing demonstration).",
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.info,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.sm),
+                FilledButton.tonalIcon(
+                  onPressed: _getCurrentLocation,
+                  icon: const Icon(Icons.my_location),
+                  label: Text(_hasLocation ? "Update Location" : "Capture Location"),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppSectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ReportFormSectionHeader(
+                  icon: Icons.tips_and_updates_outlined,
+                  title: "Photo Guidelines",
+                  subtitle: "Ensure accurate detection by following these quick tips.",
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _buildGuidelineRow(context, Icons.check_circle_outline, AppColors.success, "Center the waste item clearly in the frame."),
+                const SizedBox(height: AppSpacing.xs),
+                _buildGuidelineRow(context, Icons.check_circle_outline, AppColors.success, "Ensure good lighting and avoid blurry images."),
+                const SizedBox(height: AppSpacing.xs),
+                _buildGuidelineRow(context, Icons.info_outline, AppColors.primary, "The system will analyze and classify the waste upon selection."),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+        ],
+      );
+    }
 
     return ListView(
       padding: AppSpacing.screen,
       children: [
-        // ── Submission result card (shown after successful submit) ────────────
-        if (_showResultCard && _submittedResult != null)
+        if (_showResultCard && _submittedResult != null) ...[
           ReportResultCard(
             result: _submittedResult!,
             onDismiss: () {
@@ -451,11 +801,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               });
             },
           ),
-        // ── Detection loading overlay ────────────────────────────────────────
+          const SizedBox(height: AppSpacing.md),
+        ],
         if (_isDetecting)
-
           const Padding(
-            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            padding: EdgeInsets.only(bottom: AppSpacing.md),
             child: Card(
               child: Padding(
                 padding: EdgeInsets.all(AppSpacing.md),
@@ -468,85 +818,113 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     SizedBox(width: AppSpacing.sm),
-                    Text(
-                      "Analyzing image for waste…",
-                      style: TextStyle(fontWeight: FontWeight.w500),
+                    Flexible(
+                      child: Text(
+                        "Analyzing photo…",
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
           ),
-
+        AppSectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ReportFormSectionHeader(
+                icon: Icons.photo_camera_rounded,
+                title: "Step 2: Review Photo & Analysis",
+                subtitle: "The system verifies and categorizes your captured image.",
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      File(_images.first.path),
+                      width: double.infinity,
+                      height: 220,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _images.clear();
+                          _resetDetection();
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: AppColors.destructive,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (_detectedConfidence != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                ConfidenceBadge(
+                  confidence: _detectedConfidence!,
+                  hasWaste: _detectResult?.hasWaste == true,
+                  isSpamFlagged: _isSpamFlagged,
+                ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isDetecting ? null : _pickFromCamera,
+                      icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                      label: const Text("Retake Camera"),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isDetecting ? null : _pickFromGallery,
+                      icon: const Icon(Icons.photo_library_outlined, size: 18),
+                      label: const Text("Replace Gallery"),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
         AppSectionCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ReportFormSectionHeader(
                 icon: Icons.edit_note,
-                title: "Submit Waste Report",
-                subtitle:
-                    "Provide clear details, location, and photos for faster validation.",
+                title: "Report Details",
+                subtitle: "Category auto-classified. Add notes if desired.",
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
-                children: const [
-                  ReportStepChip(number: "1", label: "Details"),
-                  ReportStepChip(number: "2", label: "Location"),
-                  ReportStepChip(number: "3", label: "Photos"),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        AppSectionCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Report Details",
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                "Required: title (5+) and description (20+ characters).",
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.mutedForeground,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: _titleController,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: "Title",
-                  prefixIcon: Icon(Icons.title_outlined),
-                ),
-                maxLength: 100,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: _descriptionController,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: "Description",
-                  alignLabelWithHint: true,
-                  prefixIcon: Icon(Icons.description_outlined),
-                ),
-                minLines: 4,
-                maxLines: 6,
-              ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.md),
               DropdownButtonFormField<String>(
+                key: ValueKey(_category),
                 initialValue: _category,
                 decoration: const InputDecoration(
-                  labelText: "Category",
+                  labelText: "Waste Category *",
                   prefixIcon: Icon(Icons.category_outlined),
                 ),
                 items: categories
@@ -557,12 +935,25 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                       ),
                     )
                     .toList(growable: false),
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-                  setState(() => _category = value);
-                },
+                onChanged: (_detectResult?.hasWaste == true || _isDetecting)
+                    ? null
+                    : (value) {
+                        if (value != null) {
+                          setState(() => _category = value);
+                        }
+                      },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: _descriptionController,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: "Description (optional)",
+                  alignLabelWithHint: true,
+                  prefixIcon: Icon(Icons.description_outlined),
+                ),
+                minLines: 3,
+                maxLines: 5,
               ),
               const SizedBox(height: AppSpacing.sm),
               Container(
@@ -583,7 +974,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.md),
         AppSectionCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -638,6 +1029,16 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   ],
                 ),
               ),
+              if (_isOutsideZone) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  "⚠️ Location outside designated coastal zone (Allowed for testing demonstration).",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.info,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.sm),
               FilledButton.tonalIcon(
                 onPressed: _getCurrentLocation,
@@ -648,134 +1049,31 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        AppSectionCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ReportFormSectionHeader(
-                icon: Icons.photo_library_outlined,
-                title: "Photos",
-                subtitle: "Attach one clear photo (required). Detection runs automatically.",
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Row(
-                children: [
-                  AppStatusPill(
-                    label: "${_images.length}/1 selected",
-                    color: _images.isEmpty
-                        ? AppColors.mutedForeground
-                        : AppColors.info,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    _images.isEmpty
-                        ? "$_remainingImageSlots slot(s) left"
-                        : "1 attached — tap to replace or remove",
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.mutedForeground,
-                        ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isDetecting ? null : _pickFromCamera,
-                      icon: const Icon(Icons.photo_camera_outlined),
-                      label: const Text("Camera"),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isDetecting ? null : _pickFromGallery,
-                      icon: const Icon(Icons.image_outlined),
-                      label: const Text("Gallery (single)"),
-                    ),
-                  ),
-                ],
-              ),
-              if (_images.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xs,
-                  children: _images
-                      .asMap()
-                      .entries
-                      .map(
-                        (entry) => Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                File(entry.value.path),
-                                width: 94,
-                                height: 94,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            Positioned(
-                              top: -8,
-                              right: -8,
-                              child: InkWell(
-                                onTap: () {
-                                  setState(() {
-                                    _images.removeAt(entry.key);
-                                    _resetDetection();
-                                  });
-                                },
-                                child: const CircleAvatar(
-                                  radius: 12,
-                                  backgroundColor: AppColors.destructive,
-                                  child: Icon(
-                                    Icons.close,
-                                    size: 14,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
-                // ── Confidence badge ───────────────────────────────────────
-                if (_detectedConfidence != null) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  ConfidenceBadge(
-                    confidence: _detectedConfidence!,
-                    hasWaste: _detectedConfidence! > 0,
-                    isSpamFlagged: _isSpamFlagged,
-                  ),
-                ],
-              ],
-            ],
-          ),
-        ),
         const SizedBox(height: AppSpacing.md),
         AppSectionCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              FilledButton.icon(
-                onPressed: canSubmit ? _submitReport : null,
-                icon: _isSubmitting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.send_outlined),
-                label: Text(_isSubmitting ? "Submitting…" : "Submit Report"),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton.icon(
+                  onPressed: canSubmit ? _submitReport : null,
+                  icon: _isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.send_rounded, size: 20),
+                  label: Text(
+                    _isSubmitting ? "Submitting Report…" : "Submit Report",
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(

@@ -4,7 +4,6 @@ import { analyzeImageWithGemini, GeminiError } from "@/lib/ai/gemini";
 import { validateGeminiResult } from "@/lib/ai/validator";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import prisma from "@/lib/prisma";
-import { persistAiReportAndNotify } from "@/lib/services/ai-report-service";
 
 export const runtime = "nodejs";
 
@@ -170,7 +169,7 @@ export async function POST(request: NextRequest) {
         severity: cached.severity ?? "None",
         confidence: Number(cached.confidence ?? 0),
         reason: cached.aiReason ?? "",
-        reportId: cached.id,
+        reportId: null,
         status: cached.status,
         cached: true,
         message: cached.hasWaste
@@ -205,23 +204,23 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       if (err instanceof GeminiError) {
         if (err.code === "RATE_LIMIT") {
-          return jsonError(429, "AI analysis rate limit reached. Please try again shortly.");
+          return jsonError(429, "Photo analysis rate limit reached. Please try again shortly.");
         }
         if (err.code === "TIMEOUT" || err.code === "UNAVAILABLE") {
-          return jsonError(503, "AI analysis service is temporarily unavailable. Please try again in a moment.");
+          return jsonError(503, "Photo analysis service is temporarily unavailable. Please try again in a moment.");
         }
         if (err.code === "MODEL_NOT_FOUND") {
           console.error("[AI] Gemini model not found — GEMINI_MODEL env var may be set to an invalid model name");
-          return jsonError(500, "Server misconfiguration: Gemini model not found. Check GEMINI_MODEL environment variable.");
+          return jsonError(500, "Server misconfiguration: Analysis model not found. Please contact support.");
         }
         if (err.code === "INVALID_JSON") {
           // Log the raw invalid output for admin review but do not expose it
           console.error("[AI] Gemini returned invalid JSON — logged for admin review. code:", err.code);
-          return jsonError(422, "AI returned an unrecognized response. Please retry your upload.");
+          return jsonError(422, "Analysis service returned an unrecognized response. Please retry your upload.");
         }
       }
       console.error("[AI] Gemini unexpected error:", err);
-      return jsonError(500, `Unexpected error during AI analysis: ${err instanceof Error ? err.message : String(err)}`);
+      return jsonError(500, `Unexpected error during photo analysis: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     const { result: rawResult, modelName, latencyMs, tokenUsage } = geminiResponse;
@@ -240,7 +239,7 @@ export async function POST(request: NextRequest) {
       );
       return jsonError(
         422,
-        "AI response failed schema validation. Please retry your upload.",
+        "Analysis response failed validation. Please retry your upload.",
         `Field: ${validation.error.field}`,
       );
     }
@@ -260,20 +259,8 @@ export async function POST(request: NextRequest) {
       tokenUsage,
     });
 
-    // ── 11. Persist to DB & Notify Admins via Service ─────────────────────
-    const { reportId, reportStatus, isSpam } = await persistAiReportAndNotify({
-      latitude,
-      longitude,
-      description,
-      citizenId,
-      imageHash,
-      imageUrl,
-      cloudinaryPublicId,
-      aiResult,
-      modelName,
-      totalMs,
-      latencyMs,
-    });
+    const isSpam = !aiResult.hasWaste;
+    const reportStatus = isSpam ? "REJECTED" : "PENDING";
 
     // ── 13. Return response ───────────────────────────────────────────────
     return NextResponse.json(
@@ -283,7 +270,7 @@ export async function POST(request: NextRequest) {
         severity: aiResult.severity,
         confidence: aiResult.confidence,
         reason: aiResult.reason,
-        reportId,
+        reportId: null,
         status: reportStatus,
         imageUrl,
         ...(isSpam && {

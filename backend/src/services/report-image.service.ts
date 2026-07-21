@@ -54,12 +54,10 @@ export class ReportImageService {
 
     const images = await Promise.all(uploadPromises);
 
-    // Auto-run analysis on the report after images are uploaded
-    try {
-      await ReportAnalysisService.analyzeReport(reportId);
-    } catch (err) {
+    // Run analysis asynchronously in the background so image upload response is fast and doesn't time out
+    ReportAnalysisService.analyzeReport(reportId).catch((err) => {
       logger.warn({ err, reportId }, "Auto analysis failed for report");
-    }
+    });
 
     return images;
   }

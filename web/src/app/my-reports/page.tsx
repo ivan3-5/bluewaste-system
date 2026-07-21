@@ -62,14 +62,14 @@ export default function MyWasteReportsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              My AI Waste Reports
+              My Waste Reports
             </h1>
             <p className="text-sm text-gray-600">
               History of analyzed waste images and classifications.
             </p>
           </div>
           <Link href="/report-waste">
-            <Button>New AI Waste Report</Button>
+            <Button>New Waste Report</Button>
           </Link>
         </div>
 
@@ -83,7 +83,7 @@ export default function MyWasteReportsPage() {
           ) : reports.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-gray-500">
-                No AI waste reports yet.
+                No waste reports yet.
               </CardContent>
             </Card>
           ) : (

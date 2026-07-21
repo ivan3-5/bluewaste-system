@@ -172,6 +172,11 @@ export class ReportAnalysisService {
 
     if (!report) throw new Error("Report not found");
 
+    // If report has already been analyzed (e.g., analyzed on client during submission), skip redundant re-analysis
+    if (report.analyzedAt != null && report.severity != null) {
+      return report;
+    }
+
     const firstImage =
       report.images && report.images.length > 0 ? report.images[0] : null;
     if (!firstImage) return report;

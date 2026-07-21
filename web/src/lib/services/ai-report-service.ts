@@ -54,8 +54,8 @@ async function notifyLguAdmins(
 
     for (const admin of admins) {
       const notifId = randomUUID();
-      const title = "New AI-Analyzed Waste Report";
-      const message = `A new waste report has been submitted and analyzed by AI. Severity: ${aiResult.severity}. Categories: ${aiResult.categories.join(", ") || "None"}.`;
+      const title = "New Auto-Analyzed Waste Report";
+      const message = `A new waste report has been submitted and analyzed. Severity: ${aiResult.severity}. Categories: ${aiResult.categories.join(", ") || "None"}.`;
 
       await tx.$executeRaw`
         INSERT INTO "Notification" (id, "userId", title, message, type, "reportId", "isRead", "createdAt")
@@ -104,7 +104,7 @@ export async function persistAiReportAndNotify(
       VALUES (
         ${reportId},
         ${locationName},
-        ${params.description ?? "Submitted via AI analysis."},
+        ${params.description ?? "Submitted via photo analysis."},
         ${"with_waste"}::"WasteCategory",
         ${reportStatus}::"ReportStatus",
         ${params.latitude},
@@ -114,7 +114,7 @@ export async function persistAiReportAndNotify(
         false,
         ${isSpam},
         ${isSpam ? new Date() : null},
-        ${isSpam ? "No waste detected by Gemini AI" : null},
+        ${isSpam ? "No waste detected during photo analysis" : null},
         ${analysisStatus}::"AnalysisStatus",
         ${params.aiResult.confidence},
         ${params.aiResult.categories},

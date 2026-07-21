@@ -2,13 +2,15 @@ import "dart:io";
 
 import "package:dio/dio.dart";
 
-import "../../../core/config/app_env.dart";
+import "../../../core/network/api_exception.dart";
+import "../domain/report_models.dart";
 
-// ── Severity levels from the hybrid pipeline ────────────────────────────────
+// ── Severity levels from the AI pipeline ────────────────────────────────────
 enum WasteSeverity {
   critical,
   high,
   moderate,
+  low,
   spam,
   unknown;
 
@@ -20,8 +22,12 @@ enum WasteSeverity {
       case "HIGH":
         return WasteSeverity.high;
       case "MODERATE":
+      case "MEDIUM":
         return WasteSeverity.moderate;
+      case "LOW":
+        return WasteSeverity.low;
       case "SPAM":
+      case "NONE":
         return WasteSeverity.spam;
       default:
         return WasteSeverity.unknown;
@@ -36,6 +42,8 @@ enum WasteSeverity {
         return "High 🟠";
       case WasteSeverity.moderate:
         return "Moderate 🟡";
+      case WasteSeverity.low:
+        return "Low 🟢";
       case WasteSeverity.spam:
         return "Spam ⚪";
       case WasteSeverity.unknown:
@@ -51,6 +59,8 @@ enum WasteSeverity {
         return "Schedule cleanup within 24 hours.";
       case WasteSeverity.moderate:
         return "Queued for cleanup.";
+      case WasteSeverity.low:
+        return "Minor cleanup required.";
       case WasteSeverity.spam:
         return "Flagged for admin review.";
       case WasteSeverity.unknown:
@@ -65,6 +75,7 @@ enum WasteSeverity {
       case WasteSeverity.high:
         return "HIGH";
       case WasteSeverity.moderate:
+      case WasteSeverity.low:
         return "MODERATE";
       case WasteSeverity.spam:
         return "SPAM";
@@ -74,7 +85,7 @@ enum WasteSeverity {
   }
 }
 
-// ── A single Cloud Vision label ──────────────────────────────────────────────
+// ── A single label item ─────────────────────────────────────────────────────
 class WasteLabel {
   const WasteLabel({required this.label, required this.confidence});
 
@@ -89,7 +100,9 @@ class WasteLabel {
   }
 }
 
-/// Result from the FastAPI `/analyze` hybrid pipeline endpoint.
+/// Result from the backend `/ai/analyze-report` Gemini Vision endpoint.
+/// Note: Unlike legacy edge inference models, Gemini returns overall category classifications
+/// without spatial bounding-box coordinates or real-time camera overlays.
 class DetectResult {
   const DetectResult({
     required this.hasWaste,
@@ -97,58 +110,107 @@ class DetectResult {
     required this.confidence,
     required this.severity,
     required this.layer1Passed,
+    this.categories = const [],
     this.labels = const [],
     this.allLabels = const [],
     this.spamReason,
+    this.reason,
+    this.reportId,
+    this.imageUrl,
+    this.status,
   });
 
-  /// Whether waste-related labels were detected.
+  /// Whether waste-related categories were detected.
   final bool hasWaste;
 
-  /// Human-readable result string from the server.
+  /// Human-readable result or reason string from the server.
   final String message;
 
-  /// Top waste-label confidence as a fraction (0.0 – 1.0).
+  /// Overall AI confidence as a fraction (0.0 – 1.0).
   final double confidence;
 
-  /// Severity level determined by the pipeline.
+  /// Severity level determined by Gemini Vision.
   final WasteSeverity severity;
 
-  /// Whether YOLOv8 (Layer 1) detected any object at all.
+  /// Whether AI detection passed cleanly.
   final bool layer1Passed;
 
-  /// Waste-matched Cloud Vision labels.
+  /// Detected waste category identifiers from Gemini.
+  final List<String> categories;
+
+  /// Mapped display labels for cards and lists.
   final List<WasteLabel> labels;
 
-  /// All Cloud Vision labels returned (for display).
+  /// All labels returned (for display).
   final List<WasteLabel> allLabels;
 
   /// Human-readable spam reason, if spam-flagged.
   final String? spamReason;
 
+  /// Detailed reasoning provided by Gemini Vision.
+  final String? reason;
+
+  /// Server-generated report draft ID if returned during analysis.
+  final String? reportId;
+
+  /// Uploaded Cloudinary image URL if returned during analysis.
+  final String? imageUrl;
+
+  /// Initial report status assigned by the backend.
+  final String? status;
+
   /// Confidence as a percentage string, e.g. "87.3%"
   String get confidencePct =>
-      "${(confidence * 100).toStringAsFixed(1)}%";
+      "${(confidence <= 1.0 ? confidence * 100 : confidence).toStringAsFixed(1)}%";
 
   factory DetectResult.fromJson(Map<String, dynamic> json) {
+    final categoriesList = (json["categories"] is List)
+        ? (json["categories"] as List)
+            .map((e) => e.toString())
+            .toList(growable: false)
+        : (json["labels"] is List &&
+                json["labels"].isNotEmpty &&
+                json["labels"].first is String)
+            ? (json["labels"] as List)
+                .map((e) => e.toString())
+                .toList(growable: false)
+            : <String>[];
+
+    final confidenceVal = (json["confidence"] as num?)?.toDouble() ?? 0.0;
+
     List<WasteLabel> parseLabels(dynamic raw) {
-      if (raw is! List) return const [];
-      return raw
-          .whereType<Map<String, dynamic>>()
-          .map(WasteLabel.fromJson)
+      if (raw is List && raw.isNotEmpty && raw.first is Map) {
+        return raw
+            .whereType<Map<String, dynamic>>()
+            .map(WasteLabel.fromJson)
+            .toList(growable: false);
+      }
+      return categoriesList
+          .map((cat) => WasteLabel(
+                label: wasteCategoryLabels[cat] ?? cat,
+                confidence: confidenceVal,
+              ))
           .toList(growable: false);
     }
 
+    final reasonStr = (json["reason"] ?? json["message"] ?? "").toString();
+    final hasWasteVal = json["hasWaste"] == true || json["has_waste"] == true;
+
     return DetectResult(
-      hasWaste: json["has_waste"] == true,
-      message: (json["message"] ?? "").toString(),
-      // Server returns 0.0–1.0 fraction from /analyze
-      confidence: (json["confidence"] as num?)?.toDouble() ?? 0.0,
+      hasWaste: hasWasteVal,
+      message: reasonStr,
+      confidence: confidenceVal,
       severity: WasteSeverity.fromString(json["severity"]?.toString()),
-      layer1Passed: json["layer1_passed"] != false,
-      labels: parseLabels(json["labels"]),
-      allLabels: parseLabels(json["all_labels"]),
-      spamReason: json["spam_reason"]?.toString(),
+      layer1Passed: json["layer1_passed"] != false && json["layer1Passed"] != false,
+      categories: categoriesList,
+      labels: parseLabels(json["labels"] ?? json["categories"]),
+      allLabels: parseLabels(json["all_labels"] ?? json["categories"]),
+      spamReason: (json["spamReason"] ?? json["spam_reason"])?.toString() ??
+          (!hasWasteVal ? "No visible waste detected in photo" : null),
+      reason: reasonStr,
+      reportId: json["reportId"]?.toString(),
+      imageUrl: json["imageUrl"]?.toString(),
+      status: json["status"]?.toString(),
     );
   }
 
@@ -156,7 +218,7 @@ class DetectResult {
   factory DetectResult.unreachable() {
     return const DetectResult(
       hasWaste: false,
-      message: "Detection server unreachable.",
+      message: "Photo analysis service unreachable.",
       confidence: 0.0,
       severity: WasteSeverity.unknown,
       layer1Passed: false,
@@ -167,55 +229,44 @@ class DetectResult {
   bool get isSpam => severity == WasteSeverity.spam;
 }
 
-/// Thrown when the detection server cannot be reached (network/timeout).
-class DetectServerUnreachableException implements Exception {
-  const DetectServerUnreachableException(
-      [this.message = "The YOLO detection server is unreachable."]);
-  final String message;
-  @override
-  String toString() => message;
+/// Thrown when the AI server cannot be reached (network/timeout).
+class DetectServerUnreachableException extends ApiException {
+  DetectServerUnreachableException(
+      [super.message = "The detection service is unreachable."]);
 }
 
-/// Thrown when the server responds but with an error status.
-class DetectServerException implements Exception {
-  const DetectServerException(this.message);
-  final String message;
-  @override
-  String toString() => message;
+/// Thrown when the AI server responds with an error status.
+class DetectServerException extends ApiException {
+  DetectServerException(super.message, [int? statusCode])
+      : super(statusCode: statusCode);
 }
 
-/// HTTP client that calls the FastAPI `/analyze` hybrid endpoint.
+/// HTTP client that calls the backend `/ai/analyze-report` endpoint.
 ///
 /// Usage:
 /// ```dart
-/// final result = await DetectService.instance.detect(imageFile);
+/// final detectService = ref.read(detectServiceProvider);
+/// final result = await detectService.detect(imageFile: file, latitude: lat, longitude: lng);
 /// if (result.hasWaste) { ... }
 /// ```
 class DetectService {
-  DetectService._();
-  static final DetectService instance = DetectService._();
+  DetectService(this._dio);
 
-  Dio? _dio;
+  final Dio _dio;
 
-  Dio _buildDio() {
-    return Dio(
-      BaseOptions(
-        baseUrl: AppEnv.yoloBaseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 45),
-        sendTimeout: const Duration(seconds: 30),
-      ),
-    );
-  }
-
-  Dio get _client => _dio ??= _buildDio();
-
-  /// Sends [imageFile] to the `/analyze` endpoint and returns a [DetectResult].
+  /// Sends [imageFile] along with geolocation and metadata to `/ai/analyze-report`
+  /// and returns a [DetectResult].
   ///
   /// Throws:
   ///   [DetectServerUnreachableException] — network error, server down, timeout
-  ///   [DetectServerException]            — server returned an error response
-  Future<DetectResult> detect(File imageFile) async {
+  ///   [ApiException]                     — server returned an error response
+  Future<DetectResult> detect({
+    required File imageFile,
+    required double latitude,
+    required double longitude,
+    String? description,
+    String? citizenId,
+  }) async {
     final filename = imageFile.path.split(Platform.pathSeparator).last;
 
     final formData = FormData.fromMap({
@@ -223,11 +274,17 @@ class DetectService {
         imageFile.path,
         filename: filename,
       ),
+      "latitude": latitude.toString(),
+      "longitude": longitude.toString(),
+      if (description != null && description.trim().isNotEmpty)
+        "description": description.trim(),
+      if (citizenId != null && citizenId.trim().isNotEmpty)
+        "citizenId": citizenId.trim(),
     });
 
     try {
-      final response = await _client.post<Map<String, dynamic>>(
-        "/analyze",
+      final response = await _dio.post<Map<String, dynamic>>(
+        "/ai/analyze-report",
         data: formData,
         options: Options(
           headers: {"Accept": "application/json"},
@@ -236,8 +293,8 @@ class DetectService {
 
       final body = response.data;
       if (body == null) {
-        throw const DetectServerException(
-            "Empty response from detection server.");
+        throw DetectServerException(
+            "Empty response from detection service.");
       }
 
       return DetectResult.fromJson(body);
@@ -246,34 +303,39 @@ class DetectService {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
-          throw const DetectServerUnreachableException(
-            "Detection timed out. Check your connection and that the YOLO server is running.",
+          throw DetectServerUnreachableException(
+            "Photo analysis timed out. Please check your network connection.",
           );
         case DioExceptionType.connectionError:
-          throw const DetectServerUnreachableException(
-            "Cannot reach the YOLO detection server. Make sure it is running.",
+          throw DetectServerUnreachableException(
+            "Cannot reach the analysis service. Please verify your connection.",
           );
         case DioExceptionType.badResponse:
           final status = e.response?.statusCode ?? 0;
           final detail = _extractDetail(e.response?.data);
           if (status == 503) {
             throw DetectServerException(
-              "Detection model not ready (503). $detail",
+              "Photo analysis service is not ready (503). $detail",
+              status,
             );
           }
-          throw DetectServerException(
-            "Detection server error ($status): $detail",
-          );
+          if (status == 429) {
+            throw DetectServerException(
+              "Analysis rate limit exceeded. Please wait a moment and try again.",
+              status,
+            );
+          }
+          throw ApiException.fromDioError(e);
         default:
           throw DetectServerUnreachableException(
             "Unexpected network error: ${e.message}",
           );
       }
     } catch (e) {
-      if (e is DetectServerUnreachableException || e is DetectServerException) {
+      if (e is ApiException) {
         rethrow;
       }
-      throw DetectServerException("Detection failed: $e");
+      throw DetectServerException("Photo analysis failed: $e");
     }
   }
 

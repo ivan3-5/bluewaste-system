@@ -2,6 +2,7 @@ import "package:dio/dio.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "config/app_env.dart";
+import "../features/reports/data/detect_service.dart";
 import "storage/session_storage.dart";
 
 final sessionStorageProvider = Provider<SessionStorage>((ref) {
@@ -15,8 +16,8 @@ final dioProvider = Provider<Dio>((ref) {
     BaseOptions(
       baseUrl: AppEnv.apiBaseUrl,
       connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 20),
-      sendTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 60),
+      sendTimeout: const Duration(seconds: 60),
       headers: const {"Content-Type": "application/json"},
     ),
   );
@@ -48,4 +49,8 @@ final dioProvider = Provider<Dio>((ref) {
   );
 
   return dio;
+});
+
+final detectServiceProvider = Provider<DetectService>((ref) {
+  return DetectService(ref.watch(dioProvider));
 });

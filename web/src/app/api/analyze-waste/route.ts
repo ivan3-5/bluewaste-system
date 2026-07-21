@@ -213,8 +213,8 @@ export async function POST(request: NextRequest) {
       if (yoloResponse.status === 502 || yoloResponse.status === 503 || yoloResponse.status === 504) {
         return toJsonError(
           503,
-          "AI detection service is currently unreachable or restarting",
-          "The Render free-tier server may be waking up from sleep or recovering from a timeout. Please wait 30 seconds and try again.",
+          "Photo detection service is currently unreachable or restarting",
+          "The server may be waking up from sleep or recovering from a timeout. Please wait 30 seconds and try again.",
         );
       }
 
@@ -223,12 +223,12 @@ export async function POST(request: NextRequest) {
         yoloData.error ||
         (typeof yoloText === "string" && yoloText.length > 0 && !yoloText.includes("<html")
           ? yoloText
-          : "Unknown YOLO API error");
+          : "Unknown detection error");
 
       return toJsonError(
         502,
-        `YOLO API request failed: ${yoloMessage}`,
-        "Check if the YOLO service is reachable and CORS is configured.",
+        `Detection request failed: ${yoloMessage}`,
+        "Check if the detection service is reachable.",
       );
     }
 
@@ -360,10 +360,10 @@ export async function POST(request: NextRequest) {
     return toJsonError(
       isNetworkError ? 503 : 500,
       isNetworkError
-        ? "AI detection service is currently unreachable or restarting"
+        ? "Photo detection service is currently unreachable or restarting"
         : `Unexpected error while analyzing image: ${errMsg}`,
       isNetworkError
-        ? "The Render free-tier server may be waking up from sleep or restarting after a timeout. Please wait 30 seconds and try again."
+        ? "The server may be waking up from sleep or restarting after a timeout. Please wait 30 seconds and try again."
         : undefined,
     );
   }

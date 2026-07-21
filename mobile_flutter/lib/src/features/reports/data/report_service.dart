@@ -79,7 +79,6 @@ class ReportService {
       isAnonymous: data["isAnonymous"] as bool? ?? false,
       isSpamFlagged: data["isSpamFlagged"] as bool? ?? false,
       spamReason: data["spamReason"] as String?,
-      yoloConfidence: (data["yoloConfidence"] as num?)?.toDouble() ?? 0.0,
       severity: data["severity"] as String?,
       analysisStatus: data["analysisStatus"] as String?,
       analysisConfidence: (data["analysisConfidence"] as num?)?.toDouble(),
@@ -119,7 +118,6 @@ class ReportService {
         isAnonymous: data["isAnonymous"] as bool? ?? false,
         isSpamFlagged: data["isSpamFlagged"] as bool? ?? false,
         spamReason: data["spamReason"] as String?,
-        yoloConfidence: (data["yoloConfidence"] as num?)?.toDouble() ?? 0.0,
         severity: data["severity"] as String?,
         analysisStatus: data["analysisStatus"] as String?,
         analysisConfidence: (data["analysisConfidence"] as num?)?.toDouble(),
@@ -130,8 +128,18 @@ class ReportService {
         await uploadReportImages(reportId: report.id, images: images);
       }
       return report;
+    } on ApiException catch (e) {
+      if (e.isTimeoutOrNetworkError) {
+        final payload = OfflineReportPayload(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          data: data,
+          imagePaths: images.map((img) => img.path).toList(),
+        );
+        await offlineService.queueReport(payload);
+        return null;
+      }
+      rethrow;
     } on DioException catch (e) {
-      // If it's a network error during submission, queue it instead of failing
       if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
           e.type == DioExceptionType.unknown) {
@@ -157,7 +165,6 @@ class ReportService {
     bool isAnonymous = false,
     bool isSpamFlagged = false,
     String? spamReason,
-    double yoloConfidence = 0.0,
     String? severity,
     String? analysisStatus,
     double? analysisConfidence,
@@ -172,12 +179,11 @@ class ReportService {
           "category": category,
           "latitude": latitude,
           "longitude": longitude,
-          "address": address,
+          if (address != null) "address": address,
           "isAnonymous": isAnonymous,
-          // YOLO detection spam-flag fields
+          // AI detection spam-flag fields
           if (isSpamFlagged) "isSpamFlagged": true,
           if (isSpamFlagged && spamReason != null) "spamReason": spamReason,
-          "yoloConfidence": yoloConfidence,
           if (severity != null) "severity": severity,
           if (analysisStatus != null) "analysisStatus": analysisStatus,
           if (analysisConfidence != null) "analysisConfidence": analysisConfidence,

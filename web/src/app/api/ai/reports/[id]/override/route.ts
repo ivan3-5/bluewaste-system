@@ -119,7 +119,7 @@ export async function PATCH(request: NextRequest, { params }: PageProps) {
     return NextResponse.json({
       reportId: id,
       ...rows[0],
-      message: "AI analysis fields updated successfully.",
+      message: "Analysis fields updated successfully.",
     });
   } catch (err) {
     console.error("[AI Override] Error:", err);

@@ -110,7 +110,7 @@ export default function SpamReportsPage() {
                 Source
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
-                YOLO Confidence
+                Confidence
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
                 Reason

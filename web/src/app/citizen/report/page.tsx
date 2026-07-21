@@ -321,6 +321,20 @@ export default function SubmitReportPage() {
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [outsideZone, setOutsideZone] = useState(false);
+  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
+  const [countdownSeconds, setCountdownSeconds] = useState(3);
+
+  useEffect(() => {
+    if (!isSubmittedSuccess) return;
+    if (countdownSeconds <= 0) {
+      router.push("/citizen/my-reports");
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCountdownSeconds((prev) => prev - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [isSubmittedSuccess, countdownSeconds, router]);
 
   // Re-validate every time location or zones change
   useEffect(() => {
@@ -662,7 +676,8 @@ export default function SubmitReportPage() {
         type: "REPORT",
       });
 
-      router.push("/citizen/my-reports");
+      setIsSubmittedSuccess(true);
+      setCountdownSeconds(3);
     } catch (error: any) {
       if (error?.response?.status === 401) {
         setSubmitError("Session expired. Please log in and try again.");
@@ -677,6 +692,57 @@ export default function SubmitReportPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (isSubmittedSuccess) {
+    return (
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-b from-gray-50 to-emerald-50/30 p-4">
+        <div className="w-full max-w-md rounded-3xl border border-emerald-100 bg-white p-8 text-center shadow-xl animate-in fade-in zoom-in duration-300">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-8 ring-emerald-50">
+            <CheckCircle2 className="h-8 w-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Report Submitted Successfully!
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-gray-600">
+            Thank you for helping protect our coastal areas. Your waste report has been submitted and is queued for review.
+          </p>
+
+          <div className="my-6 rounded-xl bg-gray-50 p-3.5 text-xs font-medium text-gray-700 ring-1 ring-gray-100">
+            Redirecting to My Reports in{" "}
+            <span className="font-bold text-emerald-600 text-sm">
+              {countdownSeconds}s
+            </span>
+            …
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <Button
+              className="w-full bg-emerald-600 text-white hover:bg-emerald-700 font-semibold h-11 rounded-xl shadow-sm"
+              onClick={() => router.push("/citizen/my-reports")}
+            >
+              Go to My Reports Now
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-11 rounded-xl border-gray-200 text-gray-700 hover:bg-gray-50"
+              onClick={() => {
+                setIsSubmittedSuccess(false);
+                setCountdownSeconds(3);
+                setImageFile(null);
+                setImagePreview(null);
+                setLocationConfirmed(false);
+                setDescription("");
+                setSelectedCategory("");
+                setAnalysisResult(null);
+              }}
+            >
+              Submit Another Report
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col bg-gray-50 min-h-[calc(100vh-4rem)]">
@@ -848,7 +914,7 @@ export default function SubmitReportPage() {
                       <Loader2 className="h-6 w-6 animate-spin text-violet-600" />
                       <div>
                         <p className="text-sm font-semibold text-slate-900">
-                          Analyzing image with Gemini Vision AI…
+                          Analyzing image…
                         </p>
                         <p className="mt-0.5 text-xs text-slate-500">
                           Detecting waste categories, severity, and confidence score

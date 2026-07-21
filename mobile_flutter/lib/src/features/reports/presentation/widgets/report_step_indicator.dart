@@ -93,12 +93,15 @@ class ReportStepChip extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.secondaryForeground,
-                  fontWeight: FontWeight.w600,
-                ),
+          Flexible(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.secondaryForeground,
+                    fontWeight: FontWeight.w600,
+                  ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -106,7 +109,7 @@ class ReportStepChip extends StatelessWidget {
   }
 }
 
-/// Small badge shown below the selected photo preview with the YOLO confidence.
+/// Small badge shown below the selected photo preview with the AI analysis confidence.
 class ConfidenceBadge extends StatelessWidget {
   const ConfidenceBadge({
     super.key,
@@ -125,20 +128,22 @@ class ConfidenceBadge extends StatelessWidget {
     final IconData icon;
     final String label;
 
+    final pct = confidence <= 1.0 ? confidence * 100 : confidence;
+
     if (!hasWaste) {
       color = isSpamFlagged ? AppColors.destructive : Colors.orange;
       icon = isSpamFlagged ? Icons.warning_amber_rounded : Icons.help_outline;
       label = isSpamFlagged
           ? "Spam flagged — no waste detected"
-          : "No waste detected (${confidence.toStringAsFixed(1)}%)";
+          : "No waste detected (${pct.toStringAsFixed(1)}%)";
     } else {
-      color = confidence >= 75
+      color = pct >= 75
           ? const Color(0xFF2ECC71)
-          : confidence >= 40
+          : pct >= 40
               ? const Color(0xFFF39C12)
               : Colors.orange;
       icon = Icons.check_circle_outline;
-      label = "Waste detected — confidence ${confidence.toStringAsFixed(1)}%";
+      label = "Waste detected — confidence ${pct.toStringAsFixed(1)}%";
     }
 
     return Container(
@@ -156,12 +161,15 @@ class ConfidenceBadge extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
+          Flexible(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),

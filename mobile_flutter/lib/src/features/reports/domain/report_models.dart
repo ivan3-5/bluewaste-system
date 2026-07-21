@@ -127,7 +127,7 @@ class ReportRecord {
       id: (json["id"] ?? "").toString(),
       title: (json["title"] ?? "").toString(),
       description: (json["description"] ?? "").toString(),
-      category: (json["category"] ?? "PLASTIC_WASTE").toString(),
+      category: (json["category"] ?? "with_waste").toString(),
       status: (json["status"] ?? "PENDING").toString(),
       latitude: parseDouble(json["latitude"], 0),
       longitude: parseDouble(json["longitude"], 0),
@@ -152,9 +152,21 @@ const Map<String, String> statusLabels = {
 };
 
 const Map<String, String> wasteCategoryLabels = {
+  "with_waste": "With Waste",
+  "no_waste": "No Waste",
   "PLASTIC_WASTE": "Plastic Waste",
   "ORGANIC_WASTE": "Organic Waste",
   "GLASS_WASTE": "Glass Waste",
   "METAL_WASTE": "Metal Waste",
   "PAPER_WASTE": "Paper Waste",
+  "plastic_bottle": "Plastic Bottle",
+  "plastic_bag": "Plastic Bag",
+  "fishing_net": "Fishing Net",
+  "rope": "Rope",
+  "styrofoam": "Styrofoam",
+  "can": "Can / Metal",
+  "glass": "Glass Debris",
+  "battery": "Battery / Hazardous",
+  "diaper": "Diaper / Sanitary",
+  "cigarette_butt": "Cigarette Butt",
 };

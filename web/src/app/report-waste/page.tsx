@@ -21,6 +21,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useReportingZones, isPointInAnyZone } from "@/hooks/useReportingZones";
+import { useCreateReport, useUploadReportImages } from "@/hooks/useReports";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -84,15 +85,30 @@ export default function ReportWastePage() {
   const router = useRouter();
   const { user, token, isLoading } = useAuth();
   const { data: reportingZones = [] } = useReportingZones(true);
+  const createReport = useCreateReport();
+  const uploadImages = useUploadReportImages();
   const [outsideZone, setOutsideZone] = useState(false);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<GeminiAnalysisResult | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = useState(4);
   const [error, setError] = useState<string>("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!result || !result.reportId) return;
+    if (countdownSeconds <= 0) {
+      router.push("/my-reports");
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCountdownSeconds((prev) => prev - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [result, countdownSeconds, router]);
   const [locationStatus, setLocationStatus] = useState<string>("");
   const [address, setAddress] = useState<string>("");
   const [description, setDescription] = useState<string>("");
@@ -227,7 +243,40 @@ export default function ReportWastePage() {
         throw new Error(data.message || data.error || "Failed to analyze image");
       }
 
-      setResult(data as GeminiAnalysisResult);
+      const reportTitle = `Waste report - ${data.categories?.[0] ? (CATEGORY_LABELS[data.categories[0]] ?? data.categories[0]) : (data.hasWaste ? "With Waste" : "No Waste")}`;
+      const reportDescription = description.trim().length > 0
+        ? description.trim()
+        : (address.trim().length > 0 ? address.trim() : (data.reason || `Waste report submitted via quick capture.`));
+
+      const severityMap: Record<string, "CRITICAL" | "HIGH" | "MODERATE" | "SPAM"> = {
+        Critical: "CRITICAL",
+        High: "HIGH",
+        Medium: "MODERATE",
+        Low: "MODERATE",
+        None: "SPAM",
+      };
+
+      const createdReport = await createReport.mutateAsync({
+        title: reportTitle,
+        description: reportDescription,
+        category: data.hasWaste ? "with_waste" : "no_waste",
+        latitude: latitude,
+        longitude: longitude,
+        address: address.trim().length > 0 ? address.trim() : undefined,
+        severity: data.hasWaste ? (severityMap[data.severity] ?? "MODERATE") : "SPAM",
+        analysisStatus: data.hasWaste ? "DIRTY" : "CLEAN",
+        analysisConfidence: data.confidence,
+        analysisWasteCount: data.hasWaste ? Math.max(1, data.categories?.length || 1) : 0,
+      });
+
+      await uploadImages.mutateAsync({
+        reportId: createdReport.id,
+        files: [imageFile],
+        type: "REPORT",
+      });
+
+      setCountdownSeconds(4);
+      setResult({ ...data, reportId: createdReport.id } as GeminiAnalysisResult);
     } catch (err) {
       const message = getApiErrorMessage(err, "Failed to analyze image");
       setError(message);
@@ -244,9 +293,9 @@ export default function ReportWastePage() {
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">AI Waste Analysis</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Waste Analysis</h1>
             <p className="text-sm text-gray-600">
-              Upload a photo — Gemini Vision AI will detect, classify, and submit your waste report automatically.
+              Upload a photo — the system will detect, classify, and prepare your waste report automatically.
             </p>
           </div>
           <Link href="/my-reports">
@@ -396,8 +445,54 @@ export default function ReportWastePage() {
               <div className="text-center">
                 <p className="text-lg font-semibold text-slate-800">Analyzing image…</p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Gemini Vision AI is scanning your photo for waste. This usually takes 3–8 seconds.
+                  Scanning your photo for waste and categories. This usually takes 3–8 seconds.
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Success Confirmation Card & Countdown */}
+        {result && !isAnalyzing && (
+          <Card className="border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 shadow-lg animate-in fade-in zoom-in duration-300">
+            <CardContent className="p-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-4 ring-emerald-50">
+                <CheckCircle2 className="h-7 w-7" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Report Submitted Successfully!
+              </h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Your photo was analyzed and submitted. Report ID:{" "}
+                <span className="font-mono font-semibold">{result.reportId}</span>
+              </p>
+              <div className="my-4 rounded-xl bg-white/80 p-3 text-xs font-medium text-gray-700 shadow-sm border border-emerald-100">
+                Redirecting to My Reports in{" "}
+                <span className="font-bold text-emerald-600 text-sm">
+                  {countdownSeconds}s
+                </span>
+                …
+              </div>
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button
+                  className="bg-emerald-600 text-white hover:bg-emerald-700 font-semibold"
+                  onClick={() => router.push("/my-reports")}
+                >
+                  Go to My Reports Now
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-white"
+                  onClick={() => {
+                    setResult(null);
+                    setImageFile(null);
+                    setPreviewUrl(null);
+                    setError("");
+                    setDescription("");
+                  }}
+                >
+                  Submit Another Report
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -509,7 +604,7 @@ export default function ReportWastePage() {
                   {/* AI Reason */}
                   <div className="md:col-span-2">
                     <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
-                      AI Reasoning
+                      Analysis Details
                     </p>
                     <p className="text-sm text-gray-700 leading-relaxed">
                       {result.reason}

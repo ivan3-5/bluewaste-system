@@ -87,10 +87,10 @@ export function AiAnalysisPanel({
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="flex items-center gap-2">
           <Brain className="h-5 w-5 text-slate-400" />
-          <h2 className="text-xl font-bold text-slate-900">AI Analysis</h2>
+          <h2 className="text-xl font-bold text-slate-900">Waste Analysis</h2>
         </div>
         <p className="mt-3 text-sm text-slate-500">
-          This report was not analyzed by Gemini Vision AI (submitted via the legacy pipeline).
+          This report was not auto-analyzed (submitted manually).
         </p>
       </section>
     );
@@ -109,9 +109,9 @@ export function AiAnalysisPanel({
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100">
             <Brain className="h-5 w-5 text-violet-600" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900">AI Analysis</h2>
+          <h2 className="text-xl font-bold text-slate-900">Waste Analysis</h2>
           <span className="rounded-full border border-violet-200 bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">
-            ✦ Analyzed by AI
+            ✦ Auto-analyzed
           </span>
         </div>
 
@@ -170,7 +170,7 @@ export function AiAnalysisPanel({
           {/* Severity */}
           <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
             <dt className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              AI Severity
+              Severity
             </dt>
             <dd>
               {severityConfig ? (
@@ -204,7 +204,7 @@ export function AiAnalysisPanel({
         {aiReason && (
           <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
             <dt className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              AI Reasoning
+              Analysis Details
             </dt>
             <dd className="text-sm leading-relaxed text-slate-700">{aiReason}</dd>
           </div>
@@ -215,13 +215,13 @@ export function AiAnalysisPanel({
           {aiModel && (
             <span className="flex items-center gap-1">
               <Zap className="h-3.5 w-3.5 text-violet-400" />
-              {aiModel}
+              {aiModel.replace(/gemini-/i, "v").replace(/gemini/i, "System")}
             </span>
           )}
           {aiGeminiMs !== null && aiGeminiMs !== undefined && (
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
-              Gemini {aiGeminiMs}ms
+              Inference {aiGeminiMs}ms
             </span>
           )}
           {aiProcessingMs !== null && aiProcessingMs !== undefined && (

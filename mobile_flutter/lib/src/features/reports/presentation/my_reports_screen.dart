@@ -450,7 +450,7 @@ class _ReportDetailSheet extends StatelessWidget {
                       const SizedBox(height: AppSpacing.xs),
                       _DetailRow(
                         icon: Icons.psychology_outlined,
-                        label: "AI confidence",
+                        label: "Confidence",
                         value:
                             "${(report.analysisConfidence! * 100).toStringAsFixed(1)}%",
                       ),

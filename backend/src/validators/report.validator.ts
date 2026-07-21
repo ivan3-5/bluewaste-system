@@ -19,11 +19,11 @@ export const createReportSchema = z.object({
     .default("with_waste"),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
-  address: z.string().max(500).optional(),
+  address: z.string().max(500).nullable().optional(),
   isAnonymous: z.boolean().default(false),
-  isSpamFlagged: z.boolean().optional(),
-  spamReason: z.string().max(500).optional(),
-  yoloConfidence: z.number().min(0).max(100).optional(),
+  isSpamFlagged: z.boolean().nullable().optional(),
+  spamReason: z.string().max(500).nullable().optional(),
+  yoloConfidence: z.number().min(0).max(100).nullable().optional(),
   /** Pre-computed severity from the client-side YOLO /analyze pipeline */
   severity: z
     .enum(["CRITICAL", "HIGH", "MODERATE", "SPAM"])
