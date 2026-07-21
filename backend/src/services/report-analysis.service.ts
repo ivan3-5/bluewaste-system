@@ -247,6 +247,9 @@ export class ReportAnalysisService {
             analysisConfidence: analysis.confidence ?? null,
             analyzedAt: now,
             severity: resolvedSeverity,
+            aiCategories: labels.filter((l: string) => l !== "with_waste" && l !== "no_waste"),
+            aiReason: spamReason ?? (hasWaste ? `Detected waste items (${labels.filter((l: string) => l !== "with_waste" && l !== "no_waste").join(", ") || "waste"}) with ${Math.round((conf ?? 0) * 100)}% confidence.` : "No visible waste detected."),
+            aiModel: report.aiModel ?? "gemini-3.5-flash",
           },
         }),
         ...(report.reporterId

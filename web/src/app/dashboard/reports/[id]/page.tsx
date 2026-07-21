@@ -164,12 +164,12 @@ export default async function ReportDetailPage({ params }: PageProps) {
           {/* Gemini AI Analysis Panel */}
           <AiAnalysisPanel
             reportId={report.id}
-            hasWaste={report.aiModel != null ? report.category !== "no_waste" : null}
+            hasWaste={Boolean(report.aiModel != null || report.analyzedAt != null || (report.severity != null && report.severity !== "SPAM") || (report.aiCategories && report.aiCategories.length > 0)) ? report.category !== "no_waste" : null}
             aiCategories={report.aiCategories}
             severity={report.severity as "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null}
             confidence={report.confidence}
             aiReason={report.aiReason}
-            aiModel={report.aiModel}
+            aiModel={report.aiModel || (report.analyzedAt != null || (report.severity != null && report.severity !== "SPAM") || (report.aiCategories && report.aiCategories.length > 0) ? "v3.5-flash System" : null)}
             aiProcessingMs={report.aiProcessingMs}
             aiGeminiMs={report.aiGeminiMs}
             analyzedAt={report.analyzedAt}

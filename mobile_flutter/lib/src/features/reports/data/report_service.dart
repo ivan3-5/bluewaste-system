@@ -83,6 +83,9 @@ class ReportService {
       analysisStatus: data["analysisStatus"] as String?,
       analysisConfidence: (data["analysisConfidence"] as num?)?.toDouble(),
       analysisWasteCount: data["analysisWasteCount"] as int?,
+      aiModel: data["aiModel"] as String?,
+      aiCategories: (data["aiCategories"] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+      aiReason: data["aiReason"] as String?,
     );
 
     if (imagePaths.isNotEmpty) {
@@ -122,6 +125,9 @@ class ReportService {
         analysisStatus: data["analysisStatus"] as String?,
         analysisConfidence: (data["analysisConfidence"] as num?)?.toDouble(),
         analysisWasteCount: data["analysisWasteCount"] as int?,
+        aiModel: data["aiModel"] as String?,
+        aiCategories: (data["aiCategories"] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+        aiReason: data["aiReason"] as String?,
       );
 
       if (images.isNotEmpty) {
@@ -169,6 +175,9 @@ class ReportService {
     String? analysisStatus,
     double? analysisConfidence,
     int? analysisWasteCount,
+    String? aiModel,
+    List<String>? aiCategories,
+    String? aiReason,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -188,6 +197,9 @@ class ReportService {
           if (analysisStatus != null) "analysisStatus": analysisStatus,
           if (analysisConfidence != null) "analysisConfidence": analysisConfidence,
           if (analysisWasteCount != null) "analysisWasteCount": analysisWasteCount,
+          if (aiModel != null) "aiModel": aiModel,
+          if (aiCategories != null) "aiCategories": aiCategories,
+          if (aiReason != null) "aiReason": aiReason,
         },
       );
 

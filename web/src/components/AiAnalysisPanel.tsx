@@ -80,7 +80,12 @@ export function AiAnalysisPanel({
   aiGeminiMs,
   analyzedAt,
 }: AiAnalysisPanelProps) {
-  const isAnalyzed = aiModel !== null && aiModel !== undefined;
+  const isAnalyzed = Boolean(
+    (aiModel && aiModel.trim() !== "") ||
+    (analyzedAt !== null && analyzedAt !== undefined) ||
+    (aiCategories && aiCategories.length > 0) ||
+    (severity !== null && severity !== undefined && severity !== "SPAM")
+  );
 
   if (!isAnalyzed) {
     return (
@@ -100,6 +105,7 @@ export function AiAnalysisPanel({
   const categories = Array.isArray(aiCategories) ? aiCategories : [];
   const conf = typeof confidence === "number" ? confidence : null;
   const analyzedDate = analyzedAt ? new Date(analyzedAt).toLocaleString() : null;
+  const displayModel = aiModel ? aiModel.replace(/gemini-/i, "v").replace(/gemini/i, "System") : "v3.5-flash";
 
   return (
     <section className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm sm:p-6">
@@ -212,12 +218,10 @@ export function AiAnalysisPanel({
 
         {/* Meta: model + timing */}
         <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-          {aiModel && (
-            <span className="flex items-center gap-1">
-              <Zap className="h-3.5 w-3.5 text-violet-400" />
-              {aiModel.replace(/gemini-/i, "v").replace(/gemini/i, "System")}
-            </span>
-          )}
+          <span className="flex items-center gap-1">
+            <Zap className="h-3.5 w-3.5 text-violet-400" />
+            {displayModel}
+          </span>
           {aiGeminiMs !== null && aiGeminiMs !== undefined && (
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />

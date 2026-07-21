@@ -121,6 +121,11 @@ export function useCreateReport() {
       analysisConfidence?: number | null;
       /** Number of waste items detected */
       analysisWasteCount?: number | null;
+      aiModel?: string | null;
+      aiCategories?: string[] | null;
+      aiReason?: string | null;
+      aiProcessingMs?: number | null;
+      aiGeminiMs?: number | null;
     }) => {
       const { data } = await api.post("/reports", reportData);
       return data;

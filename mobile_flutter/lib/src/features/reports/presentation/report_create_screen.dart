@@ -398,6 +398,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           "analysisStatus": _detectResult?.hasWaste == true ? "DIRTY" : "CLEAN",
           "analysisConfidence": _detectResult?.confidence,
           "analysisWasteCount": _detectResult?.hasWaste == true ? (_detectResult?.labels.length ?? 1) : 0,
+          "aiModel": _detectResult != null ? "gemini-3.5-flash" : null,
+          "aiCategories": _detectResult?.categories.isNotEmpty == true
+              ? _detectResult!.categories
+              : (_detectResult?.labels.map((l) => l.label).toList() ?? []),
+          "aiReason": _detectResult?.reason ?? _detectResult?.message,
         },
         images: _images,
         offlineService: offlineService,

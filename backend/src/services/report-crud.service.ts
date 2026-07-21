@@ -27,6 +27,11 @@ export class ReportCrudService {
     analysisStatus?: "DIRTY" | "CLEAN" | null;
     analysisConfidence?: number | null;
     analysisWasteCount?: number | null;
+    aiModel?: string | null;
+    aiCategories?: string[] | null;
+    aiReason?: string | null;
+    aiProcessingMs?: number | null;
+    aiGeminiMs?: number | null;
   }) {
     await ReportSpamService.purgeExpiredSpamIfDue();
 
@@ -59,12 +64,17 @@ export class ReportCrudService {
             typeof data.analysisConfidence === "number" && data.analysisConfidence > 0
               ? data.analysisConfidence
               : yoloConfidenceFraction,
-          ...(data.severity != null && {
-            severity: data.severity as Severity,
+          ...((data.severity != null || data.aiModel != null || data.aiCategories != null) && {
+            ...(data.severity != null && { severity: data.severity as Severity }),
             analysisStatus: (data.analysisStatus as AnalysisStatus) ?? null,
             analysisWasteCount: data.analysisWasteCount ?? null,
             analyzedAt: new Date(),
           }),
+          ...(data.aiModel != null && { aiModel: data.aiModel }),
+          ...(data.aiCategories != null && { aiCategories: data.aiCategories }),
+          ...(data.aiReason != null && { aiReason: data.aiReason }),
+          ...(data.aiProcessingMs != null && { aiProcessingMs: data.aiProcessingMs }),
+          ...(data.aiGeminiMs != null && { aiGeminiMs: data.aiGeminiMs }),
           reporterId: data.isAnonymous ? null : data.reporterId,
         },
         include: {

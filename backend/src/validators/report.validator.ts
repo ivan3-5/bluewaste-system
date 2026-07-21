@@ -35,6 +35,11 @@ export const createReportSchema = z.object({
   analysisConfidence: z.number().min(0).max(1).nullable().optional(),
   /** Number of waste items detected by client-side analysis */
   analysisWasteCount: z.number().int().min(0).nullable().optional(),
+  aiModel: z.string().nullable().optional(),
+  aiCategories: z.array(z.string()).nullable().optional(),
+  aiReason: z.string().max(2000).nullable().optional(),
+  aiProcessingMs: z.number().int().min(0).nullable().optional(),
+  aiGeminiMs: z.number().int().min(0).nullable().optional(),
 });
 
 
