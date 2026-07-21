@@ -20,6 +20,7 @@ import "../domain/report_models.dart";
 import "widgets/report_result_card.dart";
 import "widgets/report_step_indicator.dart";
 import "my_reports_screen.dart";
+import "../../notifications/presentation/notification_providers.dart";
 
 enum _NoWasteAction { retake, submitAnyway }
 
@@ -185,8 +186,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         _resetDetection();
       });
     } else {
-      // Submit Anyway — mark as spam flagged
+      // Submit Anyway — mark as spam flagged and submit directly quickly
       setState(() => _isSpamFlagged = true);
+      await _submitReport(isDirectSpamSubmit: true);
     }
   }
 
@@ -339,17 +341,25 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     return inside;
   }
 
-  Future<void> _submitReport() async {
+  Future<void> _submitReport({bool isDirectSpamSubmit = false}) async {
     final rawDescription = _descriptionController.text.trim();
 
-    if (rawDescription.isNotEmpty && rawDescription.length < 10) {
+    if (!isDirectSpamSubmit && rawDescription.isNotEmpty && rawDescription.length < 10) {
       _showMessage("Description must be at least 10 characters when provided.");
       return;
     }
 
     if (_latitude == null || _longitude == null) {
-      _showMessage("Please capture your location first.");
-      return;
+      if (isDirectSpamSubmit) {
+        await _getCurrentLocation();
+        if (_latitude == null || _longitude == null) {
+          _latitude ??= 0.0;
+          _longitude ??= 0.0;
+        }
+      } else {
+        _showMessage("Please capture your location first.");
+        return;
+      }
     }
 
     if (_images.isEmpty) {
@@ -357,7 +367,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       return;
     }
 
-    if (!_detectionReady) {
+    if (!_detectionReady && !isDirectSpamSubmit) {
       _showMessage("Please wait for detection to complete or retake the photo.");
       return;
     }
@@ -375,8 +385,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       final reportService = ref.read(reportServiceProvider);
       final offlineService = ref.read(offlineServiceProvider);
 
-      final categoryLabel = wasteCategoryLabels[_category] ??
-          (_category == "with_waste" ? "With Waste" : "No Waste");
+      final effectiveCategory = isDirectSpamSubmit ? "no_waste" : _category;
+      final effectiveIsSpam = isDirectSpamSubmit || _isSpamFlagged;
+      final categoryLabel = wasteCategoryLabels[effectiveCategory] ??
+          (effectiveCategory == "with_waste" ? "With Waste" : "No Waste");
       final title = "Waste report - $categoryLabel";
       final description = rawDescription.isNotEmpty
           ? rawDescription
@@ -386,18 +398,18 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         data: {
           "title": title,
           "description": description,
-          "category": _category,
+          "category": effectiveCategory,
           "latitude": _latitude!,
           "longitude": _longitude!,
           "isAnonymous": _isAnonymous,
-          "isSpamFlagged": _isSpamFlagged,
-          "spamReason": _isSpamFlagged
+          "isSpamFlagged": effectiveIsSpam,
+          "spamReason": effectiveIsSpam
               ? (_detectResult?.spamReason ?? "No visible waste detected during photo analysis")
               : null,
-          "severity": _detectResult?.severity.dbValue,
-          "analysisStatus": _detectResult?.hasWaste == true ? "DIRTY" : "CLEAN",
+          "severity": isDirectSpamSubmit ? "SPAM" : _detectResult?.severity.dbValue,
+          "analysisStatus": isDirectSpamSubmit ? "CLEAN" : (_detectResult?.hasWaste == true ? "DIRTY" : "CLEAN"),
           "analysisConfidence": _detectResult?.confidence,
-          "analysisWasteCount": _detectResult?.hasWaste == true ? (_detectResult?.labels.length ?? 1) : 0,
+          "analysisWasteCount": (_detectResult?.hasWaste == true && !isDirectSpamSubmit) ? (_detectResult?.labels.length ?? 1) : 0,
           "aiModel": _detectResult != null ? "gemini-3.5-flash" : null,
           "aiCategories": _detectResult?.categories.isNotEmpty == true
               ? _detectResult!.categories
@@ -408,6 +420,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         offlineService: offlineService,
       );
 
+      try {
+        ref.read(unreadCountProvider.notifier).refresh();
+        ref.read(notificationsListProvider.notifier).refresh();
+      } catch (_) {}
+
       _descriptionController.clear();
 
       final submittedResult = _detectResult;
@@ -415,13 +432,21 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         _images.clear();
         _isAnonymous = false;
         _category = "with_waste";
+        _isSpamFlagged = false;
         _resetDetection();
-        _showResultCard = submittedResult != null;
-        _submittedResult = submittedResult;
+        if (isDirectSpamSubmit) {
+          _showResultCard = false;
+          _submittedResult = null;
+        } else {
+          _showResultCard = submittedResult != null;
+          _submittedResult = submittedResult;
+        }
       });
 
       if (report == null && submittedResult == null) {
         _showMessage("You are offline. Report queued and will sync later.");
+      } else if (isDirectSpamSubmit) {
+        _showMessage("Spam report submitted directly. Screen refreshed so you can submit again.");
       } else {
         _startSuccessCountdown();
       }
@@ -648,16 +673,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                     color: AppColors.primary,
                   ),
                 ),
+
                 const SizedBox(height: AppSpacing.md),
-                Text(
-                  "Step 1: Capture Waste Photo",
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.xs),
                 Text(
                   "Take a clear photo of coastal waste or upload one from your gallery. The system will automatically detect waste and classify the category.",
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -673,7 +690,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                     onPressed: _isDetecting ? null : _pickFromCamera,
                     icon: const Icon(Icons.photo_camera_rounded, size: 22),
                     label: const Text(
-                      "Take a Photo (Camera)",
+                      "Take a Photo",
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -841,7 +858,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
             children: [
               ReportFormSectionHeader(
                 icon: Icons.photo_camera_rounded,
-                title: "Step 2: Review Photo & Analysis",
+                title: "Review Photo & Analysis",
                 subtitle: "The system verifies and categorizes your captured image.",
               ),
               const SizedBox(height: AppSpacing.md),
@@ -1063,7 +1080,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 width: double.infinity,
                 height: 50,
                 child: FilledButton.icon(
-                  onPressed: canSubmit ? _submitReport : null,
+                  onPressed: canSubmit ? () => _submitReport() : null,
                   icon: _isSubmitting
                       ? const SizedBox(
                           width: 18,
