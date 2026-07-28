@@ -120,6 +120,98 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _showAvatarSourcePicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Text(
+                  "Update Profile Picture",
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.tint(AppColors.primary, opacity: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.photo_camera_outlined,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  title: const Text(
+                    "Take Photo",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text("Use camera to snap a new picture"),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _pickAndUploadAvatar(ImageSource.camera);
+                  },
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.tint(AppColors.info, opacity: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.image_outlined,
+                      color: AppColors.info,
+                    ),
+                  ),
+                  title: const Text(
+                    "Choose from Gallery",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text("Select existing photo from library"),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _pickAndUploadAvatar(ImageSource.gallery);
+                  },
+                ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authControllerProvider).user;
@@ -138,139 +230,261 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         : "U";
     final isBusy = _saving || _uploadingAvatar;
 
+    final roleText = (user?.role ?? "CITIZEN").toUpperCase();
+    final isWorker = roleText == "FIELD_WORKER";
+    final userRoleLabel = isWorker ? "Field Worker" : "Citizen";
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Profile")),
+      appBar: AppBar(
+        title: const Text("Profile"),
+        centerTitle: true,
+      ),
       body: ListView(
         padding: AppSpacing.screen,
         children: [
+          // Hero Profile Card
+          AppSectionCard(
+            child: Column(
+              children: [
+                Center(
+                  child: GestureDetector(
+                    onTap: isBusy ? null : _showAvatarSourcePicker,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.2),
+                              width: 3,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 44,
+                            backgroundColor: AppColors.tint(AppColors.primary),
+                            foregroundImage: profileImage,
+                            child: profileImage == null
+                                ? Text(
+                                    initials,
+                                    style: const TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 28,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 2,
+                          right: 2,
+                          child: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt_rounded,
+                              size: 15,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  "${user?.firstName ?? ""} ${user?.lastName ?? ""}".trim(),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  user?.email ?? "",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.mutedForeground,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                AppStatusPill(
+                  label: userRoleLabel,
+                  color: isWorker ? AppColors.purple : AppColors.primary,
+                  icon: isWorker
+                      ? Icons.engineering_outlined
+                      : Icons.person_outline,
+                ),
+                if (_uploadingAvatar) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        "Uploading profile picture...",
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // Personal Information Form
           AppSectionCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: AppColors.tint(AppColors.primary),
-                      foregroundImage: profileImage,
-                      child: profileImage == null
-                          ? Text(
-                              initials,
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 20,
-                              ),
-                            )
-                          : null,
+                    const Icon(
+                      Icons.person_pin_outlined,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      "Personal Information",
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.foreground,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _firstNameController,
+                        decoration: const InputDecoration(
+                          labelText: "First Name",
+                          prefixIcon: Icon(Icons.person_outline, size: 20),
+                        ),
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "${user?.firstName ?? ""} ${user?.lastName ?? ""}"
-                                .trim(),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            user?.email ?? "",
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppColors.mutedForeground,
-                                    ),
-                          ),
-                        ],
+                      child: TextField(
+                        controller: _lastNameController,
+                        decoration: const InputDecoration(
+                          labelText: "Last Name",
+                          prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                        ),
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xs,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: isBusy
-                          ? null
-                          : () => _pickAndUploadAvatar(ImageSource.camera),
-                      icon: const Icon(Icons.photo_camera_outlined),
-                      label: const Text("Camera"),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: isBusy
-                          ? null
-                          : () => _pickAndUploadAvatar(ImageSource.gallery),
-                      icon: const Icon(Icons.image_outlined),
-                      label: const Text("Gallery"),
-                    ),
-                  ],
-                ),
-                if (_uploadingAvatar)
-                  Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.xs),
-                    child: Text(
-                      "Uploading profile picture...",
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.mutedForeground,
-                          ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppSectionCard(
-            child: Column(
-              children: [
-                TextField(
-                  controller: _firstNameController,
-                  decoration: const InputDecoration(
-                    labelText: "First Name",
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                TextField(
-                  controller: _lastNameController,
-                  decoration: const InputDecoration(
-                    labelText: "Last Name",
-                    prefixIcon: Icon(Icons.badge_outlined),
-                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
-                    labelText: "Phone",
-                    prefixIcon: Icon(Icons.phone_outlined),
+                    labelText: "Phone Number",
+                    prefixIcon: Icon(Icons.phone_outlined, size: 20),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: _addressController,
+                  minLines: 1,
+                  maxLines: 2,
                   decoration: const InputDecoration(
                     labelText: "Address",
-                    prefixIcon: Icon(Icons.location_on_outlined),
+                    prefixIcon: Icon(Icons.location_on_outlined, size: 20),
                   ),
                 ),
               ],
             ),
           ),
+
           const SizedBox(height: AppSpacing.md),
+
+          // Account & Activity Section
           AppSectionCard(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.space_dashboard_outlined,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      "Account & Activity",
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.foreground,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
                 ListTile(
-                  leading: const Icon(Icons.assignment_turned_in_outlined),
-                  title: const Text("My Reports"),
-                  trailing: const Icon(Icons.chevron_right),
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.tint(AppColors.primary, opacity: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.assignment_turned_in_outlined,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  title: Text(
+                    "My Reports",
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  subtitle: Text(
+                    "Track your submitted waste reports",
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.mutedForeground,
+                        ),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.mutedForeground,
+                  ),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
@@ -287,16 +501,57 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ],
             ),
           ),
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // Action Buttons
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton.icon(
+              onPressed: isBusy ? null : _saveProfile,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.check_circle_outline, size: 20),
+              label: Text(
+                _saving ? "Saving..." : "Save Changes",
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: isBusy ? null : _logout,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.destructive,
+                side: BorderSide(
+                  color: AppColors.destructive.withValues(alpha: 0.4),
+                ),
+              ),
+              icon: const Icon(Icons.logout_rounded, size: 20),
+              label: const Text(
+                "Logout",
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: AppSpacing.md),
-          FilledButton(
-            onPressed: isBusy ? null : _saveProfile,
-            child: Text(_saving ? "Saving..." : "Save Changes"),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          OutlinedButton(
-            onPressed: isBusy ? null : _logout,
-            child: const Text("Logout"),
-          ),
         ],
       ),
     );

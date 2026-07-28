@@ -86,6 +86,7 @@ class ReportRecord {
     this.address,
     this.severity,
     this.analysisConfidence,
+    this.aiReason,
   });
 
   final String id;
@@ -104,6 +105,15 @@ class ReportRecord {
   final String? severity;
   /// Top confidence score from Cloud Vision (0.0 – 1.0).
   final double? analysisConfidence;
+  /// AI Analysis details reason string from Gemini/Vision AI
+  final String? aiReason;
+
+  String get displayDescription {
+    if (aiReason != null && aiReason!.trim().isNotEmpty) {
+      return aiReason!;
+    }
+    return description;
+  }
 
   factory ReportRecord.fromJson(Map<String, dynamic> json) {
     double parseDouble(dynamic value, double fallback) {
@@ -138,6 +148,7 @@ class ReportRecord {
       images: imageList,
       severity: json["severity"]?.toString(),
       analysisConfidence: (json["analysisConfidence"] as num?)?.toDouble(),
+      aiReason: json["aiReason"]?.toString(),
     );
   }
 }
