@@ -132,6 +132,7 @@ export interface MapReport {
   title: string;
   category: WasteCategory;
   status: ReportStatus;
+  severity?: WasteSeverity | null;
   latitude: number;
   longitude: number;
   address?: string;

@@ -10,15 +10,12 @@ const WasteMap = dynamic(() => import("@/components/map/WasteMap"), {
 });
 
 export default function PublicMapPage() {
-  const [bucket, setBucket] = useState<"" | "with_waste" | "no_waste">("");
+  const [bucket, setBucket] = useState<"" | "with_waste">("");
   const { data: reports = [], isLoading } = useMapData();
 
   const filteredReports = useMemo(() => {
     if (bucket === "with_waste") {
       return reports.filter((report) => report.status !== "CLEANED");
-    }
-    if (bucket === "no_waste") {
-      return reports.filter((report) => report.status === "CLEANED");
     }
     return reports;
   }, [reports, bucket]);
@@ -40,12 +37,11 @@ export default function PublicMapPage() {
             className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
             value={bucket}
             onChange={(e) =>
-              setBucket(e.target.value as "" | "with_waste" | "no_waste")
+              setBucket(e.target.value as "" | "with_waste")
             }
           >
             <option value="">All Reports</option>
             <option value="with_waste">With Waste</option>
-            <option value="no_waste">No Waste</option>
           </select>
           <span className="rounded-xl bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-500">
             {filteredReports.length}

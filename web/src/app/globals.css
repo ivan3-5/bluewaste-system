@@ -285,6 +285,11 @@
   border-color: #ef444440;
 }
 
+.custom-waste-marker-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
 .waste-marker {
   position: relative;
   overflow: visible;

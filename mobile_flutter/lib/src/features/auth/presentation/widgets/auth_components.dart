@@ -62,6 +62,7 @@ class _FadeInSlideState extends State<FadeInSlide>
 class PremiumTextField extends StatefulWidget {
   final TextEditingController controller;
   final String labelText;
+  final String? hintText;
   final IconData prefixIcon;
   final bool obscureText;
   final TextInputType? keyboardType;
@@ -73,6 +74,7 @@ class PremiumTextField extends StatefulWidget {
     super.key,
     required this.controller,
     required this.labelText,
+    this.hintText,
     required this.prefixIcon,
     this.obscureText = false,
     this.keyboardType,
@@ -115,12 +117,6 @@ class _PremiumTextFieldState extends State<PremiumTextField> {
             ? AppColors.background
             : AppColors.background.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _isFocused
-              ? AppColors.primary
-              : AppColors.border.withValues(alpha: 0.5),
-          width: _isFocused ? 2 : 1,
-        ),
         boxShadow: _isFocused
             ? [
                 BoxShadow(
@@ -145,11 +141,18 @@ class _PremiumTextFieldState extends State<PremiumTextField> {
         ),
         decoration: InputDecoration(
           labelText: widget.labelText,
+          hintText: widget.hintText,
+          hintStyle: TextStyle(
+            color: AppColors.mutedForeground.withValues(alpha: 0.5),
+            fontWeight: FontWeight.w400,
+          ),
           labelStyle: TextStyle(
-            color: _isFocused
-                ? AppColors.primary
-                : AppColors.mutedForeground.withValues(alpha: 0.8),
-            fontWeight: _isFocused ? FontWeight.w600 : FontWeight.w500,
+            color: AppColors.mutedForeground.withValues(alpha: 0.8),
+            fontWeight: FontWeight.w500,
+          ),
+          floatingLabelStyle: const TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w600,
           ),
           prefixIcon: Icon(
             widget.prefixIcon,
@@ -158,7 +161,20 @@ class _PremiumTextFieldState extends State<PremiumTextField> {
                 : AppColors.mutedForeground.withValues(alpha: 0.8),
           ),
           suffixIcon: widget.suffixIcon,
-          border: InputBorder.none,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(
+              color: AppColors.border.withValues(alpha: 0.5),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(
+              color: AppColors.primary,
+              width: 2,
+            ),
+          ),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         ),

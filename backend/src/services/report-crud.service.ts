@@ -10,6 +10,54 @@ type Viewer = {
   role: string;
 };
 
+export function sanitizeReportForPrivacy<T extends Record<string, any>>(
+  report: T,
+  viewerId?: string,
+): T {
+  if (!report || !report.isAnonymous) {
+    return report;
+  }
+  const isReporter = Boolean(
+    viewerId && report.reporterId && report.reporterId === viewerId,
+  );
+  if (isReporter) {
+    return report;
+  }
+
+  const sanitized: any = { ...report };
+  if (sanitized.reporter) {
+    sanitized.reporter = {
+      id: null,
+      firstName: "Anonymous",
+      lastName: "Citizen",
+      email: null,
+      phone: null,
+    };
+  }
+  if (Array.isArray(sanitized.statusHistory)) {
+    sanitized.statusHistory = sanitized.statusHistory.map((history: any) => {
+      if (
+        history.changedBy &&
+        (history.notes === "Report submitted" ||
+          (report.reporterId && history.changedById === report.reporterId))
+      ) {
+        return {
+          ...history,
+          changedById: null,
+          changedBy: {
+            id: null,
+            firstName: "Anonymous",
+            lastName: "Citizen",
+          },
+        };
+      }
+      return history;
+    });
+  }
+
+  return sanitized as T;
+}
+
 export class ReportCrudService {
   static async create(data: {
     title: string;
@@ -56,7 +104,7 @@ export class ReportCrudService {
           latitude: data.latitude,
           longitude: data.longitude,
           address: data.address,
-          isAnonymous: data.isAnonymous || false,
+          isAnonymous: Boolean(data.isAnonymous || !data.reporterId),
           isSpam,
           spamMarkedAt: isSpam ? new Date() : null,
           spamReason: resolvedSpamReason,
@@ -75,7 +123,7 @@ export class ReportCrudService {
           ...(data.aiReason != null && { aiReason: data.aiReason }),
           ...(data.aiProcessingMs != null && { aiProcessingMs: data.aiProcessingMs }),
           ...(data.aiGeminiMs != null && { aiGeminiMs: data.aiGeminiMs }),
-          reporterId: data.isAnonymous ? null : data.reporterId,
+          reporterId: data.reporterId ?? null,
         },
         include: {
           reporter: {
@@ -207,7 +255,7 @@ export class ReportCrudService {
       throw new Error("Report not found");
     }
 
-    return report;
+    return sanitizeReportForPrivacy(report, viewer?.id);
   }
 
   static async updateStatus(
@@ -301,7 +349,7 @@ export class ReportCrudService {
     }
 
     await GeoCache.invalidateAll();
-    return updatedReport;
+    return sanitizeReportForPrivacy(updatedReport);
   }
 
   static async getReports(filters: {
@@ -420,7 +468,8 @@ export class ReportCrudService {
       prisma.report.count({ where }),
     ]);
 
-    return buildPaginatedResponse(reports, total, pagination);
+    const sanitizedReports = reports.map((r) => sanitizeReportForPrivacy(r));
+    return buildPaginatedResponse(sanitizedReports, total, pagination);
   }
 
   static async assignWorker(
@@ -484,7 +533,7 @@ export class ReportCrudService {
       reportId,
     });
 
-    return updatedReport;
+    return sanitizeReportForPrivacy(updatedReport);
   }
 
   static async getMyReports(
@@ -576,7 +625,8 @@ export class ReportCrudService {
       prisma.report.count({ where }),
     ]);
 
-    return buildPaginatedResponse(reports, total, pagination);
+    const sanitizedReports = reports.map((r) => sanitizeReportForPrivacy(r, userId));
+    return buildPaginatedResponse(sanitizedReports, total, pagination);
   }
 
   static async softDelete(reportId: string) {

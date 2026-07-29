@@ -157,8 +157,8 @@ export async function getDashboardReports(limit: number) {
       COALESCE(image."imageUrl", null) AS "imageUrl",
       COALESCE(images.images, '[]'::json) AS images,
       r."reporterId",
-      COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous') AS "reporterName",
-      rep.email AS "reporterEmail",
+      CASE WHEN r."isAnonymous" THEN 'Anonymous Citizen' ELSE COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous Citizen') END AS "reporterName",
+      CASE WHEN r."isAnonymous" THEN NULL ELSE rep.email END AS "reporterEmail",
       r."assignedToId",
       COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
       schedule_workers."assignedWorkerNames"
@@ -231,8 +231,8 @@ export async function getDashboardReportById(id: string) {
       COALESCE(image."imageUrl", null) AS "imageUrl",
       COALESCE(images.images, '[]'::json) AS images,
       r."reporterId",
-      COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous') AS "reporterName",
-      rep.email AS "reporterEmail",
+      CASE WHEN r."isAnonymous" THEN 'Anonymous Citizen' ELSE COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous Citizen') END AS "reporterName",
+      CASE WHEN r."isAnonymous" THEN NULL ELSE rep.email END AS "reporterEmail",
       r."assignedToId",
       COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
       schedule_workers."assignedWorkerNames"

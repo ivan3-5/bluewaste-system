@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  EyeOff,
 } from "lucide-react";
 import { useReportingZones, isPointInAnyZone } from "@/hooks/useReportingZones";
 import { useCreateReport, useUploadReportImages } from "@/hooks/useReports";
@@ -112,6 +113,7 @@ export default function ReportWastePage() {
   const [locationStatus, setLocationStatus] = useState<string>("");
   const [address, setAddress] = useState<string>("");
   const [description, setDescription] = useState<string>("");
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
   // Re-validate zone membership whenever location OR zones change
   useEffect(() => {
@@ -263,6 +265,7 @@ export default function ReportWastePage() {
         latitude: latitude,
         longitude: longitude,
         address: address.trim().length > 0 ? address.trim() : undefined,
+        isAnonymous: isAnonymous,
         severity: data.hasWaste ? (severityMap[data.severity] ?? "MODERATE") : "SPAM",
         analysisStatus: data.hasWaste ? "DIRTY" : "CLEAN",
         analysisConfidence: data.confidence,
@@ -390,6 +393,38 @@ export default function ReportWastePage() {
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={isAnalyzing}
               />
+            </div>
+
+            {/* Submit anonymously */}
+            <div
+              className={`flex items-start gap-3 rounded-xl border p-3.5 transition-all ${
+                isAnonymous
+                  ? "border-emerald-200 bg-emerald-50/60 text-emerald-950 shadow-sm"
+                  : "border-gray-200 bg-gray-50/50 text-gray-800"
+              }`}
+            >
+              <div className="pt-0.5">
+                <input
+                  type="checkbox"
+                  id="submit-anonymously-quick"
+                  checked={isAnonymous}
+                  onChange={(e) => setIsAnonymous(e.target.checked)}
+                  disabled={isAnalyzing}
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                />
+              </div>
+              <label
+                htmlFor="submit-anonymously-quick"
+                className="flex flex-1 cursor-pointer flex-col gap-0.5 select-none"
+              >
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-900">
+                  <EyeOff className={`h-4 w-4 ${isAnonymous ? "text-emerald-600" : "text-gray-500"}`} />
+                  <span>Submit anonymously</span>
+                </div>
+                <p className="text-xs text-gray-500 leading-normal">
+                  Hide your personal identity from city officials, field workers, and the public map.
+                </p>
+              </label>
             </div>
 
             {/* Image Preview */}

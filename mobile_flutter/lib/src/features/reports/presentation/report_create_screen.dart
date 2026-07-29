@@ -977,15 +977,33 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 minLines: 3,
                 maxLines: 5,
               ),
-              const SizedBox(height: AppSpacing.sm),
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isAnonymous
+                        ? AppColors.primary.withValues(alpha: 0.5)
+                        : AppColors.border,
+                  ),
                 ),
                 child: SwitchListTile(
-                  title: const Text("Submit anonymously"),
-                  subtitle: const Text("Hide your identity from public view"),
+                  secondary: Icon(
+                    _isAnonymous
+                        ? Icons.visibility_off_outlined
+                        : Icons.person_outline,
+                    color: _isAnonymous
+                        ? AppColors.primary
+                        : AppColors.mutedForeground,
+                  ),
+                  title: const Text(
+                    "Submit anonymously",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: const Text(
+                    "Your identity will be protected and hidden from city authorities and field workers.",
+                    style: TextStyle(fontSize: 12),
+                  ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.sm,
                   ),

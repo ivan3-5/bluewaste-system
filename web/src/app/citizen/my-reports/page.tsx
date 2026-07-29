@@ -12,7 +12,7 @@ import {
 } from "@/types";
 import { timeAgo } from "@/lib/utils";
 import Link from "next/link";
-import { X, ChevronLeft, ChevronRight, ImageIcon } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ImageIcon, EyeOff } from "lucide-react";
 
 interface LightboxState {
   images: string[];
@@ -298,6 +298,11 @@ export default function MyReportsPage() {
                       <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
                         {WASTE_CATEGORY_LABELS[report.category]}
                       </span>
+                      {report.isAnonymous && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10">
+                          <EyeOff className="h-3 w-3 text-slate-500" /> Anonymous
+                        </span>
+                      )}
                       <span className="text-xs font-medium text-gray-400 flex items-center gap-1">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         {timeAgo(report.createdAt)}

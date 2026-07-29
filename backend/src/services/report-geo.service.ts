@@ -1,5 +1,5 @@
 import prisma from "../config/database";
-import { ReportStatus, WasteCategory, Prisma } from "@prisma/client";
+import { ReportStatus, WasteCategory, Severity, Prisma } from "@prisma/client";
 import { GeoCache } from "../utils/geo-cache";
 import { ReportSpamService } from "./report-spam.service";
 
@@ -8,6 +8,7 @@ export type ReportMapData = {
   title: string;
   category: WasteCategory;
   status: ReportStatus;
+  severity?: Severity | null;
   latitude: number;
   longitude: number;
   address: string | null;
@@ -56,6 +57,7 @@ export class ReportGeoService {
           title: true,
           category: true,
           status: true,
+          severity: true,
           latitude: true,
           longitude: true,
           address: true,

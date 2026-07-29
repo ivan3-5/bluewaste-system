@@ -26,6 +26,7 @@ interface WasteMapProps {
   center?: [number, number];
   zoom?: number;
   showHeatmap?: boolean;
+  autoFit?: boolean;
   onReportClick?: (report: MapReport) => void;
   onMapReady?: (map: L.Map | null) => void;
   canDraw?: boolean;
@@ -37,14 +38,30 @@ interface WasteMapProps {
     maxLng: number;
   }) => void;
   showBarangayBoundaries?: boolean;
-  // Barangay boundaries removed; geojson no longer required
   reportingZones?: ReportingZone[];
   canDrawZone?: boolean;
   drawZoneMode?: boolean;
   onDrawZone?: (points: ZonePoint[]) => void;
 }
 
-const DEFAULT_CENTER: [number, number] = [7.3132, 125.6844];
+const DEFAULT_CENTER: [number, number] = [7.3056, 125.6839];
+
+function parseCoordinate(val: any): number | null {
+  if (val === null || val === undefined) return null;
+  const num = typeof val === "number" ? val : parseFloat(String(val));
+  if (Number.isNaN(num)) return null;
+  return num;
+}
+
+function isValidCoordinate(lat?: any, lng?: any): boolean {
+  const parsedLat = parseCoordinate(lat);
+  const parsedLng = parseCoordinate(lng);
+  if (parsedLat === null || parsedLng === null) return false;
+  if (parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180)
+    return false;
+  if (parsedLat === 0 && parsedLng === 0) return false;
+  return true;
+}
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -57,16 +74,17 @@ function timeAgo(dateStr: string): string {
 
 function createMarkerIcon(category: string, status: string) {
   const color =
-    (WASTE_CATEGORY_COLORS as Record<string, string>)[category] || "#6b7280";
+    (WASTE_CATEGORY_COLORS as Record<string, string>)[category] || "#3b82f6";
   const statusColor =
-    (STATUS_COLORS as Record<string, string>)[status] || "#6b7280";
-  const size = 15;
+    (STATUS_COLORS as Record<string, string>)[status] || "#3b82f6";
+  const size = 16;
 
   return L.divIcon({
-    html: `<div class="waste-marker waste-marker--pulse" style="--mc:${color};width:${size + 8}px;height:${size + 8}px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><div style="width:${Math.max(4, Math.round(size * 0.38))}px;height:${Math.max(4, Math.round(size * 0.38))}px;background:${statusColor};border-radius:50%;border:1.5px solid rgba(255,255,255,0.8);"></div></div>`,
-    className: "",
+    html: `<div class="waste-marker waste-marker--pulse" style="--mc:${color};width:${size + 8}px;height:${size + 8}px;background:${color};border:3px solid #ffffff;border-radius:50%;box-shadow:0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;cursor:pointer;"><div style="width:${Math.max(5, Math.round(size * 0.4))}px;height:${Math.max(5, Math.round(size * 0.4))}px;background:${statusColor};border-radius:50%;border:1.5px solid rgba(255,255,255,0.9);"></div></div>`,
+    className: "custom-waste-marker-icon",
     iconSize: [size + 8, size + 8],
     iconAnchor: [(size + 8) / 2, (size + 8) / 2],
+    popupAnchor: [0, -((size + 8) / 2)],
   });
 }
 
@@ -75,6 +93,7 @@ export default function WasteMap({
   center = DEFAULT_CENTER,
   zoom = 13,
   showHeatmap = false,
+  autoFit = false,
   onReportClick,
   onMapReady,
   canDraw = false,
@@ -147,7 +166,7 @@ export default function WasteMap({
         btn.title = "Recenter on Panabo City";
         L.DomEvent.on(btn, "click", (e) => {
           L.DomEvent.stopPropagation(e);
-          map.setView(centerRef.current, 13, { animate: false });
+          map.setView(centerRef.current, 13.5, { animate: true });
         });
         return btn;
       },
@@ -266,38 +285,28 @@ export default function WasteMap({
       boundaryLayerRef.current = null;
     }
     boundaryBoundsRef.current = null;
-
-    // Barangay boundary layer removed — skip
     return;
   }, [showBarangayBoundaries]);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !autoFit) return;
     const map = mapRef.current;
 
-    let combinedBounds: L.LatLngBounds | null = null;
+    const validCoords: [number, number][] = reports
+      .filter((r) => isValidCoordinate(r.latitude, r.longitude))
+      .map((r) => [r.latitude, r.longitude] as [number, number]);
 
-    // Build a flat list of coordinates from reports only, ignoring zones for bounds
-    const allCoords: [number, number][] = [];
-    if (reports.length > 0) {
-      allCoords.push(
-        ...reports.map((r) => [r.latitude, r.longitude] as [number, number]),
-      );
+    if (validCoords.length > 0) {
+      const bounds = L.latLngBounds(validCoords);
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, {
+          padding: [60, 60],
+          maxZoom: 15,
+          animate: false,
+        });
+      }
     }
-
-    if (allCoords.length > 0) {
-      const bounds = L.latLngBounds(allCoords);
-      combinedBounds = bounds;
-    }
-
-    if (combinedBounds?.isValid()) {
-      map.fitBounds(combinedBounds, {
-        padding: [60, 60],
-        maxZoom: 15,
-        animate: false,
-      });
-    }
-  }, [reports, showBarangayBoundaries, reportingZones]);
+  }, [reports, autoFit]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -406,96 +415,139 @@ export default function WasteMap({
 
   useEffect(() => {
     if (!mapRef.current) return;
-    const map = mapRef.current;
-
     zoneLayersRef.current.forEach((l) => l.remove());
     zoneLayersRef.current = [];
-
-    // Hide reporting zones for now per requirements
-    // reportingZones
-    //   .filter((z) => z.isActive)
-    //   .forEach((zone) => {
-    //     const latlngs = zone.coordinates.map(
-    //       (p) => [p.lat, p.lng] as [number, number],
-    //     );
-    //     const polygon = L.polygon(latlngs, {
-    //       color: "#2563eb",
-    //       weight: 2,
-    //       fillColor: "#3b82f6",
-    //       fillOpacity: 0.15,
-    //       dashArray: undefined,
-    //     });
-    //     polygon.bindTooltip(zone.name, {
-    //       permanent: false,
-    //       direction: "center",
-    //       className: "waste-marker-tooltip",
-    //     });
-    //     polygon.addTo(map);
-    //     zoneLayersRef.current.push(polygon);
-    //   });
   }, [reportingZones]);
 
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
 
+    // Clean up existing markers
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    if (!markerClusterGroupRef.current) {
-      markerClusterGroupRef.current = L.layerGroup();
-      map.addLayer(markerClusterGroupRef.current);
+    // Remove existing cluster group if any
+    if (markerClusterGroupRef.current) {
+      try {
+        map.removeLayer(markerClusterGroupRef.current);
+      } catch (e) {
+        // ignore
+      }
+      markerClusterGroupRef.current = null;
     }
 
-    const clusterGroup = markerClusterGroupRef.current;
-    clusterGroup.clearLayers();
+    // Create marker cluster group or layer group
+    let clusterGroup: L.LayerGroup;
+    if (typeof (L as any).markerClusterGroup === "function") {
+      clusterGroup = (L as any).markerClusterGroup({
+        chunkedLoading: true,
+        maxClusterRadius: 40,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true,
+        disableClusteringAtZoom: 16,
+      });
+    } else {
+      clusterGroup = L.featureGroup();
+    }
 
-    const newMarkers: L.Marker[] = [];
+    markerClusterGroupRef.current = clusterGroup;
+    map.addLayer(clusterGroup);
+
+    const validCoords: [number, number][] = [];
 
     reports.forEach((report) => {
-      const marker = L.marker([report.latitude, report.longitude], {
+      const lat = parseCoordinate(report.latitude);
+      const lng = parseCoordinate(report.longitude);
+
+      if (lat === null || lng === null || !isValidCoordinate(lat, lng)) {
+        return;
+      }
+
+      validCoords.push([lat, lng]);
+
+      const marker = L.marker([lat, lng], {
         icon: createMarkerIcon(report.category, report.status),
       });
 
       const catColor =
         (WASTE_CATEGORY_COLORS as Record<string, string>)[report.category] ||
-        "#6b7280";
+        "#3b82f6";
       const statusColor =
-        (STATUS_COLORS as Record<string, string>)[report.status] || "#6b7280";
-      const imgHtml = report.images?.[0]
-        ? `<img src="${report.images[0].imageUrl}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:8px;" loading="lazy" />`
+        (STATUS_COLORS as Record<string, string>)[report.status] || "#3b82f6";
+      const catLabel =
+        (WASTE_CATEGORY_LABELS as Record<string, string>)[report.category] ||
+        report.category;
+      const statusLabel =
+        (REPORT_STATUS_LABELS as Record<string, string>)[report.status] ||
+        report.status;
+
+      const severity = report.severity;
+      const severityColors: Record<string, { bg: string; color: string }> = {
+        CRITICAL: { bg: "#fef2f2", color: "#dc2626" },
+        HIGH: { bg: "#fff7ed", color: "#ea580c" },
+        MODERATE: { bg: "#fefce8", color: "#ca8a04" },
+        SPAM: { bg: "#f3f4f6", color: "#6b7280" },
+      };
+      const sevBadge = severity
+        ? `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${
+            severityColors[severity]?.bg || "#f3f4f6"
+          };color:${
+            severityColors[severity]?.color || "#4b5563"
+          };border:1px solid ${
+            severityColors[severity]?.color || "#9ca3af"
+          }40;">⚡ ${severity}</span>`
         : "";
 
-      const safeTitle = report.title.replace(/</g, "<");
-      const safeAddress = report.address?.replace(/</g, "<") || "";
+      const imgHtml = report.images?.[0]?.imageUrl
+        ? `<img src="${report.images[0].imageUrl}" alt="${report.title}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;margin-bottom:8px;" loading="lazy" />`
+        : `<div style="width:100%;height:70px;background:#f3f4f6;border-radius:8px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:11px;font-weight:500;">No photo available</div>`;
+
+      const safeTitle = report.title.replace(/</g, "&lt;");
+      const safeAddress = report.address?.replace(/</g, "&lt;") || "";
+      const dateStr = new Date(report.createdAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+
       const popupContent = `
         <div class="waste-popup">
           <div class="waste-popup-header" style="background:${catColor};">
-            <span class="waste-popup-cat">${(WASTE_CATEGORY_LABELS as Record<string, string>)[report.category]}</span>
+            <span class="waste-popup-cat">${catLabel}</span>
           </div>
-          <div class="waste-popup-body">
+          <div class="waste-popup-body" style="padding:12px;">
             ${imgHtml}
             <h3 class="waste-popup-title">${safeTitle}</h3>
-            <div class="waste-popup-meta">
-              <span class="waste-popup-status" style="background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor}44;">${(REPORT_STATUS_LABELS as Record<string, string>)[report.status]}</span>
-              <span class="waste-popup-time">${timeAgo(report.createdAt)}</span>
+            <div class="waste-popup-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+              <span class="waste-popup-status" style="background:${statusColor}18;color:${statusColor};border:1px solid ${statusColor}44;">${statusLabel}</span>
+              ${sevBadge}
+              <span class="waste-popup-time" style="font-size:10px;color:#6b7280;margin-left:auto;">📅 ${dateStr}</span>
             </div>
-            ${report.address ? `<p class="waste-popup-addr">${safeAddress}</p>` : ""}
+            ${
+              safeAddress
+                ? `<p class="waste-popup-addr" style="font-size:11px;color:#4b5563;margin-bottom:10px;">📍 ${safeAddress}</p>`
+                : `<p class="waste-popup-addr" style="font-size:11px;color:#6b7280;margin-bottom:10px;">📍 ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>`
+            }
+            <button type="button" class="waste-popup-btn" data-report-id="${report.id}" style="width:100%;padding:7px 12px;background:#2563eb;color:#ffffff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s ease;display:flex;align-items:center;justify-content:center;gap:4px;">
+              View Details &rarr;
+            </button>
           </div>
         </div>`;
 
       marker.bindPopup(popupContent, {
-        maxWidth: 240,
-        minWidth: 200,
+        maxWidth: 260,
+        minWidth: 220,
         className: "waste-popup-wrapper",
       });
 
       const tooltipContent = `
         <div style="font-size:12px;line-height:1.4;">
           <strong style="display:block;margin-bottom:3px;color:#1f2937;">${safeTitle}</strong>
-          <span style="font-size:10px;color:#6b7280;">${(WASTE_CATEGORY_LABELS as Record<string, string>)[report.category]}</span>
+          <span style="font-size:10px;color:#6b7280;">${catLabel}</span>
           <span style="margin:0 5px;color:#d1d5db;">·</span>
-          <span style="font-size:10px;color:${statusColor};font-weight:600;">${(REPORT_STATUS_LABELS as Record<string, string>)[report.status]}</span>
+          <span style="font-size:10px;color:${statusColor};font-weight:600;">${statusLabel}</span>
         </div>`;
       marker.bindTooltip(tooltipContent, {
         direction: "top",
@@ -504,15 +556,43 @@ export default function WasteMap({
         className: "waste-marker-tooltip",
       });
 
+      marker.on("popupopen", (e: any) => {
+        const popupEl = e.popup?.getElement();
+        if (!popupEl) return;
+        const btn = popupEl.querySelector(".waste-popup-btn");
+        if (btn) {
+          btn.addEventListener("click", (evt: Event) => {
+            evt.preventDefault();
+            if (onReportClick) {
+              onReportClick(report);
+            }
+          });
+        }
+      });
+
       if (onReportClick) {
         marker.on("click", () => onReportClick(report));
       }
 
-      newMarkers.push(marker);
+      clusterGroup.addLayer(marker);
       markersRef.current.push(marker);
     });
 
-    newMarkers.forEach((m) => clusterGroup.addLayer(m));
+    // Ensure all report markers are centered and displayed within the current viewport
+    if (validCoords.length > 0) {
+      const bounds = L.latLngBounds(validCoords);
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, {
+          padding: [50, 50],
+          maxZoom: 15,
+          animate: false,
+        });
+      }
+    } else {
+      map.setView(centerRef.current, zoomRef.current, { animate: false });
+    }
+
+    map.invalidateSize({ pan: false });
   }, [reports, onReportClick]);
 
   useEffect(() => {
@@ -526,7 +606,10 @@ export default function WasteMap({
 
     if (!showHeatmap || reports.length === 0) return;
 
-    const heatData: [number, number, number][] = reports.map((r) => [
+    const validReports = reports.filter((r) =>
+      isValidCoordinate(r.latitude, r.longitude),
+    );
+    const heatData: [number, number, number][] = validReports.map((r) => [
       r.latitude,
       r.longitude,
       0.5,
@@ -554,3 +637,4 @@ export default function WasteMap({
 
   return <div ref={containerRef} className="h-full w-full" />;
 }
+

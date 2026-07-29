@@ -197,6 +197,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   child: PremiumTextField(
                                     controller: _emailController,
                                     labelText: "Email address",
+                                    hintText: "Enter your email",
                                     prefixIcon: Icons.email_rounded,
                                     keyboardType: TextInputType.emailAddress,
                                     textInputAction: TextInputAction.next,
@@ -208,6 +209,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   child: PremiumTextField(
                                     controller: _passwordController,
                                     labelText: "Password",
+                                    hintText: "Enter your password",
                                     prefixIcon: Icons.lock_rounded,
                                     obscureText: _obscurePassword,
                                     onSubmitted: (_) => _handleLogin(),

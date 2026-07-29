@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Camera,
   CheckCircle2,
+  EyeOff,
   ImagePlus,
   Loader2,
   MapPin,
@@ -306,6 +307,7 @@ export default function SubmitReportPage() {
     "",
   );
   const [description, setDescription] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
@@ -663,6 +665,7 @@ export default function SubmitReportPage() {
         category: selectedCategory,
         latitude: location.lat,
         longitude: location.lng,
+        isAnonymous: isAnonymous,
         // Analysis data from the client-side YOLO /analyze pipeline
         severity: severityToSave,
         analysisStatus: analysisResult?.status ?? null,
@@ -1142,6 +1145,37 @@ export default function SubmitReportPage() {
                       rows={3}
                       className="resize-none text-sm"
                     />
+                  </div>
+
+                  {/* Submit anonymously option */}
+                  <div
+                    className={`flex items-start gap-3 rounded-xl border p-3.5 transition-all ${
+                      isAnonymous
+                        ? "border-emerald-200 bg-emerald-50/60 text-emerald-950 shadow-sm"
+                        : "border-gray-200 bg-gray-50/50 text-gray-800"
+                    }`}
+                  >
+                    <div className="pt-0.5">
+                      <input
+                        type="checkbox"
+                        id="submit-anonymously"
+                        checked={isAnonymous}
+                        onChange={(event) => setIsAnonymous(event.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                    </div>
+                    <label
+                      htmlFor="submit-anonymously"
+                      className="flex flex-1 cursor-pointer flex-col gap-0.5 select-none"
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-900">
+                        <EyeOff className={`h-4 w-4 ${isAnonymous ? "text-emerald-600" : "text-gray-500"}`} />
+                        <span>Submit anonymously</span>
+                      </div>
+                      <p className="text-xs text-gray-500 leading-normal">
+                        Hide your personal identity from city officials, field workers, and the public map.
+                      </p>
+                    </label>
                   </div>
 
                   {(fileError || submitError) && (

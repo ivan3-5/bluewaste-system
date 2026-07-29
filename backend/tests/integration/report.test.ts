@@ -111,3 +111,43 @@ describe('Report Integration Tests', () => {
     })
   })
 })
+
+describe('Anonymous Report Privacy Tests', () => {
+  let sanitizeReportForPrivacy: any
+
+  beforeEach(async () => {
+    const actual = await vi.importActual<any>('../../src/services/report-crud.service')
+    sanitizeReportForPrivacy = actual.sanitizeReportForPrivacy
+  })
+
+  it('should return unchanged report if isAnonymous is false', () => {
+    const report = { isAnonymous: false, reporterId: 'user-1', reporter: { firstName: 'John' } }
+    expect(sanitizeReportForPrivacy(report as any, 'other-user')).toEqual(report)
+  })
+
+  it('should mask reporter details for anonymous report when viewer is not reporter', () => {
+    const report = {
+      isAnonymous: true,
+      reporterId: 'user-1',
+      reporter: { id: 'user-1', firstName: 'John', lastName: 'Doe', email: 'john@example.com' },
+      statusHistory: [
+        { changedById: 'user-1', changedBy: { id: 'user-1', firstName: 'John', lastName: 'Doe' }, notes: 'Report submitted' }
+      ]
+    }
+    const sanitized = sanitizeReportForPrivacy(report as any, 'admin-123')
+    expect(sanitized.reporter.firstName).toBe('Anonymous')
+    expect(sanitized.reporter.lastName).toBe('Citizen')
+    expect(sanitized.reporter.email).toBeNull()
+    expect(sanitized.statusHistory[0].changedBy.firstName).toBe('Anonymous')
+  })
+
+  it('should retain reporter details when viewer is the reporter', () => {
+    const report = {
+      isAnonymous: true,
+      reporterId: 'user-1',
+      reporter: { id: 'user-1', firstName: 'John', lastName: 'Doe' }
+    }
+    const sanitized = sanitizeReportForPrivacy(report as any, 'user-1')
+    expect(sanitized.reporter.firstName).toBe('John')
+  })
+})

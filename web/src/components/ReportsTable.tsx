@@ -17,6 +17,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/providers/AuthProvider";
 import { useAssignWorker } from "@/hooks/useReports";
 import { useUsers } from "@/hooks/useUsers";
+import { EyeOff } from "lucide-react";
 
 type ReportsTableProps = {
   reports: AdminReport[];
@@ -268,12 +269,25 @@ export function ReportsTable({
                     <SeverityBadge severity={report.severity} showFallback />
                   </td>
                   <td className="px-4 py-3">
-                    <p className="max-w-[240px] truncate text-sm font-semibold text-slate-900">
-                      {report.reporterName || "Anonymous"}
-                    </p>
-                    <p className="max-w-[240px] truncate text-xs text-slate-500">
-                      {report.reporterEmail || "No email available."}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="max-w-[240px] truncate text-sm font-semibold text-slate-900">
+                        {report.reporterName || "Anonymous Citizen"}
+                      </p>
+                      {(report.reporterName === "Anonymous Citizen" || report.reporterName === "Anonymous" || !report.reporterEmail) && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                          <EyeOff className="h-3 w-3" /> Anonymous
+                        </span>
+                      )}
+                    </div>
+                    {report.reporterEmail ? (
+                      <p className="max-w-[240px] truncate text-xs text-slate-500">
+                        {report.reporterEmail}
+                      </p>
+                    ) : (
+                      <p className="max-w-[240px] truncate text-xs text-slate-400 italic">
+                        Identity hidden
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-900">
                     {isLGUAdmin ? (

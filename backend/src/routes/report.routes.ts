@@ -29,10 +29,10 @@ router.get(
   ReportController.getHeatmapData,
 );
 
-// Authenticated routes
+// Public / optional auth report creation routes
 router.post(
   "/",
-  authenticate,
+  optionalAuth,
   validate(createReportSchema),
   ReportController.create,
 );
@@ -76,7 +76,7 @@ router.put(
 // Image upload
 router.post(
   "/:id/images",
-  authenticate,
+  optionalAuth,
   upload.array("images", 5),
   validateUploadedImages,
   ReportController.addImages,
