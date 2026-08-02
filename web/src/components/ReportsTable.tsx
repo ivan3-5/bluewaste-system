@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import {
   ADMIN_REPORT_CATEGORY_LABELS,
@@ -17,7 +17,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/providers/AuthProvider";
 import { useAssignWorker } from "@/hooks/useReports";
 import { useUsers } from "@/hooks/useUsers";
-import { EyeOff } from "lucide-react";
+import { EyeOff, ChevronDown, Check, UserPlus, X } from "lucide-react";
 
 type ReportsTableProps = {
   reports: AdminReport[];
@@ -290,68 +290,11 @@ export function ReportsTable({
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-900">
-                    {isLGUAdmin ? (
-                      <div className="space-y-2">
-                        {/* If schedule workers exist, show them as read-only pills */}
-                        {report.assignedWorkerNames ? (
-                          <div className="flex flex-wrap gap-1">
-                            {report.assignedWorkerNames.split(", ").map((name, i) => (
-                              <span
-                                key={i}
-                                className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800"
-                              >
-                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
-                                  {name.trim().charAt(0)}
-                                </span>
-                                {name.trim()}
-                              </span>
-                            ))}
-                          </div>
-                        ) : report.assignedToName ? (
-                          /* Directly assigned (not via schedule) — show single pill */
-                          <div className="flex flex-wrap gap-1">
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
-                              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
-                                {report.assignedToName.trim().charAt(0)}
-                              </span>
-                              {report.assignedToName.trim()}
-                            </span>
-                          </div>
-                        ) : (
-                          /* No assignment yet — show dropdown to assign manually */
-                          <select
-                            value={assignmentDrafts[report.id] ?? ""}
-                            onChange={(event) => {
-                              const nextAssignedToId = event.target.value;
-                              if (!nextAssignedToId) return;
-                              setAssignmentDrafts((current) => ({
-                                ...current,
-                                [report.id]: nextAssignedToId,
-                              }));
-                              void handleAssignWorker(report.id, nextAssignedToId);
-                            }}
-                            aria-label={`Assign field worker for report ${report.id}`}
-                            disabled={savingReportId === report.id}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            <option value="">Unassigned</option>
-                            {workers.map((worker) => (
-                              <option key={worker.id} value={worker.id}>
-                                {worker.firstName} {worker.lastName}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        {savingReportId === report.id && (
-                          <p className="text-xs text-primary animate-pulse">
-                            Saving assignment…
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      // Non-admin view
-                      report.assignedWorkerNames ?? report.assignedToName ?? "Unassigned"
-                    )}
+                    <ReportAssignmentCell
+                      report={report}
+                      workers={workers}
+                      isLGUAdmin={isLGUAdmin}
+                    />
                   </td>
                   <td className="px-4 py-3">
                     {isLGUAdmin ? (
@@ -420,3 +363,217 @@ export function ReportsTable({
     </div>
   );
 }
+
+function ReportAssignmentCell({
+  report,
+  workers,
+  isLGUAdmin,
+}: {
+  report: AdminReport;
+  workers: Array<{ id: string; firstName: string; lastName: string; email?: string }>;
+  isLGUAdmin: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const assignWorker = useAssignWorker();
+  const router = useRouter();
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [open]);
+
+  // Derived current assigned workers
+  const currentWorkers = useMemo(() => {
+    if (report.assignedWorkers && report.assignedWorkers.length > 0) {
+      return report.assignedWorkers.map((w) => ({
+        id: w.id,
+        name: `${w.firstName} ${w.lastName}`.trim(),
+      }));
+    }
+    if (report.assignedWorkerNames) {
+      return report.assignedWorkerNames.split(", ").map((name) => {
+        const found = workers.find(
+          (wk) => `${wk.firstName} ${wk.lastName}`.trim().toLowerCase() === name.trim().toLowerCase()
+        );
+        return {
+          id: found ? found.id : name,
+          name: name.trim(),
+        };
+      });
+    }
+    if (report.assignedToId && report.assignedToName) {
+      return [{ id: report.assignedToId, name: report.assignedToName.trim() }];
+    }
+    return [];
+  }, [report.assignedWorkers, report.assignedWorkerNames, report.assignedToId, report.assignedToName, workers]);
+
+  const assignedWorkerIds = useMemo(() => {
+    return currentWorkers
+      .map((w) => w.id)
+      .filter((id) => workers.some((wk) => wk.id === id));
+  }, [currentWorkers, workers]);
+
+  const handleToggleWorker = async (workerId: string) => {
+    const nextIds = assignedWorkerIds.includes(workerId)
+      ? assignedWorkerIds.filter((id) => id !== workerId)
+      : [...assignedWorkerIds, workerId];
+
+    setSaving(true);
+    try {
+      await assignWorker.mutateAsync({ reportId: report.id, workerIds: nextIds });
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to update worker assignment:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveWorker = async (workerId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextIds = assignedWorkerIds.filter((id) => id !== workerId);
+    setSaving(true);
+    try {
+      await assignWorker.mutateAsync({ reportId: report.id, workerIds: nextIds });
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to remove worker assignment:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isLGUAdmin) {
+    if (currentWorkers.length > 0) {
+      return (
+        <div className="flex flex-wrap gap-1">
+          {currentWorkers.map((w, i) => (
+            <span
+              key={w.id || i}
+              className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800"
+            >
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
+                {w.name.charAt(0)}
+              </span>
+              {w.name}
+            </span>
+          ))}
+        </div>
+      );
+    }
+    return <span className="text-sm text-slate-500">Unassigned</span>;
+  }
+
+  return (
+    <div className="relative space-y-1" ref={dropdownRef}>
+      <div className="flex flex-wrap items-center gap-1 min-w-[140px]">
+        {currentWorkers.map((w, i) => {
+          const isRemovable = workers.some((wk) => wk.id === w.id);
+          return (
+            <span
+              key={w.id || i}
+              className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-semibold text-blue-800"
+            >
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
+                {w.name.charAt(0)}
+              </span>
+              <span>{w.name}</span>
+              {isRemovable && (
+                <button
+                  type="button"
+                  onClick={(e) => handleRemoveWorker(w.id, e)}
+                  disabled={saving}
+                  className="ml-0.5 rounded-full p-0.5 text-blue-500 hover:bg-blue-200 hover:text-blue-900 transition disabled:opacity-50"
+                  title={`Remove ${w.name}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </span>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          disabled={saving}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-sm disabled:opacity-50"
+          title="Assign field workers"
+        >
+          <UserPlus className="h-3.5 w-3.5 text-blue-600" />
+          {currentWorkers.length === 0 ? "Unassigned" : "+ Add"}
+          <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      {saving && (
+        <p className="text-[11px] font-medium text-blue-600 animate-pulse">
+          Saving...
+        </p>
+      )}
+
+      {open && (
+        <div className="absolute left-0 z-30 mt-1 w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100">
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 mb-1.5 px-1">
+            <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+              Select Workers
+            </span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="text-slate-400 hover:text-slate-600 text-xs font-semibold hover:underline"
+            >
+              Done
+            </button>
+          </div>
+
+          <div className="max-h-48 overflow-y-auto space-y-0.5">
+            {workers.length === 0 ? (
+              <p className="p-2 text-xs text-slate-400">No field workers available</p>
+            ) : (
+              workers.map((worker) => {
+                const isSelected = assignedWorkerIds.includes(worker.id);
+                return (
+                  <label
+                    key={worker.id}
+                    className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-xs font-medium cursor-pointer transition select-none ${
+                      isSelected
+                        ? "bg-blue-50 text-blue-900 font-semibold"
+                        : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleWorker(worker.id)}
+                        disabled={saving}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                      />
+                      <span>
+                        {worker.firstName} {worker.lastName}
+                      </span>
+                    </div>
+                    {isSelected && <Check className="h-3.5 w-3.5 text-blue-600" />}
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+

@@ -317,7 +317,7 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
                               ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
-                              "Description",
+                              "Analysis Details",
                               style: Theme.of(context)
                                   .textTheme
                                   .titleSmall
@@ -332,9 +332,7 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                report.description.trim().isEmpty
-                                    ? "No description provided."
-                                    : report.description,
+                                report.displayDescription,
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ),

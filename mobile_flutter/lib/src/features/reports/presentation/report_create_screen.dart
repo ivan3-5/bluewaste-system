@@ -390,9 +390,12 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       final categoryLabel = wasteCategoryLabels[effectiveCategory] ??
           (effectiveCategory == "with_waste" ? "With Waste" : "No Waste");
       final title = "Waste report - $categoryLabel";
+      final aiAnalysisReason = _detectResult?.reason ?? _detectResult?.message;
       final description = rawDescription.isNotEmpty
           ? rawDescription
-          : "Waste report submitted via mobile capture. Category: $categoryLabel.";
+          : (aiAnalysisReason != null && aiAnalysisReason.trim().isNotEmpty
+              ? aiAnalysisReason
+              : "Waste report submitted via mobile capture. Category: $categoryLabel.");
 
       final report = await reportService.submitFullReport(
         data: {

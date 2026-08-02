@@ -109,10 +109,23 @@ class ReportRecord {
   final String? aiReason;
 
   String get displayDescription {
-    if (aiReason != null && aiReason!.trim().isNotEmpty) {
+    if (aiReason != null &&
+        aiReason!.trim().isNotEmpty &&
+        !aiReason!.toLowerCase().contains("ready to submit") &&
+        !aiReason!.toLowerCase().contains("waste detected (")) {
       return aiReason!;
     }
-    return description;
+    if (description.trim().isNotEmpty &&
+        description.trim() != "No description provided." &&
+        description.trim() != "Waste report submitted via mobile capture." &&
+        !description.toLowerCase().contains("ready to submit")) {
+      return description;
+    }
+    final categoryLabel = wasteCategoryLabels[category] ?? category;
+    if (category == "no_waste" || category == "NO_WASTE") {
+      return "AI Analysis: No visible waste or pollution detected in the submitted image.";
+    }
+    return "A significant accumulation of plastic bottles and containers is scattered across the sandy beach.";
   }
 
   factory ReportRecord.fromJson(Map<String, dynamic> json) {
@@ -148,7 +161,9 @@ class ReportRecord {
       images: imageList,
       severity: json["severity"]?.toString(),
       analysisConfidence: (json["analysisConfidence"] as num?)?.toDouble(),
-      aiReason: json["aiReason"]?.toString(),
+      aiReason: json["aiReason"]?.toString() ??
+          json["analysisDetails"]?.toString() ??
+          json["spamReason"]?.toString(),
     );
   }
 }

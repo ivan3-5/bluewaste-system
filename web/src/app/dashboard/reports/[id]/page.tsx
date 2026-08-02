@@ -5,7 +5,7 @@ import MapView from "@/components/MapView";
 import { ReportStatusUpdater } from "@/components/ReportStatusUpdater";
 import Link from "next/link";
 import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
-import { getReverseGeocodedLocation } from "@/lib/utils";
+import { getReverseGeocodedLocation, formatAnalysisDetails } from "@/lib/utils";
 import { AiAnalysisPanel } from "@/components/AiAnalysisPanel";
 import Image from "next/image";
 
@@ -222,10 +222,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
               </div>
               <div className="rounded-xl bg-slate-50 p-3">
                 <dt className="text-xs uppercase tracking-wide text-slate-500">
-                  Description
+                  Analysis Details
                 </dt>
                 <dd className="mt-1 text-sm leading-relaxed text-slate-700">
-                  {report.description || "No description provided."}
+                  {formatAnalysisDetails(report.aiCategories, report.aiReason || report.description)}
                 </dd>
               </div>
             </dl>

@@ -233,6 +233,13 @@ exports.Prisma.CleanupScheduleWorkerScalarFieldEnum = {
   workerId: 'workerId'
 };
 
+exports.Prisma.ReportWorkerScalarFieldEnum = {
+  id: 'id',
+  assignedAt: 'assignedAt',
+  reportId: 'reportId',
+  workerId: 'workerId'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -317,7 +324,8 @@ exports.Prisma.ModelName = {
   Notification: 'Notification',
   ReportingZone: 'ReportingZone',
   CleanupSchedule: 'CleanupSchedule',
-  CleanupScheduleWorker: 'CleanupScheduleWorker'
+  CleanupScheduleWorker: 'CleanupScheduleWorker',
+  ReportWorker: 'ReportWorker'
 };
 
 /**

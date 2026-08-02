@@ -4,6 +4,7 @@
  */
 
 import { Brain, Clock, Zap, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { formatAnalysisDetails } from "@/lib/utils";
 
 type AiSeverity = "Low" | "Medium" | "High" | "Critical" | "None";
 type DbSeverity = "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
@@ -207,14 +208,14 @@ export function AiAnalysisPanel({
         </div>
 
         {/* AI Reason */}
-        {aiReason && (
-          <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-            <dt className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Analysis Details
-            </dt>
-            <dd className="text-sm leading-relaxed text-slate-700">{aiReason}</dd>
-          </div>
-        )}
+        <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+          <dt className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Analysis Details
+          </dt>
+          <dd className="text-sm leading-relaxed text-slate-700">
+            {formatAnalysisDetails(categories, aiReason)}
+          </dd>
+        </div>
 
         {/* Meta: model + timing */}
         <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">

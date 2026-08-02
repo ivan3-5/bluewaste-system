@@ -90,6 +90,7 @@ model User {
 
   reports              Report[]                @relation("ReporterReports")
   assignedReports      Report[]                @relation("AssignedReports")
+  assignedReportWorkers ReportWorker[]         @relation("AssignedReportWorkers")
   statusChanges        StatusHistory[]
   notifications        Notification[]
   reportingZones       ReportingZone[]
@@ -138,6 +139,8 @@ model Report {
 
   assignedToId String?
   assignedTo   User?   @relation("AssignedReports", fields: [assignedToId], references: [id])
+
+  assignedWorkers ReportWorker[]
 
   cleanupScheduleId String?
   cleanupSchedule   CleanupSchedule? @relation(fields: [cleanupScheduleId], references: [id], onDelete: SetNull)
@@ -268,4 +271,19 @@ model CleanupScheduleWorker {
 
   @@unique([scheduleId, workerId])
   @@index([workerId])
+}
+
+model ReportWorker {
+  id         String   @id @default(uuid())
+  assignedAt DateTime @default(now())
+
+  reportId String
+  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  workerId String
+  worker   User   @relation("AssignedReportWorkers", fields: [workerId], references: [id])
+
+  @@unique([reportId, workerId])
+  @@index([workerId])
+  @@index([reportId])
 }

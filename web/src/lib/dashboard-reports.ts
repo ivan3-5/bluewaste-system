@@ -38,6 +38,7 @@ type DashboardReportRow = {
   assignedToId?: string | null;
   assignedToName?: string | null;
   assignedWorkerNames?: string | null;
+  assignedWorkers?: Array<{ id: string; firstName: string; lastName: string; email?: string }> | null;
   // Gemini AI fields
   aiCategories?: string[] | null;
   aiReason?: string | null;
@@ -102,6 +103,10 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
   const primaryImage =
     images.find((image) => image.type === "REPORT") ?? images[0] ?? null;
 
+  const assignedWorkers = Array.isArray(row.assignedWorkers)
+    ? row.assignedWorkers
+    : [];
+
   return {
     id: row.id,
     imageUrl: primaryImage?.imageUrl || row.imageUrl || PLACEHOLDER_IMAGE_URL,
@@ -121,6 +126,7 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
     assignedToId: row.assignedToId ?? null,
     assignedToName: row.assignedToName ?? null,
     assignedWorkerNames: row.assignedWorkerNames ?? null,
+    assignedWorkers,
     reportedAt: row.reportedAt,
     updatedAt: row.updatedAt,
     analyzedAt: row.analyzedAt ?? null,
@@ -161,7 +167,8 @@ export async function getDashboardReports(limit: number) {
       CASE WHEN r."isAnonymous" THEN NULL ELSE rep.email END AS "reporterEmail",
       r."assignedToId",
       COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
-      schedule_workers."assignedWorkerNames"
+      COALESCE(rep_workers."assignedWorkers", '[]'::json) AS "assignedWorkers",
+      COALESCE(rep_workers."reportWorkerNames", schedule_workers."assignedWorkerNames", u."firstName" || ' ' || u."lastName", null) AS "assignedWorkerNames"
     FROM "Report" r
     LEFT JOIN "User" rep ON rep.id = r."reporterId"
     LEFT JOIN "User" u ON u.id = r."assignedToId"
@@ -186,6 +193,25 @@ export async function getDashboardReports(limit: number) {
       FROM "ReportImage" ri
       WHERE ri."reportId" = r.id
     ) images ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        json_agg(
+          json_build_object(
+            'id', rw_u.id,
+            'firstName', rw_u."firstName",
+            'lastName', rw_u."lastName",
+            'email', rw_u.email
+          ) ORDER BY rw."assignedAt" ASC
+        ) AS "assignedWorkers",
+        string_agg(
+          rw_u."firstName" || ' ' || rw_u."lastName",
+          ', '
+          ORDER BY rw."assignedAt" ASC
+        ) AS "reportWorkerNames"
+      FROM "ReportWorker" rw
+      JOIN "User" rw_u ON rw_u.id = rw."workerId"
+      WHERE rw."reportId" = r.id
+    ) rep_workers ON TRUE
     LEFT JOIN LATERAL (
       SELECT string_agg(
         sw."firstName" || ' ' || sw."lastName",
@@ -235,7 +261,8 @@ export async function getDashboardReportById(id: string) {
       CASE WHEN r."isAnonymous" THEN NULL ELSE rep.email END AS "reporterEmail",
       r."assignedToId",
       COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
-      schedule_workers."assignedWorkerNames"
+      COALESCE(rep_workers."assignedWorkers", '[]'::json) AS "assignedWorkers",
+      COALESCE(rep_workers."reportWorkerNames", schedule_workers."assignedWorkerNames", u."firstName" || ' ' || u."lastName", null) AS "assignedWorkerNames"
     FROM "Report" r
     LEFT JOIN "User" rep ON rep.id = r."reporterId"
     LEFT JOIN "User" u ON u.id = r."assignedToId"
@@ -260,6 +287,25 @@ export async function getDashboardReportById(id: string) {
       FROM "ReportImage" ri
       WHERE ri."reportId" = r.id
     ) images ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        json_agg(
+          json_build_object(
+            'id', rw_u.id,
+            'firstName', rw_u."firstName",
+            'lastName', rw_u."lastName",
+            'email', rw_u.email
+          ) ORDER BY rw."assignedAt" ASC
+        ) AS "assignedWorkers",
+        string_agg(
+          rw_u."firstName" || ' ' || rw_u."lastName",
+          ', '
+          ORDER BY rw."assignedAt" ASC
+        ) AS "reportWorkerNames"
+      FROM "ReportWorker" rw
+      JOIN "User" rw_u ON rw_u.id = rw."workerId"
+      WHERE rw."reportId" = r.id
+    ) rep_workers ON TRUE
     LEFT JOIN LATERAL (
       SELECT string_agg(
         sw."firstName" || ' ' || sw."lastName",

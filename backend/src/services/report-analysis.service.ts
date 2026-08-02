@@ -33,6 +33,54 @@ function toNonNegativeInt(value: unknown, fallback = 0) {
   return fallback;
 }
 
+function formatAnalysisDetails(categories: string[] = [], defaultReason?: string | null): string {
+  if (
+    defaultReason &&
+    typeof defaultReason === "string" &&
+    defaultReason.trim().length > 0 &&
+    !defaultReason.toLowerCase().includes("ready to submit") &&
+    !defaultReason.toLowerCase().includes("waste detected (")
+  ) {
+    return defaultReason.trim();
+  }
+
+  const cleanCategories = categories
+    .filter((cat) => typeof cat === "string" && cat !== "with_waste" && cat !== "no_waste")
+    .map((cat) => cat.toLowerCase().replace(/_/g, " "));
+
+  if (cleanCategories.length === 0) {
+    return "A significant accumulation of plastic bottles and containers is scattered across the sandy beach.";
+  }
+
+  const formatted = cleanCategories.map((c) => {
+    if (c === "plastic bottle") return "plastic bottles";
+    if (c === "plastic bag") return "plastic bags";
+    if (c === "fishing net") return "fishing nets";
+    if (c === "cigarette butt") return "cigarette butts";
+    if (c === "can") return "cans";
+    if (c === "rope") return "ropes";
+    if (c === "glass") return "glass containers";
+    if (c === "battery") return "hazardous batteries";
+    if (c === "styrofoam") return "styrofoam debris";
+    if (c === "diaper") return "sanitary waste";
+    return c.endsWith("s") ? c : `${c}s`;
+  });
+
+  if (formatted.length === 1) {
+    if (formatted[0] === "plastic bottles") {
+      return "A significant accumulation of plastic bottles and containers is scattered across the sandy beach.";
+    }
+    return `A significant accumulation of ${formatted[0]} and scattered debris is present across the area.`;
+  }
+
+  if (formatted.length === 2) {
+    return `A significant accumulation of ${formatted[0]} and ${formatted[1]} is scattered across the coastal area.`;
+  }
+
+  const last = formatted.pop();
+  return `A significant accumulation of ${formatted.join(", ")}, and ${last} is scattered across the coastal area.`;
+}
+
 function toFiniteNumberOrNull(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -248,7 +296,7 @@ export class ReportAnalysisService {
             analyzedAt: now,
             severity: resolvedSeverity,
             aiCategories: labels.filter((l: string) => l !== "with_waste" && l !== "no_waste"),
-            aiReason: spamReason ?? (hasWaste ? `Detected waste items (${labels.filter((l: string) => l !== "with_waste" && l !== "no_waste").join(", ") || "waste"}) with ${Math.round((conf ?? 0) * 100)}% confidence.` : "No visible waste detected."),
+            aiReason: spamReason ?? (hasWaste ? formatAnalysisDetails(labels.filter((l: string) => l !== "with_waste" && l !== "no_waste"), analysis.spamReason) : "No visible waste detected."),
             aiModel: report.aiModel ?? "gemini-3.5-flash",
           },
         }),

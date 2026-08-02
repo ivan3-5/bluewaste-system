@@ -22,6 +22,7 @@ export interface AdminReport {
   assignedToId?: string | null;
   assignedToName?: string | null;
   assignedWorkerNames?: string | null;
+  assignedWorkers?: Array<{ id: string; firstName: string; lastName: string; email?: string }>;
   reportedAt: string | Date;
   updatedAt: string | Date;
   // Gemini Vision AI fields

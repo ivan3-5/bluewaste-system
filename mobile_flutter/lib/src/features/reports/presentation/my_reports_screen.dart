@@ -793,10 +793,7 @@ class _ReportDetailSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            (report.aiReason != null &&
-                                    report.aiReason!.trim().isNotEmpty)
-                                ? "ANALYSIS DETAILS"
-                                : "DESCRIPTION",
+                            "ANALYSIS DETAILS",
                             style: Theme.of(context)
                                 .textTheme
                                 .labelSmall

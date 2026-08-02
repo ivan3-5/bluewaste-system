@@ -67,10 +67,10 @@ export class ReportController {
 
   static async assignWorker(req: AuthRequest, res: Response) {
     try {
-      const { assignedToId } = req.body;
+      const { assignedToId, workerIds } = req.body;
       const report = await ReportCrudService.assignWorker(
         req.params.id,
-        assignedToId,
+        workerIds !== undefined ? workerIds : assignedToId,
         req.user!.id,
       );
       res.json(report);

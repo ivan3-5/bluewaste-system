@@ -45,11 +45,25 @@ export interface Report {
     email?: string;
     phone?: string;
   };
+  assignedWorkers?: ReportWorker[];
   images: ReportImage[];
   statusHistory?: StatusHistory[];
   _count?: { images: number; statusHistory?: number };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ReportWorker {
+  id: string;
+  workerId: string;
+  worker: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+    phone?: string;
+  };
+  assignedAt: string;
 }
 
 export type WasteType = "PLASTIC" | "ORGANIC" | "GLASS" | "METAL" | "PAPER";
@@ -130,6 +144,8 @@ export interface Notification {
 export interface MapReport {
   id: string;
   title: string;
+  description?: string;
+  aiReason?: string;
   category: WasteCategory;
   status: ReportStatus;
   severity?: WasteSeverity | null;
@@ -137,6 +153,7 @@ export interface MapReport {
   longitude: number;
   address?: string;
   createdAt: string;
+  updatedAt?: string;
   images: { imageUrl: string }[];
 }
 

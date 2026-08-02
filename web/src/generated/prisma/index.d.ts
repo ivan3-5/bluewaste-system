@@ -53,6 +53,11 @@ export type CleanupSchedule = $Result.DefaultSelection<Prisma.$CleanupSchedulePa
  * 
  */
 export type CleanupScheduleWorker = $Result.DefaultSelection<Prisma.$CleanupScheduleWorkerPayload>
+/**
+ * Model ReportWorker
+ * 
+ */
+export type ReportWorker = $Result.DefaultSelection<Prisma.$ReportWorkerPayload>
 
 /**
  * Enums
@@ -379,6 +384,16 @@ export class PrismaClient<
     * ```
     */
   get cleanupScheduleWorker(): Prisma.CleanupScheduleWorkerDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.reportWorker`: Exposes CRUD operations for the **ReportWorker** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ReportWorkers
+    * const reportWorkers = await prisma.reportWorker.findMany()
+    * ```
+    */
+  get reportWorker(): Prisma.ReportWorkerDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -827,7 +842,8 @@ export namespace Prisma {
     Notification: 'Notification',
     ReportingZone: 'ReportingZone',
     CleanupSchedule: 'CleanupSchedule',
-    CleanupScheduleWorker: 'CleanupScheduleWorker'
+    CleanupScheduleWorker: 'CleanupScheduleWorker',
+    ReportWorker: 'ReportWorker'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -846,7 +862,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "report" | "reportImage" | "statusHistory" | "notification" | "reportingZone" | "cleanupSchedule" | "cleanupScheduleWorker"
+      modelProps: "user" | "report" | "reportImage" | "statusHistory" | "notification" | "reportingZone" | "cleanupSchedule" | "cleanupScheduleWorker" | "reportWorker"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1442,6 +1458,80 @@ export namespace Prisma {
           }
         }
       }
+      ReportWorker: {
+        payload: Prisma.$ReportWorkerPayload<ExtArgs>
+        fields: Prisma.ReportWorkerFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ReportWorkerFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ReportWorkerFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload>
+          }
+          findFirst: {
+            args: Prisma.ReportWorkerFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ReportWorkerFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload>
+          }
+          findMany: {
+            args: Prisma.ReportWorkerFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload>[]
+          }
+          create: {
+            args: Prisma.ReportWorkerCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload>
+          }
+          createMany: {
+            args: Prisma.ReportWorkerCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ReportWorkerCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload>[]
+          }
+          delete: {
+            args: Prisma.ReportWorkerDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload>
+          }
+          update: {
+            args: Prisma.ReportWorkerUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload>
+          }
+          deleteMany: {
+            args: Prisma.ReportWorkerDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ReportWorkerUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ReportWorkerUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload>[]
+          }
+          upsert: {
+            args: Prisma.ReportWorkerUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReportWorkerPayload>
+          }
+          aggregate: {
+            args: Prisma.ReportWorkerAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateReportWorker>
+          }
+          groupBy: {
+            args: Prisma.ReportWorkerGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ReportWorkerGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ReportWorkerCountArgs<ExtArgs>
+            result: $Utils.Optional<ReportWorkerCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1546,6 +1636,7 @@ export namespace Prisma {
     reportingZone?: ReportingZoneOmit
     cleanupSchedule?: CleanupScheduleOmit
     cleanupScheduleWorker?: CleanupScheduleWorkerOmit
+    reportWorker?: ReportWorkerOmit
   }
 
   /* Types for Logging */
@@ -1628,6 +1719,7 @@ export namespace Prisma {
   export type UserCountOutputType = {
     reports: number
     assignedReports: number
+    assignedReportWorkers: number
     statusChanges: number
     notifications: number
     reportingZones: number
@@ -1639,6 +1731,7 @@ export namespace Prisma {
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     reports?: boolean | UserCountOutputTypeCountReportsArgs
     assignedReports?: boolean | UserCountOutputTypeCountAssignedReportsArgs
+    assignedReportWorkers?: boolean | UserCountOutputTypeCountAssignedReportWorkersArgs
     statusChanges?: boolean | UserCountOutputTypeCountStatusChangesArgs
     notifications?: boolean | UserCountOutputTypeCountNotificationsArgs
     reportingZones?: boolean | UserCountOutputTypeCountReportingZonesArgs
@@ -1670,6 +1763,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountAssignedReportsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ReportWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountAssignedReportWorkersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ReportWorkerWhereInput
   }
 
   /**
@@ -1720,12 +1820,14 @@ export namespace Prisma {
    */
 
   export type ReportCountOutputType = {
+    assignedWorkers: number
     images: number
     statusHistory: number
     notifications: number
   }
 
   export type ReportCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    assignedWorkers?: boolean | ReportCountOutputTypeCountAssignedWorkersArgs
     images?: boolean | ReportCountOutputTypeCountImagesArgs
     statusHistory?: boolean | ReportCountOutputTypeCountStatusHistoryArgs
     notifications?: boolean | ReportCountOutputTypeCountNotificationsArgs
@@ -1740,6 +1842,13 @@ export namespace Prisma {
      * Select specific fields to fetch from the ReportCountOutputType
      */
     select?: ReportCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * ReportCountOutputType without action
+   */
+  export type ReportCountOutputTypeCountAssignedWorkersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ReportWorkerWhereInput
   }
 
   /**
@@ -2030,6 +2139,7 @@ export namespace Prisma {
     updatedAt?: boolean
     reports?: boolean | User$reportsArgs<ExtArgs>
     assignedReports?: boolean | User$assignedReportsArgs<ExtArgs>
+    assignedReportWorkers?: boolean | User$assignedReportWorkersArgs<ExtArgs>
     statusChanges?: boolean | User$statusChangesArgs<ExtArgs>
     notifications?: boolean | User$notificationsArgs<ExtArgs>
     reportingZones?: boolean | User$reportingZonesArgs<ExtArgs>
@@ -2088,6 +2198,7 @@ export namespace Prisma {
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     reports?: boolean | User$reportsArgs<ExtArgs>
     assignedReports?: boolean | User$assignedReportsArgs<ExtArgs>
+    assignedReportWorkers?: boolean | User$assignedReportWorkersArgs<ExtArgs>
     statusChanges?: boolean | User$statusChangesArgs<ExtArgs>
     notifications?: boolean | User$notificationsArgs<ExtArgs>
     reportingZones?: boolean | User$reportingZonesArgs<ExtArgs>
@@ -2104,6 +2215,7 @@ export namespace Prisma {
     objects: {
       reports: Prisma.$ReportPayload<ExtArgs>[]
       assignedReports: Prisma.$ReportPayload<ExtArgs>[]
+      assignedReportWorkers: Prisma.$ReportWorkerPayload<ExtArgs>[]
       statusChanges: Prisma.$StatusHistoryPayload<ExtArgs>[]
       notifications: Prisma.$NotificationPayload<ExtArgs>[]
       reportingZones: Prisma.$ReportingZonePayload<ExtArgs>[]
@@ -2520,6 +2632,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     reports<T extends User$reportsArgs<ExtArgs> = {}>(args?: Subset<T, User$reportsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReportPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     assignedReports<T extends User$assignedReportsArgs<ExtArgs> = {}>(args?: Subset<T, User$assignedReportsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReportPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    assignedReportWorkers<T extends User$assignedReportWorkersArgs<ExtArgs> = {}>(args?: Subset<T, User$assignedReportWorkersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     statusChanges<T extends User$statusChangesArgs<ExtArgs> = {}>(args?: Subset<T, User$statusChangesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StatusHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     notifications<T extends User$notificationsArgs<ExtArgs> = {}>(args?: Subset<T, User$notificationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$NotificationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     reportingZones<T extends User$reportingZonesArgs<ExtArgs> = {}>(args?: Subset<T, User$reportingZonesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReportingZonePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -3000,6 +3113,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: ReportScalarFieldEnum | ReportScalarFieldEnum[]
+  }
+
+  /**
+   * User.assignedReportWorkers
+   */
+  export type User$assignedReportWorkersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    where?: ReportWorkerWhereInput
+    orderBy?: ReportWorkerOrderByWithRelationInput | ReportWorkerOrderByWithRelationInput[]
+    cursor?: ReportWorkerWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ReportWorkerScalarFieldEnum | ReportWorkerScalarFieldEnum[]
   }
 
   /**
@@ -3573,6 +3710,7 @@ export namespace Prisma {
     cleanupScheduleId?: boolean
     reporter?: boolean | Report$reporterArgs<ExtArgs>
     assignedTo?: boolean | Report$assignedToArgs<ExtArgs>
+    assignedWorkers?: boolean | Report$assignedWorkersArgs<ExtArgs>
     cleanupSchedule?: boolean | Report$cleanupScheduleArgs<ExtArgs>
     images?: boolean | Report$imagesArgs<ExtArgs>
     statusHistory?: boolean | Report$statusHistoryArgs<ExtArgs>
@@ -3686,6 +3824,7 @@ export namespace Prisma {
   export type ReportInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     reporter?: boolean | Report$reporterArgs<ExtArgs>
     assignedTo?: boolean | Report$assignedToArgs<ExtArgs>
+    assignedWorkers?: boolean | Report$assignedWorkersArgs<ExtArgs>
     cleanupSchedule?: boolean | Report$cleanupScheduleArgs<ExtArgs>
     images?: boolean | Report$imagesArgs<ExtArgs>
     statusHistory?: boolean | Report$statusHistoryArgs<ExtArgs>
@@ -3708,6 +3847,7 @@ export namespace Prisma {
     objects: {
       reporter: Prisma.$UserPayload<ExtArgs> | null
       assignedTo: Prisma.$UserPayload<ExtArgs> | null
+      assignedWorkers: Prisma.$ReportWorkerPayload<ExtArgs>[]
       cleanupSchedule: Prisma.$CleanupSchedulePayload<ExtArgs> | null
       images: Prisma.$ReportImagePayload<ExtArgs>[]
       statusHistory: Prisma.$StatusHistoryPayload<ExtArgs>[]
@@ -4139,6 +4279,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     reporter<T extends Report$reporterArgs<ExtArgs> = {}>(args?: Subset<T, Report$reporterArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     assignedTo<T extends Report$assignedToArgs<ExtArgs> = {}>(args?: Subset<T, Report$assignedToArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    assignedWorkers<T extends Report$assignedWorkersArgs<ExtArgs> = {}>(args?: Subset<T, Report$assignedWorkersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     cleanupSchedule<T extends Report$cleanupScheduleArgs<ExtArgs> = {}>(args?: Subset<T, Report$cleanupScheduleArgs<ExtArgs>>): Prisma__CleanupScheduleClient<$Result.GetResult<Prisma.$CleanupSchedulePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     images<T extends Report$imagesArgs<ExtArgs> = {}>(args?: Subset<T, Report$imagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReportImagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     statusHistory<T extends Report$statusHistoryArgs<ExtArgs> = {}>(args?: Subset<T, Report$statusHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StatusHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -4632,6 +4773,30 @@ export namespace Prisma {
      */
     include?: UserInclude<ExtArgs> | null
     where?: UserWhereInput
+  }
+
+  /**
+   * Report.assignedWorkers
+   */
+  export type Report$assignedWorkersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    where?: ReportWorkerWhereInput
+    orderBy?: ReportWorkerOrderByWithRelationInput | ReportWorkerOrderByWithRelationInput[]
+    cursor?: ReportWorkerWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ReportWorkerScalarFieldEnum | ReportWorkerScalarFieldEnum[]
   }
 
   /**
@@ -11472,6 +11637,1059 @@ export namespace Prisma {
 
 
   /**
+   * Model ReportWorker
+   */
+
+  export type AggregateReportWorker = {
+    _count: ReportWorkerCountAggregateOutputType | null
+    _min: ReportWorkerMinAggregateOutputType | null
+    _max: ReportWorkerMaxAggregateOutputType | null
+  }
+
+  export type ReportWorkerMinAggregateOutputType = {
+    id: string | null
+    assignedAt: Date | null
+    reportId: string | null
+    workerId: string | null
+  }
+
+  export type ReportWorkerMaxAggregateOutputType = {
+    id: string | null
+    assignedAt: Date | null
+    reportId: string | null
+    workerId: string | null
+  }
+
+  export type ReportWorkerCountAggregateOutputType = {
+    id: number
+    assignedAt: number
+    reportId: number
+    workerId: number
+    _all: number
+  }
+
+
+  export type ReportWorkerMinAggregateInputType = {
+    id?: true
+    assignedAt?: true
+    reportId?: true
+    workerId?: true
+  }
+
+  export type ReportWorkerMaxAggregateInputType = {
+    id?: true
+    assignedAt?: true
+    reportId?: true
+    workerId?: true
+  }
+
+  export type ReportWorkerCountAggregateInputType = {
+    id?: true
+    assignedAt?: true
+    reportId?: true
+    workerId?: true
+    _all?: true
+  }
+
+  export type ReportWorkerAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ReportWorker to aggregate.
+     */
+    where?: ReportWorkerWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ReportWorkers to fetch.
+     */
+    orderBy?: ReportWorkerOrderByWithRelationInput | ReportWorkerOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ReportWorkerWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ReportWorkers from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ReportWorkers.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ReportWorkers
+    **/
+    _count?: true | ReportWorkerCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ReportWorkerMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ReportWorkerMaxAggregateInputType
+  }
+
+  export type GetReportWorkerAggregateType<T extends ReportWorkerAggregateArgs> = {
+        [P in keyof T & keyof AggregateReportWorker]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateReportWorker[P]>
+      : GetScalarType<T[P], AggregateReportWorker[P]>
+  }
+
+
+
+
+  export type ReportWorkerGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ReportWorkerWhereInput
+    orderBy?: ReportWorkerOrderByWithAggregationInput | ReportWorkerOrderByWithAggregationInput[]
+    by: ReportWorkerScalarFieldEnum[] | ReportWorkerScalarFieldEnum
+    having?: ReportWorkerScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ReportWorkerCountAggregateInputType | true
+    _min?: ReportWorkerMinAggregateInputType
+    _max?: ReportWorkerMaxAggregateInputType
+  }
+
+  export type ReportWorkerGroupByOutputType = {
+    id: string
+    assignedAt: Date
+    reportId: string
+    workerId: string
+    _count: ReportWorkerCountAggregateOutputType | null
+    _min: ReportWorkerMinAggregateOutputType | null
+    _max: ReportWorkerMaxAggregateOutputType | null
+  }
+
+  type GetReportWorkerGroupByPayload<T extends ReportWorkerGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ReportWorkerGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ReportWorkerGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ReportWorkerGroupByOutputType[P]>
+            : GetScalarType<T[P], ReportWorkerGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ReportWorkerSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    assignedAt?: boolean
+    reportId?: boolean
+    workerId?: boolean
+    report?: boolean | ReportDefaultArgs<ExtArgs>
+    worker?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["reportWorker"]>
+
+  export type ReportWorkerSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    assignedAt?: boolean
+    reportId?: boolean
+    workerId?: boolean
+    report?: boolean | ReportDefaultArgs<ExtArgs>
+    worker?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["reportWorker"]>
+
+  export type ReportWorkerSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    assignedAt?: boolean
+    reportId?: boolean
+    workerId?: boolean
+    report?: boolean | ReportDefaultArgs<ExtArgs>
+    worker?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["reportWorker"]>
+
+  export type ReportWorkerSelectScalar = {
+    id?: boolean
+    assignedAt?: boolean
+    reportId?: boolean
+    workerId?: boolean
+  }
+
+  export type ReportWorkerOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "assignedAt" | "reportId" | "workerId", ExtArgs["result"]["reportWorker"]>
+  export type ReportWorkerInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    report?: boolean | ReportDefaultArgs<ExtArgs>
+    worker?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ReportWorkerIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    report?: boolean | ReportDefaultArgs<ExtArgs>
+    worker?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ReportWorkerIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    report?: boolean | ReportDefaultArgs<ExtArgs>
+    worker?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $ReportWorkerPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ReportWorker"
+    objects: {
+      report: Prisma.$ReportPayload<ExtArgs>
+      worker: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      assignedAt: Date
+      reportId: string
+      workerId: string
+    }, ExtArgs["result"]["reportWorker"]>
+    composites: {}
+  }
+
+  type ReportWorkerGetPayload<S extends boolean | null | undefined | ReportWorkerDefaultArgs> = $Result.GetResult<Prisma.$ReportWorkerPayload, S>
+
+  type ReportWorkerCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ReportWorkerFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ReportWorkerCountAggregateInputType | true
+    }
+
+  export interface ReportWorkerDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ReportWorker'], meta: { name: 'ReportWorker' } }
+    /**
+     * Find zero or one ReportWorker that matches the filter.
+     * @param {ReportWorkerFindUniqueArgs} args - Arguments to find a ReportWorker
+     * @example
+     * // Get one ReportWorker
+     * const reportWorker = await prisma.reportWorker.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ReportWorkerFindUniqueArgs>(args: SelectSubset<T, ReportWorkerFindUniqueArgs<ExtArgs>>): Prisma__ReportWorkerClient<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ReportWorker that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ReportWorkerFindUniqueOrThrowArgs} args - Arguments to find a ReportWorker
+     * @example
+     * // Get one ReportWorker
+     * const reportWorker = await prisma.reportWorker.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ReportWorkerFindUniqueOrThrowArgs>(args: SelectSubset<T, ReportWorkerFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ReportWorkerClient<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ReportWorker that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReportWorkerFindFirstArgs} args - Arguments to find a ReportWorker
+     * @example
+     * // Get one ReportWorker
+     * const reportWorker = await prisma.reportWorker.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ReportWorkerFindFirstArgs>(args?: SelectSubset<T, ReportWorkerFindFirstArgs<ExtArgs>>): Prisma__ReportWorkerClient<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ReportWorker that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReportWorkerFindFirstOrThrowArgs} args - Arguments to find a ReportWorker
+     * @example
+     * // Get one ReportWorker
+     * const reportWorker = await prisma.reportWorker.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ReportWorkerFindFirstOrThrowArgs>(args?: SelectSubset<T, ReportWorkerFindFirstOrThrowArgs<ExtArgs>>): Prisma__ReportWorkerClient<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ReportWorkers that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReportWorkerFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ReportWorkers
+     * const reportWorkers = await prisma.reportWorker.findMany()
+     * 
+     * // Get first 10 ReportWorkers
+     * const reportWorkers = await prisma.reportWorker.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const reportWorkerWithIdOnly = await prisma.reportWorker.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ReportWorkerFindManyArgs>(args?: SelectSubset<T, ReportWorkerFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ReportWorker.
+     * @param {ReportWorkerCreateArgs} args - Arguments to create a ReportWorker.
+     * @example
+     * // Create one ReportWorker
+     * const ReportWorker = await prisma.reportWorker.create({
+     *   data: {
+     *     // ... data to create a ReportWorker
+     *   }
+     * })
+     * 
+     */
+    create<T extends ReportWorkerCreateArgs>(args: SelectSubset<T, ReportWorkerCreateArgs<ExtArgs>>): Prisma__ReportWorkerClient<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ReportWorkers.
+     * @param {ReportWorkerCreateManyArgs} args - Arguments to create many ReportWorkers.
+     * @example
+     * // Create many ReportWorkers
+     * const reportWorker = await prisma.reportWorker.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ReportWorkerCreateManyArgs>(args?: SelectSubset<T, ReportWorkerCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ReportWorkers and returns the data saved in the database.
+     * @param {ReportWorkerCreateManyAndReturnArgs} args - Arguments to create many ReportWorkers.
+     * @example
+     * // Create many ReportWorkers
+     * const reportWorker = await prisma.reportWorker.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ReportWorkers and only return the `id`
+     * const reportWorkerWithIdOnly = await prisma.reportWorker.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ReportWorkerCreateManyAndReturnArgs>(args?: SelectSubset<T, ReportWorkerCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ReportWorker.
+     * @param {ReportWorkerDeleteArgs} args - Arguments to delete one ReportWorker.
+     * @example
+     * // Delete one ReportWorker
+     * const ReportWorker = await prisma.reportWorker.delete({
+     *   where: {
+     *     // ... filter to delete one ReportWorker
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ReportWorkerDeleteArgs>(args: SelectSubset<T, ReportWorkerDeleteArgs<ExtArgs>>): Prisma__ReportWorkerClient<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ReportWorker.
+     * @param {ReportWorkerUpdateArgs} args - Arguments to update one ReportWorker.
+     * @example
+     * // Update one ReportWorker
+     * const reportWorker = await prisma.reportWorker.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ReportWorkerUpdateArgs>(args: SelectSubset<T, ReportWorkerUpdateArgs<ExtArgs>>): Prisma__ReportWorkerClient<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ReportWorkers.
+     * @param {ReportWorkerDeleteManyArgs} args - Arguments to filter ReportWorkers to delete.
+     * @example
+     * // Delete a few ReportWorkers
+     * const { count } = await prisma.reportWorker.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ReportWorkerDeleteManyArgs>(args?: SelectSubset<T, ReportWorkerDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ReportWorkers.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReportWorkerUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ReportWorkers
+     * const reportWorker = await prisma.reportWorker.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ReportWorkerUpdateManyArgs>(args: SelectSubset<T, ReportWorkerUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ReportWorkers and returns the data updated in the database.
+     * @param {ReportWorkerUpdateManyAndReturnArgs} args - Arguments to update many ReportWorkers.
+     * @example
+     * // Update many ReportWorkers
+     * const reportWorker = await prisma.reportWorker.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ReportWorkers and only return the `id`
+     * const reportWorkerWithIdOnly = await prisma.reportWorker.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ReportWorkerUpdateManyAndReturnArgs>(args: SelectSubset<T, ReportWorkerUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ReportWorker.
+     * @param {ReportWorkerUpsertArgs} args - Arguments to update or create a ReportWorker.
+     * @example
+     * // Update or create a ReportWorker
+     * const reportWorker = await prisma.reportWorker.upsert({
+     *   create: {
+     *     // ... data to create a ReportWorker
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ReportWorker we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ReportWorkerUpsertArgs>(args: SelectSubset<T, ReportWorkerUpsertArgs<ExtArgs>>): Prisma__ReportWorkerClient<$Result.GetResult<Prisma.$ReportWorkerPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ReportWorkers.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReportWorkerCountArgs} args - Arguments to filter ReportWorkers to count.
+     * @example
+     * // Count the number of ReportWorkers
+     * const count = await prisma.reportWorker.count({
+     *   where: {
+     *     // ... the filter for the ReportWorkers we want to count
+     *   }
+     * })
+    **/
+    count<T extends ReportWorkerCountArgs>(
+      args?: Subset<T, ReportWorkerCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ReportWorkerCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ReportWorker.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReportWorkerAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ReportWorkerAggregateArgs>(args: Subset<T, ReportWorkerAggregateArgs>): Prisma.PrismaPromise<GetReportWorkerAggregateType<T>>
+
+    /**
+     * Group by ReportWorker.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReportWorkerGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ReportWorkerGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ReportWorkerGroupByArgs['orderBy'] }
+        : { orderBy?: ReportWorkerGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ReportWorkerGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetReportWorkerGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ReportWorker model
+   */
+  readonly fields: ReportWorkerFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ReportWorker.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ReportWorkerClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    report<T extends ReportDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ReportDefaultArgs<ExtArgs>>): Prisma__ReportClient<$Result.GetResult<Prisma.$ReportPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    worker<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ReportWorker model
+   */
+  interface ReportWorkerFieldRefs {
+    readonly id: FieldRef<"ReportWorker", 'String'>
+    readonly assignedAt: FieldRef<"ReportWorker", 'DateTime'>
+    readonly reportId: FieldRef<"ReportWorker", 'String'>
+    readonly workerId: FieldRef<"ReportWorker", 'String'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ReportWorker findUnique
+   */
+  export type ReportWorkerFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    /**
+     * Filter, which ReportWorker to fetch.
+     */
+    where: ReportWorkerWhereUniqueInput
+  }
+
+  /**
+   * ReportWorker findUniqueOrThrow
+   */
+  export type ReportWorkerFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    /**
+     * Filter, which ReportWorker to fetch.
+     */
+    where: ReportWorkerWhereUniqueInput
+  }
+
+  /**
+   * ReportWorker findFirst
+   */
+  export type ReportWorkerFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    /**
+     * Filter, which ReportWorker to fetch.
+     */
+    where?: ReportWorkerWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ReportWorkers to fetch.
+     */
+    orderBy?: ReportWorkerOrderByWithRelationInput | ReportWorkerOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ReportWorkers.
+     */
+    cursor?: ReportWorkerWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ReportWorkers from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ReportWorkers.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ReportWorkers.
+     */
+    distinct?: ReportWorkerScalarFieldEnum | ReportWorkerScalarFieldEnum[]
+  }
+
+  /**
+   * ReportWorker findFirstOrThrow
+   */
+  export type ReportWorkerFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    /**
+     * Filter, which ReportWorker to fetch.
+     */
+    where?: ReportWorkerWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ReportWorkers to fetch.
+     */
+    orderBy?: ReportWorkerOrderByWithRelationInput | ReportWorkerOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ReportWorkers.
+     */
+    cursor?: ReportWorkerWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ReportWorkers from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ReportWorkers.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ReportWorkers.
+     */
+    distinct?: ReportWorkerScalarFieldEnum | ReportWorkerScalarFieldEnum[]
+  }
+
+  /**
+   * ReportWorker findMany
+   */
+  export type ReportWorkerFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    /**
+     * Filter, which ReportWorkers to fetch.
+     */
+    where?: ReportWorkerWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ReportWorkers to fetch.
+     */
+    orderBy?: ReportWorkerOrderByWithRelationInput | ReportWorkerOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ReportWorkers.
+     */
+    cursor?: ReportWorkerWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ReportWorkers from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ReportWorkers.
+     */
+    skip?: number
+    distinct?: ReportWorkerScalarFieldEnum | ReportWorkerScalarFieldEnum[]
+  }
+
+  /**
+   * ReportWorker create
+   */
+  export type ReportWorkerCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ReportWorker.
+     */
+    data: XOR<ReportWorkerCreateInput, ReportWorkerUncheckedCreateInput>
+  }
+
+  /**
+   * ReportWorker createMany
+   */
+  export type ReportWorkerCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ReportWorkers.
+     */
+    data: ReportWorkerCreateManyInput | ReportWorkerCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ReportWorker createManyAndReturn
+   */
+  export type ReportWorkerCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * The data used to create many ReportWorkers.
+     */
+    data: ReportWorkerCreateManyInput | ReportWorkerCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ReportWorker update
+   */
+  export type ReportWorkerUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ReportWorker.
+     */
+    data: XOR<ReportWorkerUpdateInput, ReportWorkerUncheckedUpdateInput>
+    /**
+     * Choose, which ReportWorker to update.
+     */
+    where: ReportWorkerWhereUniqueInput
+  }
+
+  /**
+   * ReportWorker updateMany
+   */
+  export type ReportWorkerUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ReportWorkers.
+     */
+    data: XOR<ReportWorkerUpdateManyMutationInput, ReportWorkerUncheckedUpdateManyInput>
+    /**
+     * Filter which ReportWorkers to update
+     */
+    where?: ReportWorkerWhereInput
+    /**
+     * Limit how many ReportWorkers to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ReportWorker updateManyAndReturn
+   */
+  export type ReportWorkerUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * The data used to update ReportWorkers.
+     */
+    data: XOR<ReportWorkerUpdateManyMutationInput, ReportWorkerUncheckedUpdateManyInput>
+    /**
+     * Filter which ReportWorkers to update
+     */
+    where?: ReportWorkerWhereInput
+    /**
+     * Limit how many ReportWorkers to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ReportWorker upsert
+   */
+  export type ReportWorkerUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ReportWorker to update in case it exists.
+     */
+    where: ReportWorkerWhereUniqueInput
+    /**
+     * In case the ReportWorker found by the `where` argument doesn't exist, create a new ReportWorker with this data.
+     */
+    create: XOR<ReportWorkerCreateInput, ReportWorkerUncheckedCreateInput>
+    /**
+     * In case the ReportWorker was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ReportWorkerUpdateInput, ReportWorkerUncheckedUpdateInput>
+  }
+
+  /**
+   * ReportWorker delete
+   */
+  export type ReportWorkerDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+    /**
+     * Filter which ReportWorker to delete.
+     */
+    where: ReportWorkerWhereUniqueInput
+  }
+
+  /**
+   * ReportWorker deleteMany
+   */
+  export type ReportWorkerDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ReportWorkers to delete
+     */
+    where?: ReportWorkerWhereInput
+    /**
+     * Limit how many ReportWorkers to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ReportWorker without action
+   */
+  export type ReportWorkerDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReportWorker
+     */
+    select?: ReportWorkerSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReportWorker
+     */
+    omit?: ReportWorkerOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReportWorkerInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -11619,6 +12837,16 @@ export namespace Prisma {
   };
 
   export type CleanupScheduleWorkerScalarFieldEnum = (typeof CleanupScheduleWorkerScalarFieldEnum)[keyof typeof CleanupScheduleWorkerScalarFieldEnum]
+
+
+  export const ReportWorkerScalarFieldEnum: {
+    id: 'id',
+    assignedAt: 'assignedAt',
+    reportId: 'reportId',
+    workerId: 'workerId'
+  };
+
+  export type ReportWorkerScalarFieldEnum = (typeof ReportWorkerScalarFieldEnum)[keyof typeof ReportWorkerScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -11876,6 +13104,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"User"> | Date | string
     reports?: ReportListRelationFilter
     assignedReports?: ReportListRelationFilter
+    assignedReportWorkers?: ReportWorkerListRelationFilter
     statusChanges?: StatusHistoryListRelationFilter
     notifications?: NotificationListRelationFilter
     reportingZones?: ReportingZoneListRelationFilter
@@ -11899,6 +13128,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     reports?: ReportOrderByRelationAggregateInput
     assignedReports?: ReportOrderByRelationAggregateInput
+    assignedReportWorkers?: ReportWorkerOrderByRelationAggregateInput
     statusChanges?: StatusHistoryOrderByRelationAggregateInput
     notifications?: NotificationOrderByRelationAggregateInput
     reportingZones?: ReportingZoneOrderByRelationAggregateInput
@@ -11925,6 +13155,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"User"> | Date | string
     reports?: ReportListRelationFilter
     assignedReports?: ReportListRelationFilter
+    assignedReportWorkers?: ReportWorkerListRelationFilter
     statusChanges?: StatusHistoryListRelationFilter
     notifications?: NotificationListRelationFilter
     reportingZones?: ReportingZoneListRelationFilter
@@ -12004,6 +13235,7 @@ export namespace Prisma {
     cleanupScheduleId?: StringNullableFilter<"Report"> | string | null
     reporter?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
     assignedTo?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    assignedWorkers?: ReportWorkerListRelationFilter
     cleanupSchedule?: XOR<CleanupScheduleNullableScalarRelationFilter, CleanupScheduleWhereInput> | null
     images?: ReportImageListRelationFilter
     statusHistory?: StatusHistoryListRelationFilter
@@ -12042,6 +13274,7 @@ export namespace Prisma {
     cleanupScheduleId?: SortOrderInput | SortOrder
     reporter?: UserOrderByWithRelationInput
     assignedTo?: UserOrderByWithRelationInput
+    assignedWorkers?: ReportWorkerOrderByRelationAggregateInput
     cleanupSchedule?: CleanupScheduleOrderByWithRelationInput
     images?: ReportImageOrderByRelationAggregateInput
     statusHistory?: StatusHistoryOrderByRelationAggregateInput
@@ -12083,6 +13316,7 @@ export namespace Prisma {
     cleanupScheduleId?: StringNullableFilter<"Report"> | string | null
     reporter?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
     assignedTo?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    assignedWorkers?: ReportWorkerListRelationFilter
     cleanupSchedule?: XOR<CleanupScheduleNullableScalarRelationFilter, CleanupScheduleWhereInput> | null
     images?: ReportImageListRelationFilter
     statusHistory?: StatusHistoryListRelationFilter
@@ -12597,6 +13831,60 @@ export namespace Prisma {
     workerId?: StringWithAggregatesFilter<"CleanupScheduleWorker"> | string
   }
 
+  export type ReportWorkerWhereInput = {
+    AND?: ReportWorkerWhereInput | ReportWorkerWhereInput[]
+    OR?: ReportWorkerWhereInput[]
+    NOT?: ReportWorkerWhereInput | ReportWorkerWhereInput[]
+    id?: StringFilter<"ReportWorker"> | string
+    assignedAt?: DateTimeFilter<"ReportWorker"> | Date | string
+    reportId?: StringFilter<"ReportWorker"> | string
+    workerId?: StringFilter<"ReportWorker"> | string
+    report?: XOR<ReportScalarRelationFilter, ReportWhereInput>
+    worker?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type ReportWorkerOrderByWithRelationInput = {
+    id?: SortOrder
+    assignedAt?: SortOrder
+    reportId?: SortOrder
+    workerId?: SortOrder
+    report?: ReportOrderByWithRelationInput
+    worker?: UserOrderByWithRelationInput
+  }
+
+  export type ReportWorkerWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    reportId_workerId?: ReportWorkerReportIdWorkerIdCompoundUniqueInput
+    AND?: ReportWorkerWhereInput | ReportWorkerWhereInput[]
+    OR?: ReportWorkerWhereInput[]
+    NOT?: ReportWorkerWhereInput | ReportWorkerWhereInput[]
+    assignedAt?: DateTimeFilter<"ReportWorker"> | Date | string
+    reportId?: StringFilter<"ReportWorker"> | string
+    workerId?: StringFilter<"ReportWorker"> | string
+    report?: XOR<ReportScalarRelationFilter, ReportWhereInput>
+    worker?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "reportId_workerId">
+
+  export type ReportWorkerOrderByWithAggregationInput = {
+    id?: SortOrder
+    assignedAt?: SortOrder
+    reportId?: SortOrder
+    workerId?: SortOrder
+    _count?: ReportWorkerCountOrderByAggregateInput
+    _max?: ReportWorkerMaxOrderByAggregateInput
+    _min?: ReportWorkerMinOrderByAggregateInput
+  }
+
+  export type ReportWorkerScalarWhereWithAggregatesInput = {
+    AND?: ReportWorkerScalarWhereWithAggregatesInput | ReportWorkerScalarWhereWithAggregatesInput[]
+    OR?: ReportWorkerScalarWhereWithAggregatesInput[]
+    NOT?: ReportWorkerScalarWhereWithAggregatesInput | ReportWorkerScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"ReportWorker"> | string
+    assignedAt?: DateTimeWithAggregatesFilter<"ReportWorker"> | Date | string
+    reportId?: StringWithAggregatesFilter<"ReportWorker"> | string
+    workerId?: StringWithAggregatesFilter<"ReportWorker"> | string
+  }
+
   export type UserCreateInput = {
     id?: string
     email: string
@@ -12612,6 +13900,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportCreateNestedManyWithoutReporterInput
     assignedReports?: ReportCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryCreateNestedManyWithoutChangedByInput
     notifications?: NotificationCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneCreateNestedManyWithoutCreatedByInput
@@ -12635,6 +13924,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportUncheckedCreateNestedManyWithoutReporterInput
     assignedReports?: ReportUncheckedCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryUncheckedCreateNestedManyWithoutChangedByInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneUncheckedCreateNestedManyWithoutCreatedByInput
@@ -12658,6 +13948,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUpdateManyWithoutCreatedByNestedInput
@@ -12681,6 +13972,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUncheckedUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUncheckedUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUncheckedUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUncheckedUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUncheckedUpdateManyWithoutCreatedByNestedInput
@@ -12763,6 +14055,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reporter?: UserCreateNestedOneWithoutReportsInput
     assignedTo?: UserCreateNestedOneWithoutAssignedReportsInput
+    assignedWorkers?: ReportWorkerCreateNestedManyWithoutReportInput
     cleanupSchedule?: CleanupScheduleCreateNestedOneWithoutReportsInput
     images?: ReportImageCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryCreateNestedManyWithoutReportInput
@@ -12799,6 +14092,7 @@ export namespace Prisma {
     reporterId?: string | null
     assignedToId?: string | null
     cleanupScheduleId?: string | null
+    assignedWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutReportInput
     images?: ReportImageUncheckedCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryUncheckedCreateNestedManyWithoutReportInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutReportInput
@@ -12833,6 +14127,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reporter?: UserUpdateOneWithoutReportsNestedInput
     assignedTo?: UserUpdateOneWithoutAssignedReportsNestedInput
+    assignedWorkers?: ReportWorkerUpdateManyWithoutReportNestedInput
     cleanupSchedule?: CleanupScheduleUpdateOneWithoutReportsNestedInput
     images?: ReportImageUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUpdateManyWithoutReportNestedInput
@@ -12869,6 +14164,7 @@ export namespace Prisma {
     reporterId?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToId?: NullableStringFieldUpdateOperationsInput | string | null
     cleanupScheduleId?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedWorkers?: ReportWorkerUncheckedUpdateManyWithoutReportNestedInput
     images?: ReportImageUncheckedUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUncheckedUpdateManyWithoutReportNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutReportNestedInput
@@ -13420,6 +14716,53 @@ export namespace Prisma {
     workerId?: StringFieldUpdateOperationsInput | string
   }
 
+  export type ReportWorkerCreateInput = {
+    id?: string
+    assignedAt?: Date | string
+    report: ReportCreateNestedOneWithoutAssignedWorkersInput
+    worker: UserCreateNestedOneWithoutAssignedReportWorkersInput
+  }
+
+  export type ReportWorkerUncheckedCreateInput = {
+    id?: string
+    assignedAt?: Date | string
+    reportId: string
+    workerId: string
+  }
+
+  export type ReportWorkerUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    report?: ReportUpdateOneRequiredWithoutAssignedWorkersNestedInput
+    worker?: UserUpdateOneRequiredWithoutAssignedReportWorkersNestedInput
+  }
+
+  export type ReportWorkerUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    reportId?: StringFieldUpdateOperationsInput | string
+    workerId?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type ReportWorkerCreateManyInput = {
+    id?: string
+    assignedAt?: Date | string
+    reportId: string
+    workerId: string
+  }
+
+  export type ReportWorkerUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ReportWorkerUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    reportId?: StringFieldUpdateOperationsInput | string
+    workerId?: StringFieldUpdateOperationsInput | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -13479,6 +14822,12 @@ export namespace Prisma {
     none?: ReportWhereInput
   }
 
+  export type ReportWorkerListRelationFilter = {
+    every?: ReportWorkerWhereInput
+    some?: ReportWorkerWhereInput
+    none?: ReportWorkerWhereInput
+  }
+
   export type StatusHistoryListRelationFilter = {
     every?: StatusHistoryWhereInput
     some?: StatusHistoryWhereInput
@@ -13515,6 +14864,10 @@ export namespace Prisma {
   }
 
   export type ReportOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ReportWorkerOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -14308,6 +15661,32 @@ export namespace Prisma {
     workerId?: SortOrder
   }
 
+  export type ReportWorkerReportIdWorkerIdCompoundUniqueInput = {
+    reportId: string
+    workerId: string
+  }
+
+  export type ReportWorkerCountOrderByAggregateInput = {
+    id?: SortOrder
+    assignedAt?: SortOrder
+    reportId?: SortOrder
+    workerId?: SortOrder
+  }
+
+  export type ReportWorkerMaxOrderByAggregateInput = {
+    id?: SortOrder
+    assignedAt?: SortOrder
+    reportId?: SortOrder
+    workerId?: SortOrder
+  }
+
+  export type ReportWorkerMinOrderByAggregateInput = {
+    id?: SortOrder
+    assignedAt?: SortOrder
+    reportId?: SortOrder
+    workerId?: SortOrder
+  }
+
   export type ReportCreateNestedManyWithoutReporterInput = {
     create?: XOR<ReportCreateWithoutReporterInput, ReportUncheckedCreateWithoutReporterInput> | ReportCreateWithoutReporterInput[] | ReportUncheckedCreateWithoutReporterInput[]
     connectOrCreate?: ReportCreateOrConnectWithoutReporterInput | ReportCreateOrConnectWithoutReporterInput[]
@@ -14320,6 +15699,13 @@ export namespace Prisma {
     connectOrCreate?: ReportCreateOrConnectWithoutAssignedToInput | ReportCreateOrConnectWithoutAssignedToInput[]
     createMany?: ReportCreateManyAssignedToInputEnvelope
     connect?: ReportWhereUniqueInput | ReportWhereUniqueInput[]
+  }
+
+  export type ReportWorkerCreateNestedManyWithoutWorkerInput = {
+    create?: XOR<ReportWorkerCreateWithoutWorkerInput, ReportWorkerUncheckedCreateWithoutWorkerInput> | ReportWorkerCreateWithoutWorkerInput[] | ReportWorkerUncheckedCreateWithoutWorkerInput[]
+    connectOrCreate?: ReportWorkerCreateOrConnectWithoutWorkerInput | ReportWorkerCreateOrConnectWithoutWorkerInput[]
+    createMany?: ReportWorkerCreateManyWorkerInputEnvelope
+    connect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
   }
 
   export type StatusHistoryCreateNestedManyWithoutChangedByInput = {
@@ -14376,6 +15762,13 @@ export namespace Prisma {
     connectOrCreate?: ReportCreateOrConnectWithoutAssignedToInput | ReportCreateOrConnectWithoutAssignedToInput[]
     createMany?: ReportCreateManyAssignedToInputEnvelope
     connect?: ReportWhereUniqueInput | ReportWhereUniqueInput[]
+  }
+
+  export type ReportWorkerUncheckedCreateNestedManyWithoutWorkerInput = {
+    create?: XOR<ReportWorkerCreateWithoutWorkerInput, ReportWorkerUncheckedCreateWithoutWorkerInput> | ReportWorkerCreateWithoutWorkerInput[] | ReportWorkerUncheckedCreateWithoutWorkerInput[]
+    connectOrCreate?: ReportWorkerCreateOrConnectWithoutWorkerInput | ReportWorkerCreateOrConnectWithoutWorkerInput[]
+    createMany?: ReportWorkerCreateManyWorkerInputEnvelope
+    connect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
   }
 
   export type StatusHistoryUncheckedCreateNestedManyWithoutChangedByInput = {
@@ -14466,6 +15859,20 @@ export namespace Prisma {
     update?: ReportUpdateWithWhereUniqueWithoutAssignedToInput | ReportUpdateWithWhereUniqueWithoutAssignedToInput[]
     updateMany?: ReportUpdateManyWithWhereWithoutAssignedToInput | ReportUpdateManyWithWhereWithoutAssignedToInput[]
     deleteMany?: ReportScalarWhereInput | ReportScalarWhereInput[]
+  }
+
+  export type ReportWorkerUpdateManyWithoutWorkerNestedInput = {
+    create?: XOR<ReportWorkerCreateWithoutWorkerInput, ReportWorkerUncheckedCreateWithoutWorkerInput> | ReportWorkerCreateWithoutWorkerInput[] | ReportWorkerUncheckedCreateWithoutWorkerInput[]
+    connectOrCreate?: ReportWorkerCreateOrConnectWithoutWorkerInput | ReportWorkerCreateOrConnectWithoutWorkerInput[]
+    upsert?: ReportWorkerUpsertWithWhereUniqueWithoutWorkerInput | ReportWorkerUpsertWithWhereUniqueWithoutWorkerInput[]
+    createMany?: ReportWorkerCreateManyWorkerInputEnvelope
+    set?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    disconnect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    delete?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    connect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    update?: ReportWorkerUpdateWithWhereUniqueWithoutWorkerInput | ReportWorkerUpdateWithWhereUniqueWithoutWorkerInput[]
+    updateMany?: ReportWorkerUpdateManyWithWhereWithoutWorkerInput | ReportWorkerUpdateManyWithWhereWithoutWorkerInput[]
+    deleteMany?: ReportWorkerScalarWhereInput | ReportWorkerScalarWhereInput[]
   }
 
   export type StatusHistoryUpdateManyWithoutChangedByNestedInput = {
@@ -14580,6 +15987,20 @@ export namespace Prisma {
     deleteMany?: ReportScalarWhereInput | ReportScalarWhereInput[]
   }
 
+  export type ReportWorkerUncheckedUpdateManyWithoutWorkerNestedInput = {
+    create?: XOR<ReportWorkerCreateWithoutWorkerInput, ReportWorkerUncheckedCreateWithoutWorkerInput> | ReportWorkerCreateWithoutWorkerInput[] | ReportWorkerUncheckedCreateWithoutWorkerInput[]
+    connectOrCreate?: ReportWorkerCreateOrConnectWithoutWorkerInput | ReportWorkerCreateOrConnectWithoutWorkerInput[]
+    upsert?: ReportWorkerUpsertWithWhereUniqueWithoutWorkerInput | ReportWorkerUpsertWithWhereUniqueWithoutWorkerInput[]
+    createMany?: ReportWorkerCreateManyWorkerInputEnvelope
+    set?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    disconnect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    delete?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    connect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    update?: ReportWorkerUpdateWithWhereUniqueWithoutWorkerInput | ReportWorkerUpdateWithWhereUniqueWithoutWorkerInput[]
+    updateMany?: ReportWorkerUpdateManyWithWhereWithoutWorkerInput | ReportWorkerUpdateManyWithWhereWithoutWorkerInput[]
+    deleteMany?: ReportWorkerScalarWhereInput | ReportWorkerScalarWhereInput[]
+  }
+
   export type StatusHistoryUncheckedUpdateManyWithoutChangedByNestedInput = {
     create?: XOR<StatusHistoryCreateWithoutChangedByInput, StatusHistoryUncheckedCreateWithoutChangedByInput> | StatusHistoryCreateWithoutChangedByInput[] | StatusHistoryUncheckedCreateWithoutChangedByInput[]
     connectOrCreate?: StatusHistoryCreateOrConnectWithoutChangedByInput | StatusHistoryCreateOrConnectWithoutChangedByInput[]
@@ -14680,6 +16101,13 @@ export namespace Prisma {
     connect?: UserWhereUniqueInput
   }
 
+  export type ReportWorkerCreateNestedManyWithoutReportInput = {
+    create?: XOR<ReportWorkerCreateWithoutReportInput, ReportWorkerUncheckedCreateWithoutReportInput> | ReportWorkerCreateWithoutReportInput[] | ReportWorkerUncheckedCreateWithoutReportInput[]
+    connectOrCreate?: ReportWorkerCreateOrConnectWithoutReportInput | ReportWorkerCreateOrConnectWithoutReportInput[]
+    createMany?: ReportWorkerCreateManyReportInputEnvelope
+    connect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+  }
+
   export type CleanupScheduleCreateNestedOneWithoutReportsInput = {
     create?: XOR<CleanupScheduleCreateWithoutReportsInput, CleanupScheduleUncheckedCreateWithoutReportsInput>
     connectOrCreate?: CleanupScheduleCreateOrConnectWithoutReportsInput
@@ -14705,6 +16133,13 @@ export namespace Prisma {
     connectOrCreate?: NotificationCreateOrConnectWithoutReportInput | NotificationCreateOrConnectWithoutReportInput[]
     createMany?: NotificationCreateManyReportInputEnvelope
     connect?: NotificationWhereUniqueInput | NotificationWhereUniqueInput[]
+  }
+
+  export type ReportWorkerUncheckedCreateNestedManyWithoutReportInput = {
+    create?: XOR<ReportWorkerCreateWithoutReportInput, ReportWorkerUncheckedCreateWithoutReportInput> | ReportWorkerCreateWithoutReportInput[] | ReportWorkerUncheckedCreateWithoutReportInput[]
+    connectOrCreate?: ReportWorkerCreateOrConnectWithoutReportInput | ReportWorkerCreateOrConnectWithoutReportInput[]
+    createMany?: ReportWorkerCreateManyReportInputEnvelope
+    connect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
   }
 
   export type ReportImageUncheckedCreateNestedManyWithoutReportInput = {
@@ -14797,6 +16232,20 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAssignedReportsInput, UserUpdateWithoutAssignedReportsInput>, UserUncheckedUpdateWithoutAssignedReportsInput>
   }
 
+  export type ReportWorkerUpdateManyWithoutReportNestedInput = {
+    create?: XOR<ReportWorkerCreateWithoutReportInput, ReportWorkerUncheckedCreateWithoutReportInput> | ReportWorkerCreateWithoutReportInput[] | ReportWorkerUncheckedCreateWithoutReportInput[]
+    connectOrCreate?: ReportWorkerCreateOrConnectWithoutReportInput | ReportWorkerCreateOrConnectWithoutReportInput[]
+    upsert?: ReportWorkerUpsertWithWhereUniqueWithoutReportInput | ReportWorkerUpsertWithWhereUniqueWithoutReportInput[]
+    createMany?: ReportWorkerCreateManyReportInputEnvelope
+    set?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    disconnect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    delete?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    connect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    update?: ReportWorkerUpdateWithWhereUniqueWithoutReportInput | ReportWorkerUpdateWithWhereUniqueWithoutReportInput[]
+    updateMany?: ReportWorkerUpdateManyWithWhereWithoutReportInput | ReportWorkerUpdateManyWithWhereWithoutReportInput[]
+    deleteMany?: ReportWorkerScalarWhereInput | ReportWorkerScalarWhereInput[]
+  }
+
   export type CleanupScheduleUpdateOneWithoutReportsNestedInput = {
     create?: XOR<CleanupScheduleCreateWithoutReportsInput, CleanupScheduleUncheckedCreateWithoutReportsInput>
     connectOrCreate?: CleanupScheduleCreateOrConnectWithoutReportsInput
@@ -14847,6 +16296,20 @@ export namespace Prisma {
     update?: NotificationUpdateWithWhereUniqueWithoutReportInput | NotificationUpdateWithWhereUniqueWithoutReportInput[]
     updateMany?: NotificationUpdateManyWithWhereWithoutReportInput | NotificationUpdateManyWithWhereWithoutReportInput[]
     deleteMany?: NotificationScalarWhereInput | NotificationScalarWhereInput[]
+  }
+
+  export type ReportWorkerUncheckedUpdateManyWithoutReportNestedInput = {
+    create?: XOR<ReportWorkerCreateWithoutReportInput, ReportWorkerUncheckedCreateWithoutReportInput> | ReportWorkerCreateWithoutReportInput[] | ReportWorkerUncheckedCreateWithoutReportInput[]
+    connectOrCreate?: ReportWorkerCreateOrConnectWithoutReportInput | ReportWorkerCreateOrConnectWithoutReportInput[]
+    upsert?: ReportWorkerUpsertWithWhereUniqueWithoutReportInput | ReportWorkerUpsertWithWhereUniqueWithoutReportInput[]
+    createMany?: ReportWorkerCreateManyReportInputEnvelope
+    set?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    disconnect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    delete?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    connect?: ReportWorkerWhereUniqueInput | ReportWorkerWhereUniqueInput[]
+    update?: ReportWorkerUpdateWithWhereUniqueWithoutReportInput | ReportWorkerUpdateWithWhereUniqueWithoutReportInput[]
+    updateMany?: ReportWorkerUpdateManyWithWhereWithoutReportInput | ReportWorkerUpdateManyWithWhereWithoutReportInput[]
+    deleteMany?: ReportWorkerScalarWhereInput | ReportWorkerScalarWhereInput[]
   }
 
   export type ReportImageUncheckedUpdateManyWithoutReportNestedInput = {
@@ -15142,6 +16605,34 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutScheduleAssignmentsInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutScheduleAssignmentsInput, UserUpdateWithoutScheduleAssignmentsInput>, UserUncheckedUpdateWithoutScheduleAssignmentsInput>
+  }
+
+  export type ReportCreateNestedOneWithoutAssignedWorkersInput = {
+    create?: XOR<ReportCreateWithoutAssignedWorkersInput, ReportUncheckedCreateWithoutAssignedWorkersInput>
+    connectOrCreate?: ReportCreateOrConnectWithoutAssignedWorkersInput
+    connect?: ReportWhereUniqueInput
+  }
+
+  export type UserCreateNestedOneWithoutAssignedReportWorkersInput = {
+    create?: XOR<UserCreateWithoutAssignedReportWorkersInput, UserUncheckedCreateWithoutAssignedReportWorkersInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAssignedReportWorkersInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ReportUpdateOneRequiredWithoutAssignedWorkersNestedInput = {
+    create?: XOR<ReportCreateWithoutAssignedWorkersInput, ReportUncheckedCreateWithoutAssignedWorkersInput>
+    connectOrCreate?: ReportCreateOrConnectWithoutAssignedWorkersInput
+    upsert?: ReportUpsertWithoutAssignedWorkersInput
+    connect?: ReportWhereUniqueInput
+    update?: XOR<XOR<ReportUpdateToOneWithWhereWithoutAssignedWorkersInput, ReportUpdateWithoutAssignedWorkersInput>, ReportUncheckedUpdateWithoutAssignedWorkersInput>
+  }
+
+  export type UserUpdateOneRequiredWithoutAssignedReportWorkersNestedInput = {
+    create?: XOR<UserCreateWithoutAssignedReportWorkersInput, UserUncheckedCreateWithoutAssignedReportWorkersInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAssignedReportWorkersInput
+    upsert?: UserUpsertWithoutAssignedReportWorkersInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAssignedReportWorkersInput, UserUpdateWithoutAssignedReportWorkersInput>, UserUncheckedUpdateWithoutAssignedReportWorkersInput>
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -15565,6 +17056,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     assignedTo?: UserCreateNestedOneWithoutAssignedReportsInput
+    assignedWorkers?: ReportWorkerCreateNestedManyWithoutReportInput
     cleanupSchedule?: CleanupScheduleCreateNestedOneWithoutReportsInput
     images?: ReportImageCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryCreateNestedManyWithoutReportInput
@@ -15600,6 +17092,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     assignedToId?: string | null
     cleanupScheduleId?: string | null
+    assignedWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutReportInput
     images?: ReportImageUncheckedCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryUncheckedCreateNestedManyWithoutReportInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutReportInput
@@ -15643,6 +17136,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     reporter?: UserCreateNestedOneWithoutReportsInput
+    assignedWorkers?: ReportWorkerCreateNestedManyWithoutReportInput
     cleanupSchedule?: CleanupScheduleCreateNestedOneWithoutReportsInput
     images?: ReportImageCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryCreateNestedManyWithoutReportInput
@@ -15678,6 +17172,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reporterId?: string | null
     cleanupScheduleId?: string | null
+    assignedWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutReportInput
     images?: ReportImageUncheckedCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryUncheckedCreateNestedManyWithoutReportInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutReportInput
@@ -15690,6 +17185,28 @@ export namespace Prisma {
 
   export type ReportCreateManyAssignedToInputEnvelope = {
     data: ReportCreateManyAssignedToInput | ReportCreateManyAssignedToInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ReportWorkerCreateWithoutWorkerInput = {
+    id?: string
+    assignedAt?: Date | string
+    report: ReportCreateNestedOneWithoutAssignedWorkersInput
+  }
+
+  export type ReportWorkerUncheckedCreateWithoutWorkerInput = {
+    id?: string
+    assignedAt?: Date | string
+    reportId: string
+  }
+
+  export type ReportWorkerCreateOrConnectWithoutWorkerInput = {
+    where: ReportWorkerWhereUniqueInput
+    create: XOR<ReportWorkerCreateWithoutWorkerInput, ReportWorkerUncheckedCreateWithoutWorkerInput>
+  }
+
+  export type ReportWorkerCreateManyWorkerInputEnvelope = {
+    data: ReportWorkerCreateManyWorkerInput | ReportWorkerCreateManyWorkerInput[]
     skipDuplicates?: boolean
   }
 
@@ -15964,6 +17481,32 @@ export namespace Prisma {
     data: XOR<ReportUpdateManyMutationInput, ReportUncheckedUpdateManyWithoutAssignedToInput>
   }
 
+  export type ReportWorkerUpsertWithWhereUniqueWithoutWorkerInput = {
+    where: ReportWorkerWhereUniqueInput
+    update: XOR<ReportWorkerUpdateWithoutWorkerInput, ReportWorkerUncheckedUpdateWithoutWorkerInput>
+    create: XOR<ReportWorkerCreateWithoutWorkerInput, ReportWorkerUncheckedCreateWithoutWorkerInput>
+  }
+
+  export type ReportWorkerUpdateWithWhereUniqueWithoutWorkerInput = {
+    where: ReportWorkerWhereUniqueInput
+    data: XOR<ReportWorkerUpdateWithoutWorkerInput, ReportWorkerUncheckedUpdateWithoutWorkerInput>
+  }
+
+  export type ReportWorkerUpdateManyWithWhereWithoutWorkerInput = {
+    where: ReportWorkerScalarWhereInput
+    data: XOR<ReportWorkerUpdateManyMutationInput, ReportWorkerUncheckedUpdateManyWithoutWorkerInput>
+  }
+
+  export type ReportWorkerScalarWhereInput = {
+    AND?: ReportWorkerScalarWhereInput | ReportWorkerScalarWhereInput[]
+    OR?: ReportWorkerScalarWhereInput[]
+    NOT?: ReportWorkerScalarWhereInput | ReportWorkerScalarWhereInput[]
+    id?: StringFilter<"ReportWorker"> | string
+    assignedAt?: DateTimeFilter<"ReportWorker"> | Date | string
+    reportId?: StringFilter<"ReportWorker"> | string
+    workerId?: StringFilter<"ReportWorker"> | string
+  }
+
   export type StatusHistoryUpsertWithWhereUniqueWithoutChangedByInput = {
     where: StatusHistoryWhereUniqueInput
     update: XOR<StatusHistoryUpdateWithoutChangedByInput, StatusHistoryUncheckedUpdateWithoutChangedByInput>
@@ -16145,6 +17688,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     assignedReports?: ReportCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryCreateNestedManyWithoutChangedByInput
     notifications?: NotificationCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneCreateNestedManyWithoutCreatedByInput
@@ -16167,6 +17711,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     assignedReports?: ReportUncheckedCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryUncheckedCreateNestedManyWithoutChangedByInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneUncheckedCreateNestedManyWithoutCreatedByInput
@@ -16194,6 +17739,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     reports?: ReportCreateNestedManyWithoutReporterInput
+    assignedReportWorkers?: ReportWorkerCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryCreateNestedManyWithoutChangedByInput
     notifications?: NotificationCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneCreateNestedManyWithoutCreatedByInput
@@ -16216,6 +17762,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     reports?: ReportUncheckedCreateNestedManyWithoutReporterInput
+    assignedReportWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryUncheckedCreateNestedManyWithoutChangedByInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneUncheckedCreateNestedManyWithoutCreatedByInput
@@ -16227,6 +17774,28 @@ export namespace Prisma {
   export type UserCreateOrConnectWithoutAssignedReportsInput = {
     where: UserWhereUniqueInput
     create: XOR<UserCreateWithoutAssignedReportsInput, UserUncheckedCreateWithoutAssignedReportsInput>
+  }
+
+  export type ReportWorkerCreateWithoutReportInput = {
+    id?: string
+    assignedAt?: Date | string
+    worker: UserCreateNestedOneWithoutAssignedReportWorkersInput
+  }
+
+  export type ReportWorkerUncheckedCreateWithoutReportInput = {
+    id?: string
+    assignedAt?: Date | string
+    workerId: string
+  }
+
+  export type ReportWorkerCreateOrConnectWithoutReportInput = {
+    where: ReportWorkerWhereUniqueInput
+    create: XOR<ReportWorkerCreateWithoutReportInput, ReportWorkerUncheckedCreateWithoutReportInput>
+  }
+
+  export type ReportWorkerCreateManyReportInputEnvelope = {
+    data: ReportWorkerCreateManyReportInput | ReportWorkerCreateManyReportInput[]
+    skipDuplicates?: boolean
   }
 
   export type CleanupScheduleCreateWithoutReportsInput = {
@@ -16381,6 +17950,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     assignedReports?: ReportUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUpdateManyWithoutCreatedByNestedInput
@@ -16403,6 +17973,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     assignedReports?: ReportUncheckedUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUncheckedUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUncheckedUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUncheckedUpdateManyWithoutCreatedByNestedInput
@@ -16436,6 +18007,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUpdateManyWithoutReporterNestedInput
+    assignedReportWorkers?: ReportWorkerUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUpdateManyWithoutCreatedByNestedInput
@@ -16458,12 +18030,29 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUncheckedUpdateManyWithoutReporterNestedInput
+    assignedReportWorkers?: ReportWorkerUncheckedUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUncheckedUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUncheckedUpdateManyWithoutCreatedByNestedInput
     createdSchedules?: CleanupScheduleUncheckedUpdateManyWithoutCreatedByNestedInput
     verifiedSchedules?: CleanupScheduleUncheckedUpdateManyWithoutVerifiedByNestedInput
     scheduleAssignments?: CleanupScheduleWorkerUncheckedUpdateManyWithoutWorkerNestedInput
+  }
+
+  export type ReportWorkerUpsertWithWhereUniqueWithoutReportInput = {
+    where: ReportWorkerWhereUniqueInput
+    update: XOR<ReportWorkerUpdateWithoutReportInput, ReportWorkerUncheckedUpdateWithoutReportInput>
+    create: XOR<ReportWorkerCreateWithoutReportInput, ReportWorkerUncheckedCreateWithoutReportInput>
+  }
+
+  export type ReportWorkerUpdateWithWhereUniqueWithoutReportInput = {
+    where: ReportWorkerWhereUniqueInput
+    data: XOR<ReportWorkerUpdateWithoutReportInput, ReportWorkerUncheckedUpdateWithoutReportInput>
+  }
+
+  export type ReportWorkerUpdateManyWithWhereWithoutReportInput = {
+    where: ReportWorkerScalarWhereInput
+    data: XOR<ReportWorkerUpdateManyMutationInput, ReportWorkerUncheckedUpdateManyWithoutReportInput>
   }
 
   export type CleanupScheduleUpsertWithoutReportsInput = {
@@ -16604,6 +18193,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reporter?: UserCreateNestedOneWithoutReportsInput
     assignedTo?: UserCreateNestedOneWithoutAssignedReportsInput
+    assignedWorkers?: ReportWorkerCreateNestedManyWithoutReportInput
     cleanupSchedule?: CleanupScheduleCreateNestedOneWithoutReportsInput
     statusHistory?: StatusHistoryCreateNestedManyWithoutReportInput
     notifications?: NotificationCreateNestedManyWithoutReportInput
@@ -16639,6 +18229,7 @@ export namespace Prisma {
     reporterId?: string | null
     assignedToId?: string | null
     cleanupScheduleId?: string | null
+    assignedWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryUncheckedCreateNestedManyWithoutReportInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutReportInput
   }
@@ -16688,6 +18279,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reporter?: UserUpdateOneWithoutReportsNestedInput
     assignedTo?: UserUpdateOneWithoutAssignedReportsNestedInput
+    assignedWorkers?: ReportWorkerUpdateManyWithoutReportNestedInput
     cleanupSchedule?: CleanupScheduleUpdateOneWithoutReportsNestedInput
     statusHistory?: StatusHistoryUpdateManyWithoutReportNestedInput
     notifications?: NotificationUpdateManyWithoutReportNestedInput
@@ -16723,6 +18315,7 @@ export namespace Prisma {
     reporterId?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToId?: NullableStringFieldUpdateOperationsInput | string | null
     cleanupScheduleId?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedWorkers?: ReportWorkerUncheckedUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUncheckedUpdateManyWithoutReportNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutReportNestedInput
   }
@@ -16756,6 +18349,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reporter?: UserCreateNestedOneWithoutReportsInput
     assignedTo?: UserCreateNestedOneWithoutAssignedReportsInput
+    assignedWorkers?: ReportWorkerCreateNestedManyWithoutReportInput
     cleanupSchedule?: CleanupScheduleCreateNestedOneWithoutReportsInput
     images?: ReportImageCreateNestedManyWithoutReportInput
     notifications?: NotificationCreateNestedManyWithoutReportInput
@@ -16791,6 +18385,7 @@ export namespace Prisma {
     reporterId?: string | null
     assignedToId?: string | null
     cleanupScheduleId?: string | null
+    assignedWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutReportInput
     images?: ReportImageUncheckedCreateNestedManyWithoutReportInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutReportInput
   }
@@ -16815,6 +18410,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportCreateNestedManyWithoutReporterInput
     assignedReports?: ReportCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerCreateNestedManyWithoutWorkerInput
     notifications?: NotificationCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneCreateNestedManyWithoutCreatedByInput
     createdSchedules?: CleanupScheduleCreateNestedManyWithoutCreatedByInput
@@ -16837,6 +18433,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportUncheckedCreateNestedManyWithoutReporterInput
     assignedReports?: ReportUncheckedCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutWorkerInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneUncheckedCreateNestedManyWithoutCreatedByInput
     createdSchedules?: CleanupScheduleUncheckedCreateNestedManyWithoutCreatedByInput
@@ -16889,6 +18486,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reporter?: UserUpdateOneWithoutReportsNestedInput
     assignedTo?: UserUpdateOneWithoutAssignedReportsNestedInput
+    assignedWorkers?: ReportWorkerUpdateManyWithoutReportNestedInput
     cleanupSchedule?: CleanupScheduleUpdateOneWithoutReportsNestedInput
     images?: ReportImageUpdateManyWithoutReportNestedInput
     notifications?: NotificationUpdateManyWithoutReportNestedInput
@@ -16924,6 +18522,7 @@ export namespace Prisma {
     reporterId?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToId?: NullableStringFieldUpdateOperationsInput | string | null
     cleanupScheduleId?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedWorkers?: ReportWorkerUncheckedUpdateManyWithoutReportNestedInput
     images?: ReportImageUncheckedUpdateManyWithoutReportNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutReportNestedInput
   }
@@ -16954,6 +18553,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUpdateManyWithoutWorkerNestedInput
     notifications?: NotificationUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUpdateManyWithoutCreatedByNestedInput
     createdSchedules?: CleanupScheduleUpdateManyWithoutCreatedByNestedInput
@@ -16976,6 +18576,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUncheckedUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUncheckedUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUncheckedUpdateManyWithoutWorkerNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUncheckedUpdateManyWithoutCreatedByNestedInput
     createdSchedules?: CleanupScheduleUncheckedUpdateManyWithoutCreatedByNestedInput
@@ -16998,6 +18599,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportCreateNestedManyWithoutReporterInput
     assignedReports?: ReportCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryCreateNestedManyWithoutChangedByInput
     reportingZones?: ReportingZoneCreateNestedManyWithoutCreatedByInput
     createdSchedules?: CleanupScheduleCreateNestedManyWithoutCreatedByInput
@@ -17020,6 +18622,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportUncheckedCreateNestedManyWithoutReporterInput
     assignedReports?: ReportUncheckedCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryUncheckedCreateNestedManyWithoutChangedByInput
     reportingZones?: ReportingZoneUncheckedCreateNestedManyWithoutCreatedByInput
     createdSchedules?: CleanupScheduleUncheckedCreateNestedManyWithoutCreatedByInput
@@ -17061,6 +18664,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reporter?: UserCreateNestedOneWithoutReportsInput
     assignedTo?: UserCreateNestedOneWithoutAssignedReportsInput
+    assignedWorkers?: ReportWorkerCreateNestedManyWithoutReportInput
     cleanupSchedule?: CleanupScheduleCreateNestedOneWithoutReportsInput
     images?: ReportImageCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryCreateNestedManyWithoutReportInput
@@ -17096,6 +18700,7 @@ export namespace Prisma {
     reporterId?: string | null
     assignedToId?: string | null
     cleanupScheduleId?: string | null
+    assignedWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutReportInput
     images?: ReportImageUncheckedCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryUncheckedCreateNestedManyWithoutReportInput
   }
@@ -17131,6 +18736,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUpdateManyWithoutChangedByNestedInput
     reportingZones?: ReportingZoneUpdateManyWithoutCreatedByNestedInput
     createdSchedules?: CleanupScheduleUpdateManyWithoutCreatedByNestedInput
@@ -17153,6 +18759,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUncheckedUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUncheckedUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUncheckedUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUncheckedUpdateManyWithoutChangedByNestedInput
     reportingZones?: ReportingZoneUncheckedUpdateManyWithoutCreatedByNestedInput
     createdSchedules?: CleanupScheduleUncheckedUpdateManyWithoutCreatedByNestedInput
@@ -17200,6 +18807,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reporter?: UserUpdateOneWithoutReportsNestedInput
     assignedTo?: UserUpdateOneWithoutAssignedReportsNestedInput
+    assignedWorkers?: ReportWorkerUpdateManyWithoutReportNestedInput
     cleanupSchedule?: CleanupScheduleUpdateOneWithoutReportsNestedInput
     images?: ReportImageUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUpdateManyWithoutReportNestedInput
@@ -17235,6 +18843,7 @@ export namespace Prisma {
     reporterId?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToId?: NullableStringFieldUpdateOperationsInput | string | null
     cleanupScheduleId?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedWorkers?: ReportWorkerUncheckedUpdateManyWithoutReportNestedInput
     images?: ReportImageUncheckedUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUncheckedUpdateManyWithoutReportNestedInput
   }
@@ -17254,6 +18863,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportCreateNestedManyWithoutReporterInput
     assignedReports?: ReportCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryCreateNestedManyWithoutChangedByInput
     notifications?: NotificationCreateNestedManyWithoutUserInput
     createdSchedules?: CleanupScheduleCreateNestedManyWithoutCreatedByInput
@@ -17276,6 +18886,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportUncheckedCreateNestedManyWithoutReporterInput
     assignedReports?: ReportUncheckedCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryUncheckedCreateNestedManyWithoutChangedByInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutUserInput
     createdSchedules?: CleanupScheduleUncheckedCreateNestedManyWithoutCreatedByInput
@@ -17314,6 +18925,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUpdateManyWithoutUserNestedInput
     createdSchedules?: CleanupScheduleUpdateManyWithoutCreatedByNestedInput
@@ -17336,6 +18948,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUncheckedUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUncheckedUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUncheckedUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUncheckedUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutUserNestedInput
     createdSchedules?: CleanupScheduleUncheckedUpdateManyWithoutCreatedByNestedInput
@@ -17358,6 +18971,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportCreateNestedManyWithoutReporterInput
     assignedReports?: ReportCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryCreateNestedManyWithoutChangedByInput
     notifications?: NotificationCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneCreateNestedManyWithoutCreatedByInput
@@ -17380,6 +18994,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportUncheckedCreateNestedManyWithoutReporterInput
     assignedReports?: ReportUncheckedCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryUncheckedCreateNestedManyWithoutChangedByInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneUncheckedCreateNestedManyWithoutCreatedByInput
@@ -17407,6 +19022,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportCreateNestedManyWithoutReporterInput
     assignedReports?: ReportCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryCreateNestedManyWithoutChangedByInput
     notifications?: NotificationCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneCreateNestedManyWithoutCreatedByInput
@@ -17429,6 +19045,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportUncheckedCreateNestedManyWithoutReporterInput
     assignedReports?: ReportUncheckedCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryUncheckedCreateNestedManyWithoutChangedByInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneUncheckedCreateNestedManyWithoutCreatedByInput
@@ -17492,6 +19109,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reporter?: UserCreateNestedOneWithoutReportsInput
     assignedTo?: UserCreateNestedOneWithoutAssignedReportsInput
+    assignedWorkers?: ReportWorkerCreateNestedManyWithoutReportInput
     images?: ReportImageCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryCreateNestedManyWithoutReportInput
     notifications?: NotificationCreateNestedManyWithoutReportInput
@@ -17526,6 +19144,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reporterId?: string | null
     assignedToId?: string | null
+    assignedWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutReportInput
     images?: ReportImageUncheckedCreateNestedManyWithoutReportInput
     statusHistory?: StatusHistoryUncheckedCreateNestedManyWithoutReportInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutReportInput
@@ -17567,6 +19186,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUpdateManyWithoutCreatedByNestedInput
@@ -17589,6 +19209,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUncheckedUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUncheckedUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUncheckedUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUncheckedUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUncheckedUpdateManyWithoutCreatedByNestedInput
@@ -17622,6 +19243,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUpdateManyWithoutCreatedByNestedInput
@@ -17644,6 +19266,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUncheckedUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUncheckedUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUncheckedUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUncheckedUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUncheckedUpdateManyWithoutCreatedByNestedInput
@@ -17741,6 +19364,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportCreateNestedManyWithoutReporterInput
     assignedReports?: ReportCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryCreateNestedManyWithoutChangedByInput
     notifications?: NotificationCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneCreateNestedManyWithoutCreatedByInput
@@ -17763,6 +19387,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     reports?: ReportUncheckedCreateNestedManyWithoutReporterInput
     assignedReports?: ReportUncheckedCreateNestedManyWithoutAssignedToInput
+    assignedReportWorkers?: ReportWorkerUncheckedCreateNestedManyWithoutWorkerInput
     statusChanges?: StatusHistoryUncheckedCreateNestedManyWithoutChangedByInput
     notifications?: NotificationUncheckedCreateNestedManyWithoutUserInput
     reportingZones?: ReportingZoneUncheckedCreateNestedManyWithoutCreatedByInput
@@ -17850,6 +19475,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUpdateManyWithoutCreatedByNestedInput
@@ -17872,11 +19498,276 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reports?: ReportUncheckedUpdateManyWithoutReporterNestedInput
     assignedReports?: ReportUncheckedUpdateManyWithoutAssignedToNestedInput
+    assignedReportWorkers?: ReportWorkerUncheckedUpdateManyWithoutWorkerNestedInput
     statusChanges?: StatusHistoryUncheckedUpdateManyWithoutChangedByNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutUserNestedInput
     reportingZones?: ReportingZoneUncheckedUpdateManyWithoutCreatedByNestedInput
     createdSchedules?: CleanupScheduleUncheckedUpdateManyWithoutCreatedByNestedInput
     verifiedSchedules?: CleanupScheduleUncheckedUpdateManyWithoutVerifiedByNestedInput
+  }
+
+  export type ReportCreateWithoutAssignedWorkersInput = {
+    id?: string
+    title: string
+    description: string
+    category: $Enums.WasteCategory
+    status?: $Enums.ReportStatus
+    latitude: number
+    longitude: number
+    address?: string | null
+    isAnonymous?: boolean
+    isDeleted?: boolean
+    isSpam?: boolean
+    spamMarkedAt?: Date | string | null
+    spamReason?: string | null
+    analysisStatus?: $Enums.AnalysisStatus | null
+    analysisWasteCount?: number | null
+    analysisConfidence?: number | null
+    analyzedAt?: Date | string | null
+    severity?: $Enums.Severity | null
+    aiCategories?: ReportCreateaiCategoriesInput | string[]
+    aiReason?: string | null
+    aiModel?: string | null
+    aiImageHash?: string | null
+    aiProcessingMs?: number | null
+    aiGeminiMs?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    reporter?: UserCreateNestedOneWithoutReportsInput
+    assignedTo?: UserCreateNestedOneWithoutAssignedReportsInput
+    cleanupSchedule?: CleanupScheduleCreateNestedOneWithoutReportsInput
+    images?: ReportImageCreateNestedManyWithoutReportInput
+    statusHistory?: StatusHistoryCreateNestedManyWithoutReportInput
+    notifications?: NotificationCreateNestedManyWithoutReportInput
+  }
+
+  export type ReportUncheckedCreateWithoutAssignedWorkersInput = {
+    id?: string
+    title: string
+    description: string
+    category: $Enums.WasteCategory
+    status?: $Enums.ReportStatus
+    latitude: number
+    longitude: number
+    address?: string | null
+    isAnonymous?: boolean
+    isDeleted?: boolean
+    isSpam?: boolean
+    spamMarkedAt?: Date | string | null
+    spamReason?: string | null
+    analysisStatus?: $Enums.AnalysisStatus | null
+    analysisWasteCount?: number | null
+    analysisConfidence?: number | null
+    analyzedAt?: Date | string | null
+    severity?: $Enums.Severity | null
+    aiCategories?: ReportCreateaiCategoriesInput | string[]
+    aiReason?: string | null
+    aiModel?: string | null
+    aiImageHash?: string | null
+    aiProcessingMs?: number | null
+    aiGeminiMs?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    reporterId?: string | null
+    assignedToId?: string | null
+    cleanupScheduleId?: string | null
+    images?: ReportImageUncheckedCreateNestedManyWithoutReportInput
+    statusHistory?: StatusHistoryUncheckedCreateNestedManyWithoutReportInput
+    notifications?: NotificationUncheckedCreateNestedManyWithoutReportInput
+  }
+
+  export type ReportCreateOrConnectWithoutAssignedWorkersInput = {
+    where: ReportWhereUniqueInput
+    create: XOR<ReportCreateWithoutAssignedWorkersInput, ReportUncheckedCreateWithoutAssignedWorkersInput>
+  }
+
+  export type UserCreateWithoutAssignedReportWorkersInput = {
+    id?: string
+    email: string
+    password: string
+    firstName: string
+    lastName: string
+    phone?: string | null
+    address?: string
+    role?: $Enums.Role
+    avatarUrl?: string | null
+    isActive?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    reports?: ReportCreateNestedManyWithoutReporterInput
+    assignedReports?: ReportCreateNestedManyWithoutAssignedToInput
+    statusChanges?: StatusHistoryCreateNestedManyWithoutChangedByInput
+    notifications?: NotificationCreateNestedManyWithoutUserInput
+    reportingZones?: ReportingZoneCreateNestedManyWithoutCreatedByInput
+    createdSchedules?: CleanupScheduleCreateNestedManyWithoutCreatedByInput
+    verifiedSchedules?: CleanupScheduleCreateNestedManyWithoutVerifiedByInput
+    scheduleAssignments?: CleanupScheduleWorkerCreateNestedManyWithoutWorkerInput
+  }
+
+  export type UserUncheckedCreateWithoutAssignedReportWorkersInput = {
+    id?: string
+    email: string
+    password: string
+    firstName: string
+    lastName: string
+    phone?: string | null
+    address?: string
+    role?: $Enums.Role
+    avatarUrl?: string | null
+    isActive?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    reports?: ReportUncheckedCreateNestedManyWithoutReporterInput
+    assignedReports?: ReportUncheckedCreateNestedManyWithoutAssignedToInput
+    statusChanges?: StatusHistoryUncheckedCreateNestedManyWithoutChangedByInput
+    notifications?: NotificationUncheckedCreateNestedManyWithoutUserInput
+    reportingZones?: ReportingZoneUncheckedCreateNestedManyWithoutCreatedByInput
+    createdSchedules?: CleanupScheduleUncheckedCreateNestedManyWithoutCreatedByInput
+    verifiedSchedules?: CleanupScheduleUncheckedCreateNestedManyWithoutVerifiedByInput
+    scheduleAssignments?: CleanupScheduleWorkerUncheckedCreateNestedManyWithoutWorkerInput
+  }
+
+  export type UserCreateOrConnectWithoutAssignedReportWorkersInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutAssignedReportWorkersInput, UserUncheckedCreateWithoutAssignedReportWorkersInput>
+  }
+
+  export type ReportUpsertWithoutAssignedWorkersInput = {
+    update: XOR<ReportUpdateWithoutAssignedWorkersInput, ReportUncheckedUpdateWithoutAssignedWorkersInput>
+    create: XOR<ReportCreateWithoutAssignedWorkersInput, ReportUncheckedCreateWithoutAssignedWorkersInput>
+    where?: ReportWhereInput
+  }
+
+  export type ReportUpdateToOneWithWhereWithoutAssignedWorkersInput = {
+    where?: ReportWhereInput
+    data: XOR<ReportUpdateWithoutAssignedWorkersInput, ReportUncheckedUpdateWithoutAssignedWorkersInput>
+  }
+
+  export type ReportUpdateWithoutAssignedWorkersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    description?: StringFieldUpdateOperationsInput | string
+    category?: EnumWasteCategoryFieldUpdateOperationsInput | $Enums.WasteCategory
+    status?: EnumReportStatusFieldUpdateOperationsInput | $Enums.ReportStatus
+    latitude?: FloatFieldUpdateOperationsInput | number
+    longitude?: FloatFieldUpdateOperationsInput | number
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    isAnonymous?: BoolFieldUpdateOperationsInput | boolean
+    isDeleted?: BoolFieldUpdateOperationsInput | boolean
+    isSpam?: BoolFieldUpdateOperationsInput | boolean
+    spamMarkedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    spamReason?: NullableStringFieldUpdateOperationsInput | string | null
+    analysisStatus?: NullableEnumAnalysisStatusFieldUpdateOperationsInput | $Enums.AnalysisStatus | null
+    analysisWasteCount?: NullableIntFieldUpdateOperationsInput | number | null
+    analysisConfidence?: NullableFloatFieldUpdateOperationsInput | number | null
+    analyzedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    severity?: NullableEnumSeverityFieldUpdateOperationsInput | $Enums.Severity | null
+    aiCategories?: ReportUpdateaiCategoriesInput | string[]
+    aiReason?: NullableStringFieldUpdateOperationsInput | string | null
+    aiModel?: NullableStringFieldUpdateOperationsInput | string | null
+    aiImageHash?: NullableStringFieldUpdateOperationsInput | string | null
+    aiProcessingMs?: NullableIntFieldUpdateOperationsInput | number | null
+    aiGeminiMs?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    reporter?: UserUpdateOneWithoutReportsNestedInput
+    assignedTo?: UserUpdateOneWithoutAssignedReportsNestedInput
+    cleanupSchedule?: CleanupScheduleUpdateOneWithoutReportsNestedInput
+    images?: ReportImageUpdateManyWithoutReportNestedInput
+    statusHistory?: StatusHistoryUpdateManyWithoutReportNestedInput
+    notifications?: NotificationUpdateManyWithoutReportNestedInput
+  }
+
+  export type ReportUncheckedUpdateWithoutAssignedWorkersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    description?: StringFieldUpdateOperationsInput | string
+    category?: EnumWasteCategoryFieldUpdateOperationsInput | $Enums.WasteCategory
+    status?: EnumReportStatusFieldUpdateOperationsInput | $Enums.ReportStatus
+    latitude?: FloatFieldUpdateOperationsInput | number
+    longitude?: FloatFieldUpdateOperationsInput | number
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    isAnonymous?: BoolFieldUpdateOperationsInput | boolean
+    isDeleted?: BoolFieldUpdateOperationsInput | boolean
+    isSpam?: BoolFieldUpdateOperationsInput | boolean
+    spamMarkedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    spamReason?: NullableStringFieldUpdateOperationsInput | string | null
+    analysisStatus?: NullableEnumAnalysisStatusFieldUpdateOperationsInput | $Enums.AnalysisStatus | null
+    analysisWasteCount?: NullableIntFieldUpdateOperationsInput | number | null
+    analysisConfidence?: NullableFloatFieldUpdateOperationsInput | number | null
+    analyzedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    severity?: NullableEnumSeverityFieldUpdateOperationsInput | $Enums.Severity | null
+    aiCategories?: ReportUpdateaiCategoriesInput | string[]
+    aiReason?: NullableStringFieldUpdateOperationsInput | string | null
+    aiModel?: NullableStringFieldUpdateOperationsInput | string | null
+    aiImageHash?: NullableStringFieldUpdateOperationsInput | string | null
+    aiProcessingMs?: NullableIntFieldUpdateOperationsInput | number | null
+    aiGeminiMs?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    reporterId?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedToId?: NullableStringFieldUpdateOperationsInput | string | null
+    cleanupScheduleId?: NullableStringFieldUpdateOperationsInput | string | null
+    images?: ReportImageUncheckedUpdateManyWithoutReportNestedInput
+    statusHistory?: StatusHistoryUncheckedUpdateManyWithoutReportNestedInput
+    notifications?: NotificationUncheckedUpdateManyWithoutReportNestedInput
+  }
+
+  export type UserUpsertWithoutAssignedReportWorkersInput = {
+    update: XOR<UserUpdateWithoutAssignedReportWorkersInput, UserUncheckedUpdateWithoutAssignedReportWorkersInput>
+    create: XOR<UserCreateWithoutAssignedReportWorkersInput, UserUncheckedCreateWithoutAssignedReportWorkersInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutAssignedReportWorkersInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutAssignedReportWorkersInput, UserUncheckedUpdateWithoutAssignedReportWorkersInput>
+  }
+
+  export type UserUpdateWithoutAssignedReportWorkersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    firstName?: StringFieldUpdateOperationsInput | string
+    lastName?: StringFieldUpdateOperationsInput | string
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    reports?: ReportUpdateManyWithoutReporterNestedInput
+    assignedReports?: ReportUpdateManyWithoutAssignedToNestedInput
+    statusChanges?: StatusHistoryUpdateManyWithoutChangedByNestedInput
+    notifications?: NotificationUpdateManyWithoutUserNestedInput
+    reportingZones?: ReportingZoneUpdateManyWithoutCreatedByNestedInput
+    createdSchedules?: CleanupScheduleUpdateManyWithoutCreatedByNestedInput
+    verifiedSchedules?: CleanupScheduleUpdateManyWithoutVerifiedByNestedInput
+    scheduleAssignments?: CleanupScheduleWorkerUpdateManyWithoutWorkerNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutAssignedReportWorkersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    firstName?: StringFieldUpdateOperationsInput | string
+    lastName?: StringFieldUpdateOperationsInput | string
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    reports?: ReportUncheckedUpdateManyWithoutReporterNestedInput
+    assignedReports?: ReportUncheckedUpdateManyWithoutAssignedToNestedInput
+    statusChanges?: StatusHistoryUncheckedUpdateManyWithoutChangedByNestedInput
+    notifications?: NotificationUncheckedUpdateManyWithoutUserNestedInput
+    reportingZones?: ReportingZoneUncheckedUpdateManyWithoutCreatedByNestedInput
+    createdSchedules?: CleanupScheduleUncheckedUpdateManyWithoutCreatedByNestedInput
+    verifiedSchedules?: CleanupScheduleUncheckedUpdateManyWithoutVerifiedByNestedInput
+    scheduleAssignments?: CleanupScheduleWorkerUncheckedUpdateManyWithoutWorkerNestedInput
   }
 
   export type ReportCreateManyReporterInput = {
@@ -17939,6 +19830,12 @@ export namespace Prisma {
     updatedAt?: Date | string
     reporterId?: string | null
     cleanupScheduleId?: string | null
+  }
+
+  export type ReportWorkerCreateManyWorkerInput = {
+    id?: string
+    assignedAt?: Date | string
+    reportId: string
   }
 
   export type StatusHistoryCreateManyChangedByInput = {
@@ -18037,6 +19934,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     assignedTo?: UserUpdateOneWithoutAssignedReportsNestedInput
+    assignedWorkers?: ReportWorkerUpdateManyWithoutReportNestedInput
     cleanupSchedule?: CleanupScheduleUpdateOneWithoutReportsNestedInput
     images?: ReportImageUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUpdateManyWithoutReportNestedInput
@@ -18072,6 +19970,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     assignedToId?: NullableStringFieldUpdateOperationsInput | string | null
     cleanupScheduleId?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedWorkers?: ReportWorkerUncheckedUpdateManyWithoutReportNestedInput
     images?: ReportImageUncheckedUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUncheckedUpdateManyWithoutReportNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutReportNestedInput
@@ -18136,6 +20035,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reporter?: UserUpdateOneWithoutReportsNestedInput
+    assignedWorkers?: ReportWorkerUpdateManyWithoutReportNestedInput
     cleanupSchedule?: CleanupScheduleUpdateOneWithoutReportsNestedInput
     images?: ReportImageUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUpdateManyWithoutReportNestedInput
@@ -18171,6 +20071,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reporterId?: NullableStringFieldUpdateOperationsInput | string | null
     cleanupScheduleId?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedWorkers?: ReportWorkerUncheckedUpdateManyWithoutReportNestedInput
     images?: ReportImageUncheckedUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUncheckedUpdateManyWithoutReportNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutReportNestedInput
@@ -18205,6 +20106,24 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reporterId?: NullableStringFieldUpdateOperationsInput | string | null
     cleanupScheduleId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type ReportWorkerUpdateWithoutWorkerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    report?: ReportUpdateOneRequiredWithoutAssignedWorkersNestedInput
+  }
+
+  export type ReportWorkerUncheckedUpdateWithoutWorkerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    reportId?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type ReportWorkerUncheckedUpdateManyWithoutWorkerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    reportId?: StringFieldUpdateOperationsInput | string
   }
 
   export type StatusHistoryUpdateWithoutChangedByInput = {
@@ -18419,6 +20338,12 @@ export namespace Prisma {
     scheduleId?: StringFieldUpdateOperationsInput | string
   }
 
+  export type ReportWorkerCreateManyReportInput = {
+    id?: string
+    assignedAt?: Date | string
+    workerId: string
+  }
+
   export type ReportImageCreateManyReportInput = {
     id?: string
     imageUrl: string
@@ -18444,6 +20369,24 @@ export namespace Prisma {
     isRead?: boolean
     createdAt?: Date | string
     userId: string
+  }
+
+  export type ReportWorkerUpdateWithoutReportInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    worker?: UserUpdateOneRequiredWithoutAssignedReportWorkersNestedInput
+  }
+
+  export type ReportWorkerUncheckedUpdateWithoutReportInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workerId?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type ReportWorkerUncheckedUpdateManyWithoutReportInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workerId?: StringFieldUpdateOperationsInput | string
   }
 
   export type ReportImageUpdateWithoutReportInput = {
@@ -18611,6 +20554,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reporter?: UserUpdateOneWithoutReportsNestedInput
     assignedTo?: UserUpdateOneWithoutAssignedReportsNestedInput
+    assignedWorkers?: ReportWorkerUpdateManyWithoutReportNestedInput
     images?: ReportImageUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUpdateManyWithoutReportNestedInput
     notifications?: NotificationUpdateManyWithoutReportNestedInput
@@ -18645,6 +20589,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reporterId?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToId?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedWorkers?: ReportWorkerUncheckedUpdateManyWithoutReportNestedInput
     images?: ReportImageUncheckedUpdateManyWithoutReportNestedInput
     statusHistory?: StatusHistoryUncheckedUpdateManyWithoutReportNestedInput
     notifications?: NotificationUncheckedUpdateManyWithoutReportNestedInput

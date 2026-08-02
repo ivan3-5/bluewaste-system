@@ -13,6 +13,7 @@ import {
   WasteType,
 } from "@/types";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { formatAnalysisDetails } from "@/lib/utils";
 import { DetectionBox, inferWasteCategory } from "@/lib/waste-classification";
 import DetectionImageOverlay from "@/components/ai/DetectionImageOverlay";
 import { SeverityBadge, type SeverityLevel } from "@/components/SeverityBadge";
@@ -673,7 +674,10 @@ export default function SubmitReportPage() {
         analysisWasteCount: analysisResult?.wasteCount ?? null,
         aiModel: analysisResult ? "gemini-3.5-flash" : null,
         aiCategories: analysisResult?.labels?.filter((l: unknown): l is string => typeof l === "string" && l !== "with_waste" && l !== "no_waste") ?? [],
-        aiReason: decisionMessage || analysisResult?.decision?.message || (analysisResult?.has_waste ? `Detected waste items (${(analysisResult?.labels || []).join(", ")}) with ${Math.round((analysisResult?.confidence || 0) * 100)}% confidence.` : "No visible waste detected.") || null,
+        aiReason: formatAnalysisDetails(
+          analysisResult?.labels?.filter((l: unknown): l is string => typeof l === "string" && l !== "with_waste" && l !== "no_waste"),
+          analysisResult?.decision?.message
+        ),
       });
 
       await uploadImages.mutateAsync({

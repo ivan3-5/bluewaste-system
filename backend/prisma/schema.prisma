@@ -91,6 +91,8 @@ model User {
   reports         Report[]        @relation("ReporterReports")
   // Reports assigned to the user (field worker)
   assignedReports Report[]        @relation("AssignedReports")
+  // Multiple report worker assignments
+  assignedReportWorkers ReportWorker[] @relation("AssignedReportWorkers")
   // Status changes made by the user
   statusChanges   StatusHistory[]
   // Notifications for the user
@@ -147,9 +149,12 @@ model Report {
   reporterId String?
   reporter   User?   @relation("ReporterReports", fields: [reporterId], references: [id])
 
-  // Assigned field worker
+  // Assigned field worker (legacy single-worker reference)
   assignedToId String?
   assignedTo   User?   @relation("AssignedReports", fields: [assignedToId], references: [id])
+
+  // Assigned field workers (multiple worker assignment)
+  assignedWorkers ReportWorker[]
 
   // Cleanup Schedule
   cleanupScheduleId String?
@@ -293,3 +298,18 @@ model CleanupScheduleWorker {
   @@unique([scheduleId, workerId])
   @@index([workerId])
 }
+
+model ReportWorker {
+  id         String   @id @default(uuid())
+  assignedAt DateTime @default(now())
+
+  reportId String
+  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  workerId String
+  worker   User   @relation("AssignedReportWorkers", fields: [workerId], references: [id])
+
+  @@unique([reportId, workerId])
+  @@index([workerId])
+  @@index([reportId])
+}

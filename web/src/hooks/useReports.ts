@@ -171,14 +171,18 @@ export function useAssignWorker() {
   return useMutation({
     mutationFn: async ({
       reportId,
+      workerIds,
       assignedToId,
     }: {
       reportId: string;
-      assignedToId: string;
+      workerIds?: string[];
+      assignedToId?: string;
     }) => {
-      const { data } = await api.put(`/reports/${reportId}/assign`, {
-        assignedToId,
-      });
+      const payload: { workerIds?: string[]; assignedToId?: string } = {};
+      if (workerIds !== undefined) payload.workerIds = workerIds;
+      if (assignedToId !== undefined) payload.assignedToId = assignedToId;
+
+      const { data } = await api.put(`/reports/${reportId}/assign`, payload);
       return data;
     },
     onSuccess: () => {

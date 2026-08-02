@@ -218,7 +218,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
                             ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
-                      Text(task.description,
+                      Text(task.displayDescription,
                           maxLines: 3, overflow: TextOverflow.ellipsis),
                       // Report images
                       if (task.images

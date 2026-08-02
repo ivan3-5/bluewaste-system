@@ -6,6 +6,8 @@ import { ReportSpamService } from "./report-spam.service";
 export type ReportMapData = {
   id: string;
   title: string;
+  description?: string;
+  aiReason?: string | null;
   category: WasteCategory;
   status: ReportStatus;
   severity?: Severity | null;
@@ -13,6 +15,7 @@ export type ReportMapData = {
   longitude: number;
   address: string | null;
   createdAt: Date;
+  updatedAt?: Date;
   images: { imageUrl: string }[];
 };
 
@@ -55,6 +58,8 @@ export class ReportGeoService {
         select: {
           id: true,
           title: true,
+          description: true,
+          aiReason: true,
           category: true,
           status: true,
           severity: true,
@@ -62,6 +67,7 @@ export class ReportGeoService {
           longitude: true,
           address: true,
           createdAt: true,
+          updatedAt: true,
           images: { take: 1, select: { imageUrl: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -82,6 +88,7 @@ export class ReportGeoService {
         select: {
           id: true,
           title: true,
+          description: true,
           category: true,
           status: true,
           latitude: true,

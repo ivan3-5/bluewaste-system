@@ -96,10 +96,17 @@ export class ReportCrudService {
         : null;
 
     const report = await prisma.$transaction(async (tx) => {
+      const resolvedDescription =
+        data.description && data.description.trim().length > 0
+          ? data.description
+          : data.aiReason && data.aiReason.trim().length > 0
+            ? data.aiReason
+            : "Waste report submitted via mobile capture.";
+
       const created = await tx.report.create({
         data: {
           title: data.title,
-          description: data.description,
+          description: resolvedDescription,
           category: data.category,
           latitude: data.latitude,
           longitude: data.longitude,
@@ -228,6 +235,20 @@ export class ReportCrudService {
             email: true,
             phone: true,
           },
+        },
+        assignedWorkers: {
+          include: {
+            worker: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+          orderBy: { assignedAt: "asc" },
         },
         images: { orderBy: { createdAt: "asc" } },
         statusHistory: {
@@ -458,6 +479,20 @@ export class ReportCrudService {
               phone: true,
             },
           },
+          assignedWorkers: {
+            include: {
+              worker: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                },
+              },
+            },
+            orderBy: { assignedAt: "asc" },
+          },
           images: { take: 1 },
           _count: { select: { images: true, statusHistory: true } },
         },
@@ -474,7 +509,7 @@ export class ReportCrudService {
 
   static async assignWorker(
     reportId: string,
-    assignedToId: string,
+    workerIdsInput: string | string[],
     assignedById: string,
   ) {
     const report = await prisma.report.findFirst({
@@ -490,18 +525,59 @@ export class ReportCrudService {
       throw new Error("Report is marked as spam");
     }
 
-    const worker = await prisma.user.findFirst({
-      where: { id: assignedToId, role: Role.FIELD_WORKER, isActive: true },
-      select: { id: true, firstName: true, lastName: true },
+    const rawWorkerIds = Array.isArray(workerIdsInput)
+      ? workerIdsInput
+      : workerIdsInput ? [workerIdsInput] : [];
+
+    const workerIds = Array.from(new Set(rawWorkerIds.filter(Boolean)));
+
+    const validWorkers = workerIds.length > 0
+      ? await prisma.user.findMany({
+          where: {
+            id: { in: workerIds },
+            role: Role.FIELD_WORKER,
+            isActive: true,
+          },
+          select: { id: true, firstName: true, lastName: true },
+        })
+      : [];
+
+    const validWorkerIds = validWorkers.map((w) => w.id);
+
+    // Existing assigned workers for notification comparison
+    const existingAssignments = await prisma.reportWorker.findMany({
+      where: { reportId },
+      select: { workerId: true },
+    });
+    const existingWorkerIds = new Set(existingAssignments.map((a) => a.workerId));
+
+    const primaryWorkerId = validWorkerIds.length > 0 ? validWorkerIds[0] : null;
+
+    await prisma.$transaction(async (tx) => {
+      // Clear existing worker assignments for this report
+      await tx.reportWorker.deleteMany({
+        where: { reportId },
+      });
+
+      // Create new worker assignments
+      if (validWorkerIds.length > 0) {
+        await tx.reportWorker.createMany({
+          data: validWorkerIds.map((workerId) => ({
+            reportId,
+            workerId,
+          })),
+        });
+      }
+
+      // Update legacy single worker ID reference
+      await tx.report.update({
+        where: { id: reportId },
+        data: { assignedToId: primaryWorkerId },
+      });
     });
 
-    if (!worker) {
-      throw new Error("Field worker not found");
-    }
-
-    const updatedReport = await prisma.report.update({
+    const updatedReport = await prisma.report.findUnique({
       where: { id: reportId },
-      data: { assignedToId: worker.id },
       include: {
         reporter: {
           select: {
@@ -521,19 +597,37 @@ export class ReportCrudService {
             phone: true,
           },
         },
+        assignedWorkers: {
+          include: {
+            worker: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+          orderBy: { assignedAt: "asc" },
+        },
         images: { take: 1 },
       },
     });
 
-    await NotificationService.create({
-      userId: worker.id,
-      title: "New Cleanup Assignment",
-      message: `You have been assigned to report "${report.title}".`,
-      type: NotificationType.ASSIGNMENT,
-      reportId,
-    });
+    // Notify newly assigned workers
+    const newlyAssigned = validWorkers.filter((w) => !existingWorkerIds.has(w.id));
+    for (const worker of newlyAssigned) {
+      await NotificationService.create({
+        userId: worker.id,
+        title: "New Cleanup Assignment",
+        message: `You have been assigned to report "${report.title}".`,
+        type: NotificationType.ASSIGNMENT,
+        reportId,
+      });
+    }
 
-    return sanitizeReportForPrivacy(updatedReport);
+    return sanitizeReportForPrivacy(updatedReport!);
   }
 
   static async getMyReports(
@@ -604,7 +698,10 @@ export class ReportCrudService {
     });
 
     const where: Prisma.ReportWhereInput = {
-      assignedToId: userId,
+      OR: [
+        { assignedToId: userId },
+        { assignedWorkers: { some: { workerId: userId } } },
+      ],
       isDeleted: false,
       isSpam: false,
     };
