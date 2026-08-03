@@ -103,6 +103,17 @@ export const reportFilterSchema = z.object({
   search: z.string().max(200).optional(),
 });
 
-export const assignWorkerSchema = z.object({
-  assignedToId: z.string().min(1, "assignedToId is required"),
-});
+export const assignWorkerSchema = z
+  .object({
+    assignedToId: z.string().optional(),
+    workerIds: z.array(z.string()).optional(),
+  })
+  .refine(
+    (data) =>
+      (data.workerIds && data.workerIds.length > 0) ||
+      (typeof data.assignedToId === "string" && data.assignedToId.trim().length > 0),
+    {
+      message: "At least one worker must be selected",
+    },
+  );
+

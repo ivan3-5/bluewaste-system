@@ -55,7 +55,7 @@ export default function AssignWorker({
     setSelectedIds((prev) =>
       prev.includes(workerId)
         ? prev.filter((id) => id !== workerId)
-        : [...prev, workerId]
+        : Array.from(new Set([...prev, workerId]))
     );
   };
 
@@ -65,8 +65,13 @@ export default function AssignWorker({
 
   const onAssign = async () => {
     setMessage("");
+    if (selectedIds.length === 0) {
+      setMessage("Please select at least one worker to assign.");
+      return;
+    }
+    const uniqueIds = Array.from(new Set(selectedIds));
     try {
-      await assign.mutateAsync({ reportId, workerIds: selectedIds });
+      await assign.mutateAsync({ reportId, workerIds: uniqueIds });
       setMessage("Assignments updated successfully.");
       router.refresh();
     } catch (err) {

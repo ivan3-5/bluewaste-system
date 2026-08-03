@@ -544,6 +544,10 @@ export class ReportCrudService {
 
     const validWorkerIds = validWorkers.map((w) => w.id);
 
+    if (validWorkerIds.length === 0) {
+      throw new Error("At least one worker must be selected");
+    }
+
     // Existing assigned workers for notification comparison
     const existingAssignments = await prisma.reportWorker.findMany({
       where: { reportId },
