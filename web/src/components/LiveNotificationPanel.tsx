@@ -78,8 +78,8 @@ function ToastCard({ toast }: { toast: ToastNotification }) {
     // mount → slide-in
     const t1 = requestAnimationFrame(() => setVisible(true));
 
-    // start slide-out just before auto-dismiss fires (1.7 s in, dismiss at 2 s)
-    const t2 = setTimeout(() => setLeaving(true), 1700);
+    // start slide-out just before auto-dismiss fires (3.7 s in, dismiss at 4 s)
+    const t2 = setTimeout(() => setLeaving(true), 3700);
 
     return () => {
       cancelAnimationFrame(t1);
@@ -127,11 +127,11 @@ function ToastCard({ toast }: { toast: ToastNotification }) {
       {/* Accent bar */}
       <div className={`absolute left-0 top-0 h-full w-1 ${cfg.bar} rounded-l-2xl`} />
 
-      {/* Progress bar (shrinks over 2 s) */}
+      {/* Progress bar (shrinks over 4 s) */}
       <div
         className={`absolute bottom-0 left-0 h-0.5 ${cfg.bar} opacity-30 origin-left`}
         style={{
-          animation: "shrink-bar 2s linear forwards",
+          animation: "shrink-bar 4s linear forwards",
         }}
       />
 

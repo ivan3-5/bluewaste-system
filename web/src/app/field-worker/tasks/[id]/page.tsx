@@ -38,6 +38,7 @@ import {
   Navigation,
 } from "lucide-react";
 import { FieldWorkerTaskDetailSkeleton } from "@/components/skeletons/page-skeletons";
+import { useLiveNotifications } from "@/contexts/LiveNotificationContext";
 
 // Task-specific route map (worker location → report)
 const TaskRouteMap = dynamic(
@@ -74,6 +75,7 @@ export default function TaskDetailPage() {
   const { data: report, isLoading } = useReport(id);
   const updateStatus = useUpdateReportStatus();
   const uploadImages = useUploadReportImages();
+  const { pushToast } = useLiveNotifications();
 
   const [statusNotes, setStatusNotes] = useState("");
   const [cleanupPhotos, setCleanupPhotos] = useState<File[]>([]);
@@ -119,15 +121,36 @@ export default function TaskDetailPage() {
         notes: statusNotes || undefined,
       });
 
-      setSuccess(
+      const msg =
         newStatus === "CLEANED"
           ? "Report marked as cleaned! Great work."
-          : "Status updated successfully.",
-      );
+          : `Task status updated to ${REPORT_STATUS_LABELS[newStatus] || newStatus}.`;
+
+      setSuccess(msg);
+      pushToast({
+        id: `task-status-${report.id}-${Date.now()}`,
+        title: "Status Updated",
+        message: msg,
+        type: "STATUS_CHANGE",
+        variant: "success",
+        isRead: true,
+        createdAt: new Date().toISOString(),
+      });
       setStatusNotes("");
       setCleanupPhotos([]);
-    } catch {
-      // Error handled by react-query
+    } catch (error) {
+      pushToast({
+        id: `task-status-err-${report.id}-${Date.now()}`,
+        title: "Update Failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to update task status.",
+        type: "STATUS_CHANGE",
+        variant: "error",
+        isRead: true,
+        createdAt: new Date().toISOString(),
+      });
     } finally {
       setIsSubmitting(false);
     }

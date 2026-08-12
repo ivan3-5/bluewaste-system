@@ -12,6 +12,12 @@ export const validate = (
       next();
     } catch (error) {
       if (error instanceof ZodError) {
+        const fs = require('fs');
+        const errData = JSON.stringify(error.errors.map((e) => ({
+          field: e.path.join("."),
+          message: e.message,
+        })));
+        fs.appendFileSync('validation-error.log', errData + '\n');
         return res.status(400).json({
           error: "Validation failed",
           details: error.errors.map((e) => ({

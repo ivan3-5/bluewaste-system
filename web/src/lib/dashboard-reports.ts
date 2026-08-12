@@ -39,6 +39,7 @@ type DashboardReportRow = {
   assignedToName?: string | null;
   assignedWorkerNames?: string | null;
   assignedWorkers?: Array<{ id: string; firstName: string; lastName: string; email?: string }> | null;
+  cleanupScheduleId?: string | null;
   // Gemini AI fields
   aiCategories?: string[] | null;
   aiReason?: string | null;
@@ -130,6 +131,7 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
     reportedAt: row.reportedAt,
     updatedAt: row.updatedAt,
     analyzedAt: row.analyzedAt ?? null,
+    cleanupScheduleId: row.cleanupScheduleId ?? null,
     aiCategories: Array.isArray(row.aiCategories) ? row.aiCategories : null,
     aiReason: row.aiReason ?? null,
     aiModel: row.aiModel ?? null,
@@ -160,6 +162,7 @@ export async function getDashboardReports(limit: number) {
       r."aiModel",
       r."aiProcessingMs",
       r."aiGeminiMs",
+      r."cleanupScheduleId",
       COALESCE(image."imageUrl", null) AS "imageUrl",
       COALESCE(images.images, '[]'::json) AS images,
       r."reporterId",
@@ -254,6 +257,7 @@ export async function getDashboardReportById(id: string) {
       r."aiModel",
       r."aiProcessingMs",
       r."aiGeminiMs",
+      r."cleanupScheduleId",
       COALESCE(image."imageUrl", null) AS "imageUrl",
       COALESCE(images.images, '[]'::json) AS images,
       r."reporterId",

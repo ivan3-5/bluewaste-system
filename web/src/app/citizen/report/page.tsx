@@ -1094,119 +1094,144 @@ export default function SubmitReportPage() {
                 </div>
               </div>
 
-              {/* Report details card */}
-              <div className="rounded-2xl border bg-white shadow-sm">
-                <div className="border-b px-4 py-3">
-                  <span className="text-sm font-semibold text-gray-900">
-                    Report Details
-                  </span>
+              {/* Report details card - shown after finishing the Waste Analysis */}
+              {!imageFile ? (
+                <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center space-y-2.5 shadow-xs">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-violet-50 text-violet-600">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Report Details</h3>
+                    <p className="text-xs text-gray-500 max-w-xs mx-auto mt-0.5">
+                      Upload a waste photo above to run automated Waste Analysis and unlock report details.
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-4 p-4">
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="waste-category"
-                      className="text-xs font-medium text-gray-700"
-                    >
-                      Waste Category <span className="text-red-500">*</span>
-                    </Label>
-                    <select
-                      id="waste-category"
-                      title="Select waste category"
-                      className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-70 disabled:bg-gray-100"
-                      value={selectedCategory}
-                      onChange={(event) =>
-                        setSelectedCategory(event.target.value as WasteBucket)
-                      }
-                      // Lock the category when AI detected waste to prevent accidental override
-                      disabled={!!(analysisResult?.has_waste)}
-                    >
-                      <option value="">Select waste category…</option>
-                      {(["with_waste", "no_waste"] as WasteBucket[]).map(
-                        (key) => (
-                          <option key={key} value={key}>
-                            {WASTE_BUCKET_LABELS[key]}
-                          </option>
-                        ),
-                      )}
-                    </select>
+              ) : isAnalyzing ? (
+                <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-6 text-center space-y-3 shadow-xs">
+                  <Loader2 className="h-6 w-6 animate-spin text-violet-600 mx-auto" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Running Waste Analysis…</h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Report details will be generated and shown as soon as analysis finishes.
+                    </p>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="description"
-                      className="text-xs font-medium text-gray-700"
-                    >
-                      Description{" "}
-                      <span className="text-gray-400 font-normal">
-                        (optional)
-                      </span>
-                    </Label>
-                    <Textarea
-                      id="description"
-                      value={description}
-                      onChange={(event) => setDescription(event.target.value)}
-                      placeholder="Add details about the waste condition or surroundings…"
-                      rows={3}
-                      className="resize-none text-sm"
-                    />
+                </div>
+              ) : (
+                <div className="rounded-2xl border bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b px-4 py-3">
+                    <span className="text-sm font-semibold text-gray-900">
+                      Report Details
+                    </span>
                   </div>
+                  <div className="space-y-4 p-4">
 
-                  {/* Submit anonymously option */}
-                  <div
-                    className={`flex items-start gap-3 rounded-xl border p-3.5 transition-all ${
-                      isAnonymous
-                        ? "border-emerald-200 bg-emerald-50/60 text-emerald-950 shadow-sm"
-                        : "border-gray-200 bg-gray-50/50 text-gray-800"
-                    }`}
-                  >
-                    <div className="pt-0.5">
-                      <input
-                        type="checkbox"
-                        id="submit-anonymously"
-                        checked={isAnonymous}
-                        onChange={(event) => setIsAnonymous(event.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="waste-category"
+                        className="text-xs font-medium text-gray-700"
+                      >
+                        Waste Category <span className="text-red-500">*</span>
+                      </Label>
+                      <select
+                        id="waste-category"
+                        title="Select waste category"
+                        className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-70 disabled:bg-gray-100"
+                        value={selectedCategory}
+                        onChange={(event) =>
+                          setSelectedCategory(event.target.value as WasteBucket)
+                        }
+                        // Lock the category when AI detected waste to prevent accidental override
+                        disabled={!!(analysisResult?.has_waste)}
+                      >
+                        <option value="">Select waste category…</option>
+                        {(["with_waste", "no_waste"] as WasteBucket[]).map(
+                          (key) => (
+                            <option key={key} value={key}>
+                              {WASTE_BUCKET_LABELS[key]}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="description"
+                        className="text-xs font-medium text-gray-700"
+                      >
+                        Description{" "}
+                        <span className="text-gray-400 font-normal">
+                          (optional)
+                        </span>
+                      </Label>
+                      <Textarea
+                        id="description"
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        placeholder="Add details about the waste condition or surroundings…"
+                        rows={3}
+                        className="resize-none text-sm"
                       />
                     </div>
-                    <label
-                      htmlFor="submit-anonymously"
-                      className="flex flex-1 cursor-pointer flex-col gap-0.5 select-none"
+
+                    {/* Submit anonymously option */}
+                    <div
+                      className={`flex items-start gap-3 rounded-xl border p-3.5 transition-all ${
+                        isAnonymous
+                          ? "border-emerald-200 bg-emerald-50/60 text-emerald-950 shadow-sm"
+                          : "border-gray-200 bg-gray-50/50 text-gray-800"
+                      }`}
                     >
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-900">
-                        <EyeOff className={`h-4 w-4 ${isAnonymous ? "text-emerald-600" : "text-gray-500"}`} />
-                        <span>Submit anonymously</span>
+                      <div className="pt-0.5">
+                        <input
+                          type="checkbox"
+                          id="submit-anonymously"
+                          checked={isAnonymous}
+                          onChange={(event) => setIsAnonymous(event.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        />
                       </div>
-                      <p className="text-xs text-gray-500 leading-normal">
-                        Hide your personal identity from city officials, field workers, and the public map.
-                      </p>
-                    </label>
-                  </div>
-
-                  {(fileError || submitError) && (
-                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
-                      <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span>{fileError || submitError}</span>
+                      <label
+                        htmlFor="submit-anonymously"
+                        className="flex flex-1 cursor-pointer flex-col gap-0.5 select-none"
+                      >
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-900">
+                          <EyeOff className={`h-4 w-4 ${isAnonymous ? "text-emerald-600" : "text-gray-500"}`} />
+                          <span>Submit anonymously</span>
+                        </div>
+                        <p className="text-xs text-gray-500 leading-normal">
+                          Hide your personal identity from city officials, field workers, and the public map.
+                        </p>
+                      </label>
                     </div>
-                  )}
 
-                  <Button
-                    type="submit"
-                    disabled={!canSubmit}
-                    className="w-full h-11 gap-2 text-sm font-semibold"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> Saving
-                        Report…
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="h-4 w-4" /> Submit Report
-                      </>
+                    {(fileError || submitError) && (
+                      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <span>{fileError || submitError}</span>
+                      </div>
                     )}
-                  </Button>
+
+                    <Button
+                      type="submit"
+                      disabled={!canSubmit}
+                      className="w-full h-11 gap-2 text-sm font-semibold"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" /> Saving
+                          Report…
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" /> Submit Report
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </form>

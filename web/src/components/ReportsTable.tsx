@@ -2,22 +2,28 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
+import { Search, Loader2 } from "lucide-react";
 import {
-  ADMIN_REPORT_CATEGORY_LABELS,
   ADMIN_REPORT_STATUS_LABELS,
   type AdminReport,
-  type AdminReportCategory,
   type AdminReportStatus,
 } from "@/lib/admin-report";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/providers/AuthProvider";
-import { useAssignWorker } from "@/hooks/useReports";
-import { useUsers } from "@/hooks/useUsers";
-import { EyeOff, ChevronDown, Check, UserPlus, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useLiveNotifications } from "@/contexts/LiveNotificationContext";
+
 
 type ReportsTableProps = {
   reports: AdminReport[];
@@ -34,13 +40,22 @@ const STATUS_FLOW: Record<AdminReportStatus, AdminReportStatus[]> = {
   REJECTED: [],
 };
 
-const STATUS_SELECT_STYLES: Record<AdminReportStatus, string> = {
-  PENDING: "border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-500",
-  VERIFIED: "border-blue-200 bg-blue-50 text-blue-700 focus:ring-blue-500",
-  CLEANUP_SCHEDULED: "border-violet-200 bg-violet-50 text-violet-700 focus:ring-violet-500",
-  IN_PROGRESS: "border-orange-200 bg-orange-50 text-orange-700 focus:ring-orange-500",
-  CLEANED: "border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-500",
-  REJECTED: "border-rose-200 bg-rose-50 text-rose-700 focus:ring-rose-500",
+const STATUS_TRIGGER_STYLES: Record<AdminReportStatus, string> = {
+  PENDING: "border-amber-200/90 bg-amber-50/80 text-amber-700 hover:bg-amber-100/70 focus:ring-amber-400",
+  VERIFIED: "border-blue-200/90 bg-blue-50/80 text-blue-700 hover:bg-blue-100/70 focus:ring-blue-400",
+  CLEANUP_SCHEDULED: "border-violet-200/90 bg-violet-50/80 text-violet-700 hover:bg-violet-100/70 focus:ring-violet-400",
+  IN_PROGRESS: "border-orange-200/90 bg-orange-50/80 text-orange-700 hover:bg-orange-100/70 focus:ring-orange-400",
+  CLEANED: "border-emerald-200/90 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100/70 focus:ring-emerald-400",
+  REJECTED: "border-rose-200/90 bg-rose-50/80 text-rose-700 hover:bg-rose-100/70 focus:ring-rose-400",
+};
+
+const STATUS_DOT_COLORS: Record<AdminReportStatus, string> = {
+  PENDING: "bg-amber-500",
+  VERIFIED: "bg-blue-500",
+  CLEANUP_SCHEDULED: "bg-violet-500",
+  IN_PROGRESS: "bg-orange-500",
+  CLEANED: "bg-emerald-500",
+  REJECTED: "bg-rose-500",
 };
 
 export function ReportsTable({
@@ -50,15 +65,9 @@ export function ReportsTable({
 }: ReportsTableProps) {
   const router = useRouter();
   const { user } = useAuth();
-  const [categoryFilter, setCategoryFilter] = useState<
-    AdminReportCategory | ""
-  >("");
+  const { pushToast } = useLiveNotifications();
   const [statusFilter, setStatusFilter] = useState<AdminReportStatus | "">("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [assignmentDrafts, setAssignmentDrafts] = useState<
-    Record<string, string>
-  >({});
-  const [savingReportId, setSavingReportId] = useState<string | null>(null);
   const [statusDrafts, setStatusDrafts] = useState<
     Record<string, AdminReportStatus>
   >({});
@@ -66,17 +75,13 @@ export function ReportsTable({
     string | null
   >(null);
 
-  const { data: workersData } = useUsers({ role: "FIELD_WORKER", limit: 100 });
-  const assignWorker = useAssignWorker();
   const isLGUAdmin = user?.role === "LGU_ADMIN";
-  const workers = workersData?.data || [];
 
   const visibleReports = useMemo(() => {
     return reports.filter((report) => {
       // SPAM severity reports are automatically routed to /dashboard/spam
       if (report.severity === "SPAM") return false;
 
-      if (categoryFilter && report.category !== categoryFilter) return false;
       if (statusFilter && report.status !== statusFilter) return false;
 
       if (searchQuery.trim()) {
@@ -98,30 +103,7 @@ export function ReportsTable({
 
       return true;
     });
-  }, [categoryFilter, reports, searchQuery, statusFilter]);
-
-  const handleAssignWorker = async (reportId: string, assignedToId: string) => {
-    if (!assignedToId) return;
-
-    setSavingReportId(reportId);
-    try {
-      await assignWorker.mutateAsync({ reportId, assignedToId });
-      router.refresh();
-      setAssignmentDrafts((current) => {
-        const next = { ...current };
-        delete next[reportId];
-        return next;
-      });
-    } catch {
-      setAssignmentDrafts((current) => {
-        const next = { ...current };
-        delete next[reportId];
-        return next;
-      });
-    } finally {
-      setSavingReportId(null);
-    }
-  };
+  }, [reports, searchQuery, statusFilter]);
 
   const handleSaveStatus = async (
     report: AdminReport,
@@ -145,8 +127,27 @@ export function ReportsTable({
         throw new Error(payload?.message || "Failed to update status.");
       }
 
+      pushToast({
+        id: `status-${report.id}-${Date.now()}`,
+        title: "Status Updated",
+        message: `Report status changed to ${ADMIN_REPORT_STATUS_LABELS[nextStatus]}.`,
+        type: "STATUS_CHANGE",
+        variant: "success",
+        isRead: true,
+        createdAt: new Date().toISOString(),
+      });
+
       router.refresh();
-    } catch {
+    } catch (error) {
+      pushToast({
+        id: `status-err-${report.id}-${Date.now()}`,
+        title: "Update Failed",
+        message: error instanceof Error ? error.message : "Failed to update status.",
+        type: "STATUS_CHANGE",
+        variant: "error",
+        isRead: true,
+        createdAt: new Date().toISOString(),
+      });
       setStatusDrafts((current) => {
         const next = { ...current };
         delete next[report.id];
@@ -160,53 +161,68 @@ export function ReportsTable({
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       {showControls && (
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 p-4">
-          <select
-            value={categoryFilter}
-            onChange={(event) =>
-              setCategoryFilter(event.target.value as AdminReportCategory | "")
-            }
-            aria-label="Filter reports by category"
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-          >
-            <option value="">All Categories</option>
-            {Object.entries(ADMIN_REPORT_CATEGORY_LABELS).map(
-              ([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ),
-            )}
-          </select>
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200/80 p-4 bg-slate-50/40">
 
-          <select
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.target.value as AdminReportStatus | "")
+          <Select
+            value={statusFilter || "all"}
+            onValueChange={(val) =>
+              setStatusFilter(val === "all" ? "" : (val as AdminReportStatus))
             }
-            aria-label="Filter reports by status"
-            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-              statusFilter
-                ? STATUS_SELECT_STYLES[statusFilter]
-                : "border-slate-200 bg-white text-slate-900 focus:ring-blue-500"
-            }`}
           >
-            <option value="" className="bg-white text-slate-900 font-normal">All Statuses</option>
-            {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(([key, label]) => (
-              <option key={key} value={key} className="bg-white text-slate-900 font-normal">
-                {label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              className={cn(
+                "w-[180px] rounded-xl font-semibold transition-all shadow-xs",
+                statusFilter
+                  ? STATUS_TRIGGER_STYLES[statusFilter]
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50/80"
+              )}
+            >
+              <div className="flex items-center gap-2 truncate">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full shrink-0",
+                    statusFilter ? STATUS_DOT_COLORS[statusFilter] : "bg-slate-400"
+                  )}
+                />
+                <SelectValue placeholder="All Statuses" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="w-[210px]">
+              <SelectItem value="all">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-slate-300" />
+                  <span>All Statuses</span>
+                </div>
+              </SelectItem>
+              {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(
+                ([key, label]) => (
+                  <SelectItem key={key} value={key}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full shrink-0",
+                          STATUS_DOT_COLORS[key as AdminReportStatus]
+                        )}
+                      />
+                      <span>{label}</span>
+                    </div>
+                  </SelectItem>
+                )
+              )}
+            </SelectContent>
+          </Select>
 
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search reports..."
-            aria-label="Search reports"
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-          />
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search reports..."
+              aria-label="Search reports"
+              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
+          </div>
         </div>
       )}
 
@@ -251,107 +267,144 @@ export function ReportsTable({
                 </td>
               </tr>
             ) : (
-              visibleReports.map((report) => (
-                <tr key={report.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <Image
-                      src={report.imageUrl}
-                      alt={report.locationName}
-                      width={56}
-                      height={56}
-                      className="h-14 w-14 rounded-xl object-cover"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <CategoryBadge category={report.category} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <SeverityBadge severity={report.severity} showFallback />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <p className="max-w-[240px] truncate text-sm font-semibold text-slate-900">
-                        {report.reporterName || "Anonymous Citizen"}
-                      </p>
+              visibleReports.map((report) => {
+                const currentStatus = statusDrafts[report.id] ?? report.status;
+                const isSaving = savingStatusReportId === report.id;
+                const allowedStatuses = STATUS_FLOW[report.status] || [];
 
-                    </div>
-                    {report.reporterEmail ? (
-                      <p className="max-w-[240px] truncate text-xs text-slate-500">
-                        {report.reporterEmail}
-                      </p>
-                    ) : (
-                      <p className="max-w-[240px] truncate text-xs text-slate-400 italic">
-                        Identity hidden
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-900">
-                    <ReportAssignmentCell
-                      report={report}
-                      workers={workers}
-                      isLGUAdmin={isLGUAdmin}
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    {isLGUAdmin ? (
-                      <div className="space-y-2">
-                        <select
-                          value={statusDrafts[report.id] ?? report.status}
-                          onChange={(event) => {
-                            const nextStatus = event.target
-                              .value as AdminReportStatus;
-
+                return (
+                  <tr key={report.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="px-4 py-3">
+                      <Image
+                        src={report.imageUrl}
+                        alt={report.locationName}
+                        width={56}
+                        height={56}
+                        className="h-14 w-14 rounded-xl object-cover"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <CategoryBadge category={report.category} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <SeverityBadge severity={report.severity} showFallback />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <p className="max-w-[240px] truncate text-sm font-semibold text-slate-900">
+                          {report.reporterName || "Anonymous Citizen"}
+                        </p>
+                      </div>
+                      {report.reporterEmail ? (
+                        <p className="max-w-[240px] truncate text-xs text-slate-500">
+                          {report.reporterEmail}
+                        </p>
+                      ) : (
+                        <p className="max-w-[240px] truncate text-xs text-slate-400 italic">
+                          Identity hidden
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-900">
+                      <ReportAssignmentCell report={report} />
+                    </td>
+                    <td className="px-4 py-3">
+                      {isLGUAdmin ? (
+                        <Select
+                          value={currentStatus}
+                          disabled={isSaving}
+                          onValueChange={(nextValue) => {
+                            const nextStatus = nextValue as AdminReportStatus;
                             setStatusDrafts((current) => ({
                               ...current,
                               [report.id]: nextStatus,
                             }));
-
                             void handleSaveStatus(report, nextStatus);
                           }}
-                          aria-label={`Update status for report ${report.id}`}
-                          disabled={savingStatusReportId === report.id}
-                          className={`w-full rounded-lg border px-2 py-2 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-                            STATUS_SELECT_STYLES[statusDrafts[report.id] ?? report.status]
-                          }`}
                         >
-                          {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(
-                            ([value, label]) => {
-                              const isCurrent = value === report.status;
-                              const isAllowed = STATUS_FLOW[
-                                report.status
-                              ].includes(value as AdminReportStatus);
+                          <SelectTrigger
+                            className={cn(
+                              "h-9 w-[170px] rounded-full px-3 text-xs font-semibold shadow-xs transition-all duration-150 border",
+                              STATUS_TRIGGER_STYLES[currentStatus]
+                            )}
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              {isSaving ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500 shrink-0" />
+                              ) : (
+                                <span
+                                  className={cn(
+                                    "h-2 w-2 rounded-full shrink-0",
+                                    STATUS_DOT_COLORS[currentStatus]
+                                  )}
+                                />
+                              )}
+                              <span className="truncate">
+                                {ADMIN_REPORT_STATUS_LABELS[currentStatus]}
+                              </span>
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent className="w-[210px]">
+                            {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(
+                              ([value, label]) => {
+                                const isCurrent = value === report.status;
+                                const isAllowed = allowedStatuses.includes(
+                                  value as AdminReportStatus
+                                );
+                                const disabled = !isCurrent && !isAllowed;
 
-                              return (
-                                <option
-                                  key={value}
-                                  value={value}
-                                  disabled={!isCurrent && !isAllowed}
-                                  className="bg-white text-slate-900 font-normal"
-                                >
-                                  {label}
-                                </option>
-                              );
-                            },
-                          )}
-                        </select>
-                      </div>
-                    ) : (
-                      <StatusBadge status={report.status} />
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
-                    {new Date(report.reportedAt).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/dashboard/reports/${report.id}`}
-                      className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-primary/90"
-                    >
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))
+                                return (
+                                  <SelectItem
+                                    key={value}
+                                    value={value}
+                                    disabled={disabled}
+                                    className={cn(
+                                      "py-2 text-xs",
+                                      isCurrent && "font-semibold text-blue-600 bg-blue-50/70"
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between w-full gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={cn(
+                                            "h-2 w-2 rounded-full shrink-0",
+                                            STATUS_DOT_COLORS[
+                                              value as AdminReportStatus
+                                            ]
+                                          )}
+                                        />
+                                        <span>{label}</span>
+                                      </div>
+                                      {isCurrent && (
+                                        <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-100/80 px-1.5 py-0.5 rounded-full">
+                                          Current
+                                        </span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                );
+                              }
+                            )}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <StatusBadge status={report.status} />
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      {new Date(report.reportedAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/dashboard/reports/${report.id}`}
+                        className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-primary/90"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -360,23 +413,7 @@ export function ReportsTable({
   );
 }
 
-function ReportAssignmentCell({
-  report,
-  workers,
-  isLGUAdmin,
-}: {
-  report: AdminReport;
-  workers: Array<{ id: string; firstName: string; lastName: string; email?: string }>;
-  isLGUAdmin: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [validationError, setValidationError] = useState("");
-  const assignWorker = useAssignWorker();
-  const router = useRouter();
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Derived current assigned workers
+function ReportAssignmentCell({ report }: { report: AdminReport }) {
   const currentWorkers = useMemo(() => {
     if (report.assignedWorkers && report.assignedWorkers.length > 0) {
       return report.assignedWorkers.map((w) => ({
@@ -385,236 +422,40 @@ function ReportAssignmentCell({
       }));
     }
     if (report.assignedWorkerNames) {
-      return report.assignedWorkerNames.split(", ").map((name) => {
-        const found = workers.find(
-          (wk) => `${wk.firstName} ${wk.lastName}`.trim().toLowerCase() === name.trim().toLowerCase()
-        );
-        return {
-          id: found ? found.id : name,
-          name: name.trim(),
-        };
-      });
+      return report.assignedWorkerNames.split(", ").map((name, i) => ({
+        id: `name-${i}`,
+        name: name.trim(),
+      }));
     }
     if (report.assignedToId && report.assignedToName) {
       return [{ id: report.assignedToId, name: report.assignedToName.trim() }];
     }
     return [];
-  }, [report.assignedWorkers, report.assignedWorkerNames, report.assignedToId, report.assignedToName, workers]);
+  }, [report.assignedWorkers, report.assignedWorkerNames, report.assignedToId, report.assignedToName]);
 
-  const assignedWorkerIds = useMemo(() => {
-    return currentWorkers
-      .map((w) => w.id)
-      .filter((id) => workers.some((wk) => wk.id === id));
-  }, [currentWorkers, workers]);
-
-  const [draftWorkerIds, setDraftWorkerIds] = useState<string[]>(assignedWorkerIds);
-
-  useEffect(() => {
-    setDraftWorkerIds(assignedWorkerIds);
-  }, [assignedWorkerIds, open]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [open]);
-
-  const handleToggleDraftWorker = (workerId: string) => {
-    setValidationError("");
-    setDraftWorkerIds((prev) =>
-      prev.includes(workerId)
-        ? prev.filter((id) => id !== workerId)
-        : Array.from(new Set([...prev, workerId]))
-    );
-  };
-
-  const handleSaveAssignments = async () => {
-    setValidationError("");
-    if (draftWorkerIds.length === 0) {
-      setValidationError("At least 1 worker must be selected.");
-      return;
-    }
-
-    const uniqueIds = Array.from(new Set(draftWorkerIds));
-    setSaving(true);
-    try {
-      await assignWorker.mutateAsync({ reportId: report.id, workerIds: uniqueIds });
-      router.refresh();
-      setOpen(false);
-    } catch (err) {
-      console.error("Failed to update worker assignment:", err);
-      setValidationError(err instanceof Error ? err.message : "Failed to save assignments.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRemoveWorker = async (workerId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const nextIds = assignedWorkerIds.filter((id) => id !== workerId);
-    if (nextIds.length === 0) {
-      setOpen(true);
-      setValidationError("At least 1 worker must be selected.");
-      return;
-    }
-    setSaving(true);
-    try {
-      await assignWorker.mutateAsync({ reportId: report.id, workerIds: nextIds });
-      router.refresh();
-    } catch (err) {
-      console.error("Failed to remove worker assignment:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!isLGUAdmin) {
-    if (currentWorkers.length > 0) {
-      return (
-        <div className="flex flex-wrap gap-1">
-          {currentWorkers.map((w, i) => (
-            <span
-              key={w.id || i}
-              className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800"
-            >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
-                {w.name.charAt(0)}
-              </span>
-              {w.name}
-            </span>
-          ))}
-        </div>
-      );
-    }
-    return <span className="text-sm text-slate-500">Unassigned</span>;
+  if (currentWorkers.length === 0) {
+    return <span className="text-sm text-slate-400 italic">Unassigned</span>;
   }
 
   return (
-    <div className="relative space-y-1" ref={dropdownRef}>
-      <div className="flex flex-wrap items-center gap-1 min-w-[140px]">
-        {currentWorkers.map((w, i) => {
-          const isRemovable = workers.some((wk) => wk.id === w.id);
-          return (
-            <span
-              key={w.id || i}
-              className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-semibold text-blue-800"
-            >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
-                {w.name.charAt(0)}
-              </span>
-              <span>{w.name}</span>
-              {isRemovable && (
-                <button
-                  type="button"
-                  onClick={(e) => handleRemoveWorker(w.id, e)}
-                  disabled={saving}
-                  className="ml-0.5 rounded-full p-0.5 text-blue-500 hover:bg-blue-200 hover:text-blue-900 transition disabled:opacity-50"
-                  title={`Remove ${w.name}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </span>
-          );
-        })}
-
-        <button
-          type="button"
-          onClick={() => {
-            setValidationError("");
-            setDraftWorkerIds(assignedWorkerIds);
-            setOpen(!open);
-          }}
-          disabled={saving}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-sm disabled:opacity-50"
-          title="Assign field workers"
-        >
-          <UserPlus className="h-3.5 w-3.5 text-blue-600" />
-          {currentWorkers.length === 0 ? "Unassigned" : "+ Add"}
-          <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
-        </button>
-      </div>
-
-      {saving && (
-        <p className="text-[11px] font-medium text-blue-600 animate-pulse">
-          Saving...
-        </p>
-      )}
-
-      {open && (
-        <div className="absolute left-0 z-30 mt-1 w-64 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100">
-          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 mb-1.5 px-1">
-            <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
-              Select Workers
-            </span>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="text-slate-400 hover:text-slate-600 text-xs font-medium hover:underline"
-            >
-              Cancel
-            </button>
-          </div>
-
-          <div className="max-h-48 overflow-y-auto space-y-0.5">
-            {workers.length === 0 ? (
-              <p className="p-2 text-xs text-slate-400">No field workers available</p>
-            ) : (
-              workers.map((worker) => {
-                const isSelected = draftWorkerIds.includes(worker.id);
-                return (
-                  <label
-                    key={worker.id}
-                    className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-xs font-medium cursor-pointer transition select-none ${
-                      isSelected
-                        ? "bg-blue-50 text-blue-900 font-semibold"
-                        : "text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleToggleDraftWorker(worker.id)}
-                        disabled={saving}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
-                      />
-                      <span>
-                        {worker.firstName} {worker.lastName}
-                      </span>
-                    </div>
-                    {isSelected && <Check className="h-3.5 w-3.5 text-blue-600" />}
-                  </label>
-                );
-              })
-            )}
-          </div>
-
-          <div className="pt-2 mt-2 border-t border-slate-100 flex flex-col gap-1.5">
-            {validationError && (
-              <p className="text-[11px] font-medium text-rose-600 px-1">
-                {validationError}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={handleSaveAssignments}
-              disabled={saving}
-              className="w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary/90 disabled:opacity-60"
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
+    <div className="flex flex-wrap items-center gap-1.5">
+      {currentWorkers.map((w, i) => (
+        <div key={w.id || i} className="group relative inline-flex">
+          <span
+            title={w.name}
+            className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-xs transition-transform duration-150 group-hover:scale-105 group-hover:bg-blue-700"
+          >
+            {w.name.charAt(0).toUpperCase()}
+          </span>
+          {/* Tooltip on hover */}
+          <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 opacity-0 transition-all duration-150 group-hover:opacity-100 z-30">
+            <div className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white shadow-md">
+              {w.name}
+            </div>
+            <div className="mx-auto -mt-1 h-1.5 w-1.5 rotate-45 bg-slate-900" />
           </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }

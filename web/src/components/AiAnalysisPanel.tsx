@@ -3,7 +3,7 @@
  * Used in the admin report detail page.
  */
 
-import { Brain, Clock, Zap, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Brain, Clock, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { formatAnalysisDetails } from "@/lib/utils";
 
 type AiSeverity = "Low" | "Medium" | "High" | "Critical" | "None";
@@ -105,8 +105,6 @@ export function AiAnalysisPanel({
   const severityConfig = severity ? SEVERITY_CONFIG[severity] : null;
   const categories = Array.isArray(aiCategories) ? aiCategories : [];
   const conf = typeof confidence === "number" ? confidence : null;
-  const analyzedDate = analyzedAt ? new Date(analyzedAt).toLocaleString() : null;
-  const displayModel = aiModel ? aiModel.replace(/gemini-/i, "v").replace(/gemini/i, "System") : "v3.5-flash";
 
   return (
     <section className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm sm:p-6">
@@ -217,28 +215,23 @@ export function AiAnalysisPanel({
           </dd>
         </div>
 
-        {/* Meta: model + timing */}
-        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-          <span className="flex items-center gap-1">
-            <Zap className="h-3.5 w-3.5 text-violet-400" />
-            {displayModel}
-          </span>
-          {aiGeminiMs !== null && aiGeminiMs !== undefined && (
-            <span className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              Inference {aiGeminiMs}ms
-            </span>
-          )}
-          {aiProcessingMs !== null && aiProcessingMs !== undefined && (
-            <span className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              Total {aiProcessingMs}ms
-            </span>
-          )}
-          {analyzedDate && (
-            <span>Analyzed {analyzedDate}</span>
-          )}
-        </div>
+        {/* Meta: timing */}
+        {((aiGeminiMs !== null && aiGeminiMs !== undefined) || (aiProcessingMs !== null && aiProcessingMs !== undefined)) && (
+          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+            {aiGeminiMs !== null && aiGeminiMs !== undefined && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5" />
+                Inference {aiGeminiMs}ms
+              </span>
+            )}
+            {aiProcessingMs !== null && aiProcessingMs !== undefined && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5" />
+                Total {aiProcessingMs}ms
+              </span>
+            )}
+          </div>
+        )}
       </dl>
     </section>
   );

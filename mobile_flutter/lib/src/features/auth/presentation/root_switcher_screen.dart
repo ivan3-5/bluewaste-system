@@ -94,12 +94,6 @@ class _RootSwitcherScreenState extends ConsumerState<RootSwitcherScreen> {
             ),
             const SizedBox(height: 24),
             const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            const Text(
-              "Preparing BlueWaste...",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16),
-            ),
           ],
         ),
       ),

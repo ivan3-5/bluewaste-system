@@ -15,6 +15,7 @@ import {
   FilterToolbarSkeleton,
   PageHeadingSkeleton,
 } from "@/components/skeletons/page-skeletons";
+import { useLiveNotifications } from "@/contexts/LiveNotificationContext";
 
 const ROLE_LABELS: Record<string, string> = {
   LGU_ADMIN: "Admin",
@@ -52,6 +53,7 @@ const emptyForm: UserFormData = {
 };
 
 export default function UsersPage() {
+  const { pushToast } = useLiveNotifications();
   const [page, setPage] = useState(1);
   const [roleFilter, setRoleFilter] = useState("");
   const [search, setSearch] = useState("");
@@ -146,11 +148,29 @@ export default function UsersPage() {
         role: form.role,
         phone: form.phone || undefined,
       });
+      pushToast({
+        id: `user-create-${Date.now()}`,
+        title: "User Created",
+        message: `User ${form.firstName} ${form.lastName} was created successfully.`,
+        type: "STATUS_CHANGE",
+        variant: "success",
+        isRead: true,
+        createdAt: new Date().toISOString(),
+      });
       setShowAddModal(false);
     } catch (err: any) {
-      setFormError(
-        err?.response?.data?.error || "Failed to create user. Try again.",
-      );
+      const errorMsg =
+        err?.response?.data?.error || "Failed to create user. Try again.";
+      setFormError(errorMsg);
+      pushToast({
+        id: `user-create-err-${Date.now()}`,
+        title: "Creation Failed",
+        message: errorMsg,
+        type: "STATUS_CHANGE",
+        variant: "error",
+        isRead: true,
+        createdAt: new Date().toISOString(),
+      });
     }
   };
 
@@ -173,11 +193,29 @@ export default function UsersPage() {
         role: editUser.role,
         phone: form.phone || undefined,
       });
+      pushToast({
+        id: `user-update-${editUser.id}-${Date.now()}`,
+        title: "Changes Saved",
+        message: `User details for ${form.firstName} ${form.lastName} were updated successfully.`,
+        type: "STATUS_CHANGE",
+        variant: "success",
+        isRead: true,
+        createdAt: new Date().toISOString(),
+      });
       setEditUser(null);
     } catch (err: any) {
-      setFormError(
-        err?.response?.data?.error || "Failed to update user. Try again.",
-      );
+      const errorMsg =
+        err?.response?.data?.error || "Failed to update user. Try again.";
+      setFormError(errorMsg);
+      pushToast({
+        id: `user-update-err-${editUser.id}-${Date.now()}`,
+        title: "Save Failed",
+        message: errorMsg,
+        type: "STATUS_CHANGE",
+        variant: "error",
+        isRead: true,
+        createdAt: new Date().toISOString(),
+      });
     }
   };
 

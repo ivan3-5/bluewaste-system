@@ -157,8 +157,16 @@ export function ScheduleForm({
 
       await onSubmit(payload);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Form submission error", error);
+      if (error.response?.data?.details) {
+        const messages = error.response.data.details.map((d: any) => `${d.field}: ${d.message}`).join("\n");
+        alert(`Validation Error:\n${messages}`);
+      } else if (error.response?.data?.message) {
+        alert(`Error: ${error.response.data.message}`);
+      } else {
+        alert("An error occurred while saving the schedule. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -224,6 +232,8 @@ export function ScheduleForm({
               <Input
                 id="title"
                 required
+                minLength={3}
+                maxLength={200}
                 value={formData.title}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, title: e.target.value }))
@@ -238,6 +248,8 @@ export function ScheduleForm({
               <Input
                 id="barangay"
                 required
+                minLength={1}
+                maxLength={300}
                 value={formData.barangay}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, barangay: e.target.value }))
@@ -257,6 +269,8 @@ export function ScheduleForm({
             <Textarea
               id="description"
               required
+              minLength={10}
+              maxLength={2000}
               rows={3}
               value={formData.description}
               onChange={(e) =>
@@ -414,7 +428,7 @@ export function ScheduleForm({
                         {report.title}
                       </div>
                       <div className="text-xs text-gray-500 truncate">
-                        {report.address || "No address"} • {report.status}
+                        {report.address || formData.barangay || "Location unavailable"} • {report.status}
                       </div>
                     </div>
                   </label>

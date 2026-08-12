@@ -8,6 +8,7 @@ import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
 import { getReverseGeocodedLocation, formatAnalysisDetails } from "@/lib/utils";
 import { AiAnalysisPanel } from "@/components/AiAnalysisPanel";
 import Image from "next/image";
+import { CheckCircle2, CalendarDays } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
   const cleanupImages = report.images.filter(
     (image) => image.type === "CLEANUP",
   );
+
+  const isAlreadyScheduled =
+    Boolean(report.cleanupScheduleId) ||
+    ["CLEANUP_SCHEDULED", "IN_PROGRESS", "CLEANED"].includes(report.status);
 
   let displayLocationName = report.locationName;
   if (displayLocationName.toLowerCase().startsWith("waste report")) {
@@ -169,7 +174,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
             severity={report.severity as "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null}
             confidence={report.confidence}
             aiReason={report.aiReason}
-            aiModel={report.aiModel || (report.analyzedAt != null || (report.severity != null && report.severity !== "SPAM") || (report.aiCategories && report.aiCategories.length > 0) ? "v3.5-flash System" : null)}
+            aiModel={report.aiModel}
             aiProcessingMs={report.aiProcessingMs}
             aiGeminiMs={report.aiGeminiMs}
             analyzedAt={report.analyzedAt}
@@ -222,10 +227,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
               </div>
               <div className="rounded-xl bg-slate-50 p-3">
                 <dt className="text-xs uppercase tracking-wide text-slate-500">
-                  Analysis Details
+                  Description
                 </dt>
                 <dd className="mt-1 text-sm leading-relaxed text-slate-700">
-                  {formatAnalysisDetails(report.aiCategories, report.aiReason || report.description)}
+                  {formatAnalysisDetails(report.aiCategories, report.description || report.aiReason)}
                 </dd>
               </div>
             </dl>
@@ -245,12 +250,32 @@ export default async function ReportDetailPage({ params }: PageProps) {
                 <p className="mb-3 text-sm font-medium text-slate-700">
                   Cleanup Scheduling
                 </p>
-                <Link
-                  href="/dashboard/schedules"
-                  className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                >
-                  Cleanup Schedules
-                </Link>
+                {isAlreadyScheduled ? (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-200/80 border border-slate-300/80 px-4 py-2.5 text-sm font-semibold text-slate-500 cursor-not-allowed shadow-none"
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-slate-500" />
+                      Cleanup Schedules
+                    </button>
+                    <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200/90 p-3 text-xs text-amber-900 shadow-xs">
+                      <CalendarDays className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                      <div>
+                        <span className="font-bold block text-amber-900">Schedule Already Set</span>
+                        This report is already assigned to a cleanup schedule.
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Link
+                    href="/dashboard/schedules"
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  >
+                    Cleanup Schedules
+                  </Link>
+                )}
               </div>
             </div>
           </section>

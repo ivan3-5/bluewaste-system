@@ -17,7 +17,11 @@ const scheduleInclude = {
   verifiedBy: {
     select: { id: true, firstName: true, lastName: true },
   },
-  reports: true,
+  reports: {
+    include: {
+      images: true,
+    },
+  },
   workers: {
     include: {
       worker: {

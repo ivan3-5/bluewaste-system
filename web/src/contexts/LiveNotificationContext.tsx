@@ -76,8 +76,8 @@ export function LiveNotificationProvider({
         return [...trimmed, toast];
       });
 
-      // Auto-dismiss after 2 seconds
-      setTimeout(() => dismiss(toastKey), 2000);
+      // Auto-dismiss after 4 seconds
+      setTimeout(() => dismiss(toastKey), 4000);
     },
     [dismiss],
   );
@@ -173,9 +173,11 @@ function InternalPoller({
 export function useLiveNotifications() {
   const ctx = useContext(LiveNotificationContext);
   if (!ctx) {
-    throw new Error(
-      "useLiveNotifications must be used inside <LiveNotificationProvider>",
-    );
+    return {
+      toasts: [],
+      dismiss: () => {},
+      pushToast: () => {},
+    };
   }
   return ctx;
 }

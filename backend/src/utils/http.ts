@@ -26,6 +26,8 @@ export function handleControllerError(
   defaultCode = "INTERNAL_ERROR",
 ) {
   const message = error instanceof Error ? error.message : typeof error === "string" ? error : defaultMessage;
+  const fs = require('fs');
+  fs.appendFileSync('controller-error.log', message + '\n');
 
   // 404 Not Found mappings
   if (message === "Report not found") return sendError(res, 404, message, "REPORT_NOT_FOUND");

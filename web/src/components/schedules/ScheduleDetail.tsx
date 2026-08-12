@@ -307,9 +307,16 @@ export function ScheduleDetail({
                           onChange={() => toggleLinkDraft(r.id)}
                           className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500"
                         />
+                        {r.images?.[0]?.imageUrl && (
+                          <img
+                            src={r.images[0].imageUrl}
+                            alt={r.title}
+                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                          />
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{r.title}</p>
-                          <p className="text-xs text-gray-500 truncate">{r.address || "No address"} · {r.status}</p>
+                          <p className="text-xs text-gray-500 truncate">{r.address || schedule.barangay || "Location unavailable"} · {r.status}</p>
                         </div>
                       </label>
                     ))}
@@ -345,12 +352,23 @@ export function ScheduleDetail({
                     key={r.id}
                     className="flex flex-col p-3 bg-white/60 border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow"
                   >
-                    <p className="text-sm font-semibold text-gray-900 line-clamp-1">
-                      {r.title}
-                    </p>
-                    <p className="text-xs text-gray-500 line-clamp-1 mt-0.5 mb-2">
-                      {r.address || "No address"}
-                    </p>
+                    <div className="flex gap-3 mb-2">
+                      {r.images?.[0]?.imageUrl && (
+                        <img
+                          src={r.images[0].imageUrl}
+                          alt={r.title}
+                          className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-200"
+                        />
+                      )}
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 line-clamp-1">
+                          {r.title}
+                        </p>
+                        <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
+                          {r.address || schedule.barangay || "Location unavailable"}
+                        </p>
+                      </div>
+                    </div>
                     <div className="mt-auto">
                       <StatusBadge status={r.status} />
                     </div>
