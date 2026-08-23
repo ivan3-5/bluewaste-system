@@ -5,8 +5,11 @@ import "app_colors.dart";
 
 class AppTheme {
   static ThemeData get light {
+    const String fontFamily = 'Inter';
+
     final base = ThemeData(
       useMaterial3: true,
+      fontFamily: fontFamily,
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         onPrimary: AppColors.primaryForeground,
@@ -18,6 +21,79 @@ class AppTheme {
         onError: AppColors.primaryForeground,
       ),
       scaffoldBackgroundColor: AppColors.background,
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -1.5,
+        ),
+        displayMedium: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.5,
+        ),
+        displaySmall: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.25,
+        ),
+        headlineLarge: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.5,
+        ),
+        headlineMedium: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.25,
+        ),
+        headlineSmall: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.15,
+        ),
+        titleLarge: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+        ),
+        titleMedium: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.1,
+        ),
+        titleSmall: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w600,
+        ),
+        bodyLarge: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w400,
+        ),
+        bodyMedium: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w400,
+        ),
+        bodySmall: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w400,
+          color: AppColors.mutedForeground,
+        ),
+        labelLarge: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.1,
+        ),
+        labelMedium: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w500,
+        ),
+        labelSmall: TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.1,
+        ),
+      ),
     );
 
     return base.copyWith(
@@ -95,9 +171,17 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.foreground,
-        contentTextStyle: const TextStyle(color: AppColors.primaryForeground),
+        contentTextStyle: const TextStyle(
+          color: AppColors.primaryForeground,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        insetPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(

@@ -109,7 +109,7 @@ export interface ReportImage {
   id: string;
   imageUrl: string;
   publicId: string;
-  type: "REPORT" | "CLEANUP";
+  type: "REPORT" | "CLEANUP" | "ANGLE";
   createdAt: string;
 }
 

@@ -59,7 +59,8 @@ class MyReportsScreen extends ConsumerStatefulWidget {
   ConsumerState<MyReportsScreen> createState() => _MyReportsScreenState();
 }
 
-class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
+class _MyReportsScreenState extends ConsumerState<MyReportsScreen>
+    with WidgetsBindingObserver {
   final DateFormat _dateFormat = DateFormat("MMM d, yyyy");
   final DateFormat _detailFormat = DateFormat("MMM d, yyyy \u2022 h:mm a");
 
@@ -82,12 +83,32 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadReports();
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _loadReports());
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _loadReports());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadReports();
+      _startPolling();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _timer?.cancel();
+      _timer = null;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
@@ -104,8 +125,20 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen> {
       if (!mounted) {
         return;
       }
+
+      // Data-diff guard: skip setState when nothing changed to avoid
+      // rebuilding the entire list on every poll.
+      final newData = result.data;
+      final same = newData.length == _reports.length &&
+          !_loading &&
+          _errorMessage == null &&
+          (newData.isEmpty ||
+              newData.first.id == _reports.first.id &&
+                  newData.last.id == _reports.last.id);
+      if (same) return;
+
       setState(() {
-        _reports = result.data;
+        _reports = newData;
         _loading = false;
         _errorMessage = null;
       });

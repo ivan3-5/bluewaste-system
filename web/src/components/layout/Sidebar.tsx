@@ -154,14 +154,24 @@ export function Sidebar() {
         >
           <div
             className={cn(
-              "rounded-full border border-white/80 bg-white/75 shadow-sm backdrop-blur-md flex items-center justify-center flex-shrink-0",
+              "rounded-full border border-white/80 bg-white/75 shadow-sm backdrop-blur-md flex items-center justify-center flex-shrink-0 overflow-hidden",
               isCollapsed ? "w-10 h-10" : "w-9 h-9",
             )}
           >
-            <span className="text-sm font-semibold text-primary">
-              {user?.firstName?.[0]}
-              {user?.lastName?.[0]}
-            </span>
+            {user?.avatarUrl ? (
+              <Image
+                src={user.avatarUrl}
+                alt="User profile"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-sm font-semibold text-primary">
+                {user?.firstName?.[0]}
+                {user?.lastName?.[0]}
+              </span>
+            )}
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0">

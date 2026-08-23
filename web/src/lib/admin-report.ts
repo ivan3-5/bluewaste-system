@@ -49,3 +49,24 @@ export const ADMIN_REPORT_STATUS_LABELS: Record<AdminReportStatus, string> = {
   CLEANED: "Cleaned",
   REJECTED: "Rejected",
 };
+
+/**
+ * One entry per grouped waste incident returned by GET /reports/incidents/map.
+ * Multiple citizen Report rows may be merged into a single IncidentMapData.
+ */
+export interface IncidentMapData {
+  id: string;
+  category: AdminReportCategory;
+  status: AdminReportStatus;
+  severity?: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
+  latitude: number;
+  longitude: number;
+  address: string | null;
+  /** Number of unique citizen reports grouped into this incident */
+  contributorCount: number;
+  /** IDs of all linked Report rows */
+  reportIds: string[];
+  /** Thumbnail image from the first linked report */
+  imageUrl: string | null;
+  createdAt: string | Date;
+}

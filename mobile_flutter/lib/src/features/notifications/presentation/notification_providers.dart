@@ -13,7 +13,7 @@ class UnreadCountNotifier extends AutoDisposeAsyncNotifier<int> {
     final service = ref.watch(notificationServiceProvider);
 
     // Poll for updates every 10 seconds to reduce network load
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) async {
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) async {
       try {
         final count = await service.getUnreadCount();
         state = AsyncData(count);
@@ -63,7 +63,7 @@ class NotificationsListNotifier
     final service = ref.watch(notificationServiceProvider);
 
     // Poll for updates every 12 seconds
-    _timer = Timer.periodic(const Duration(seconds: 12), (_) async {
+    _timer = Timer.periodic(const Duration(seconds: 45), (_) async {
       try {
         final result = await service.getNotifications(page: 1, limit: 50);
         state = AsyncData(result.data);

@@ -29,16 +29,11 @@ class NotificationsScreen extends ConsumerWidget {
         final unreadCount = notifications.where((n) => !n.isRead).length;
 
         if (notifications.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                AppEmptyState(
-                  icon: Icons.notifications_none,
-                  title: "No notifications",
-                  subtitle: "You are all caught up.",
-                ),
-              ],
+          return const Center(
+            child: AppEmptyState(
+              icon: Icons.notifications_none,
+              title: "No notifications",
+              subtitle: "You are all caught up.",
             ),
           );
         }
@@ -106,17 +101,17 @@ class NotificationsScreen extends ConsumerWidget {
                               notification.message,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 13,
-                                color: Colors.grey[700],
+                                color: AppColors.mutedForeground,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               _timeAgo(notification.createdAt),
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[500],
+                                color: AppColors.neutral,
                               ),
                             ),
                           ],

@@ -646,7 +646,10 @@ export default function SubmitReportPage() {
     try {
       const resolvedCategory =
         resolveWasteCategoryForSubmission(analysisResult);
-      const reportTitle = `Waste report - ${WASTE_BUCKET_LABELS[selectedCategory]}`;
+      const categoryBucketLabel = WASTE_BUCKET_LABELS[selectedCategory];
+      const reportTitle = (categoryBucketLabel === "With Waste" || categoryBucketLabel === "No Waste" || !categoryBucketLabel)
+        ? "Waste report"
+        : `Waste report - ${categoryBucketLabel}`;
       const reportDescription =
         trimmedDescription.length > 0
           ? trimmedDescription

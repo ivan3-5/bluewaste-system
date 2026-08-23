@@ -103,33 +103,62 @@ class _WorkerHeroHeader extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color(0xFF0F172A),
-            Color(0xFF1E293B),
-            Color(0xFF0066CC),
+            Color(0xFF0B4F9C), // Rich deep navy blue
+            Color(0xFF0066CC), // BlueWaste primary blue
+            Color(0xFF0284C7), // Vibrant ocean cyan-blue
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.18),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0066CC).withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF0066CC).withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+            spreadRadius: -2,
           ),
         ],
       ),
       child: Stack(
         children: [
           Positioned(
-            right: -20,
-            top: -20,
+            right: -30,
+            top: -40,
             child: Container(
-              width: 140,
-              height: 140,
+              width: 160,
+              height: 160,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.05),
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 35,
+            top: 20,
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -40,
+            bottom: -40,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black.withValues(alpha: 0.12),
               ),
             ),
           ),
@@ -147,10 +176,10 @@ class _WorkerHeroHeader extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.success.withValues(alpha: 0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: const Color(0xFF34D399).withValues(alpha: 0.4),
+                          color: const Color(0xFF34D399).withValues(alpha: 0.5),
                           width: 1,
                         ),
                       ),
@@ -163,13 +192,20 @@ class _WorkerHeroHeader extends StatelessWidget {
                             decoration: const BoxDecoration(
                               color: Color(0xFF34D399),
                               shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Color(0xFF34D399),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 6),
                           const Text(
                             "ACTIVE SHIFT",
                             style: TextStyle(
-                              color: Color(0xFF34D399),
+                              color: Color(0xFF6EE7B7),
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.6,
@@ -178,12 +214,37 @@ class _WorkerHeroHeader extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Text(
-                      dateStr,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.12),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 11,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            dateStr,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.95),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -202,14 +263,23 @@ class _WorkerHeroHeader extends StatelessWidget {
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.5,
+                              shadows: [
+                                Shadow(
+                                  color: Color(0x33000000),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 1),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             "Ready to tackle cleanup operations today?",
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.85),
+                              color: const Color(0xFFE0F2FE).withValues(alpha: 0.92),
                               fontSize: 13,
+                              fontWeight: FontWeight.w400,
+                              height: 1.3,
                             ),
                           ),
                         ],
@@ -224,10 +294,10 @@ class _WorkerHeroHeader extends StatelessWidget {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
+                    color: Colors.black.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: Colors.white.withValues(alpha: 0.20),
                     ),
                   ),
                   child: Row(
@@ -237,6 +307,7 @@ class _WorkerHeroHeader extends StatelessWidget {
                         label: "Assigned",
                         value: hasData ? "$totalCount" : "-",
                         icon: Icons.assignment_rounded,
+                        accentColor: const Color(0xFFE0F2FE),
                       ),
                       Container(
                         width: 1,
@@ -247,7 +318,7 @@ class _WorkerHeroHeader extends StatelessWidget {
                         label: "Pending",
                         value: hasData ? "$pendingCount" : "-",
                         icon: Icons.pending_actions_rounded,
-                        accentColor: Colors.amberAccent,
+                        accentColor: const Color(0xFFFDE047),
                       ),
                       Container(
                         width: 1,
@@ -258,7 +329,7 @@ class _WorkerHeroHeader extends StatelessWidget {
                         label: "Cleaned",
                         value: hasData ? "$cleanedCount" : "-",
                         icon: Icons.check_circle_rounded,
-                        accentColor: const Color(0xFF34D399),
+                        accentColor: const Color(0xFF6EE7B7),
                       ),
                     ],
                   ),
@@ -293,7 +364,7 @@ class _StatItem extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: iconColor),
+            Icon(icon, size: 15, color: iconColor),
             const SizedBox(width: 4),
             Text(
               value,
@@ -309,7 +380,7 @@ class _StatItem extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.75),
+            color: const Color(0xFFBAE6FD).withValues(alpha: 0.85),
             fontSize: 11,
             fontWeight: FontWeight.w500,
           ),
@@ -618,7 +689,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _QuickActionsGrid extends ConsumerWidget {
+class _QuickActionsGrid extends StatelessWidget {
   const _QuickActionsGrid({
     required this.onSelectTab,
     required this.reportsAsync,
@@ -628,64 +699,66 @@ class _QuickActionsGrid extends ConsumerWidget {
   final AsyncValue<List<ReportRecord>> reportsAsync;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final pendingCount = reportsAsync.when(
-      data: (reports) => reports.where((r) => r.status != "CLEANED").length,
-      loading: () => 0,
-      error: (_, __) => 0,
-    );
-
-    return GridView.builder(
-      shrinkWrap: true,
-      itemCount: _workerActions.length,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: AppSpacing.sm,
-        mainAxisSpacing: AppSpacing.sm,
-        childAspectRatio: 1.25,
-      ),
-      itemBuilder: (context, index) {
-        final action = _workerActions[index];
-        return _QuickActionCard(
-          action: action,
-          pendingTasksCount: action.tabIndex == 1 ? pendingCount : 0,
-          onTap: () {
-            if (action.tabIndex < 0) {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const ProfileScreen(),
-                ),
-              );
-            } else {
-              onSelectTab(action.tabIndex);
-            }
-          },
-        );
-      },
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionCard(
+                action: _workerActions[0],
+                onTap: () => onSelectTab(_workerActions[0].tabIndex),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _QuickActionCard(
+                action: _workerActions[1],
+                onTap: () => onSelectTab(_workerActions[1].tabIndex),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionCard(
+                action: _workerActions[2],
+                onTap: () => onSelectTab(_workerActions[2].tabIndex),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _QuickActionCard(
+                action: _workerActions[3],
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ProfileScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
 
-class _QuickActionCard extends ConsumerWidget {
+class _QuickActionCard extends StatelessWidget {
   const _QuickActionCard({
     required this.action,
     required this.onTap,
-    this.pendingTasksCount = 0,
   });
 
   final _WorkerAction action;
   final VoidCallback onTap;
-  final int pendingTasksCount;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final unreadAlerts = action.tabIndex == 4
-        ? (ref.watch(unreadCountProvider).value ?? 0)
-        : 0;
-
-    final badgeCount = action.tabIndex == 1 ? pendingTasksCount : unreadAlerts;
-
+  Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -711,49 +784,14 @@ class _QuickActionCard extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: AppColors.tint(action.color, opacity: 0.14),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(action.icon, size: 22, color: action.color),
-                      ),
-                      if (badgeCount > 0)
-                        Positioned(
-                          right: -4,
-                          top: -4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            constraints: const BoxConstraints(
-                                minWidth: 18, minHeight: 18),
-                            decoration: BoxDecoration(
-                              color: action.tabIndex == 1
-                                  ? AppColors.primary
-                                  : AppColors.destructive,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: AppColors.card,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Text(
-                              badgeCount > 9 ? "9+" : "$badgeCount",
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.tint(action.color, opacity: 0.14),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(action.icon, size: 22, color: action.color),
                   ),
                   Container(
                     width: 28,

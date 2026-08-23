@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/providers/AuthProvider";
-import { Bell, Menu, LogOut } from "lucide-react";
+import { Bell, Menu, LogOut, Settings } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 import Image from "next/image";
 import Link from "next/link";
@@ -65,15 +65,23 @@ export function Header() {
               onClick={() => setProfileMenuOpen(!profileMenuOpen)}
               className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                <span className="text-xs font-semibold text-primary">
-                  {user?.firstName?.[0]}
-                  {user?.lastName?.[0]}
-                </span>
+              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
+                {user?.avatarUrl ? (
+                  <Image
+                    src={user.avatarUrl}
+                    alt="User profile"
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-xs font-semibold text-primary">
+                    {user?.firstName?.[0]}
+                    {user?.lastName?.[0]}
+                  </span>
+                )}
               </div>
-              <span className="text-sm font-medium text-gray-700">
-                {user?.firstName}
-              </span>
+
             </button>
 
             {/* Profile Dropdown */}
@@ -91,6 +99,14 @@ export function Header() {
                         : "Citizen"}
                   </p>
                 </div>
+                <Link
+                  href="/dashboard/profile"
+                  onClick={() => setProfileMenuOpen(false)}
+                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Link>
                 <button
                   onClick={() => {
                     setProfileMenuOpen(false);

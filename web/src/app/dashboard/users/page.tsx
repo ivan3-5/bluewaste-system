@@ -340,16 +340,7 @@ export default function UsersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {isLoading ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-10 text-center text-gray-400"
-                >
-                  Loading...
-                </td>
-              </tr>
-            ) : users.length === 0 ? (
+            {users.length === 0 ? (
               <tr>
                 <td
                   colSpan={7}

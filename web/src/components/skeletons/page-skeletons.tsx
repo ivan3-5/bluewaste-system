@@ -73,7 +73,7 @@ export function PageHeadingSkeleton({
 
 export function StatsCardsSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {Array.from({ length: count }).map((_, idx) => (
         <div key={idx} className="rounded-xl border bg-white p-4">
           <div className="flex items-center gap-3">
@@ -373,6 +373,74 @@ export function ReportDetailSkeleton() {
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-9 w-full rounded-md" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function SchedulePageSkeleton() {
+  return (
+    <div className="space-y-8 pb-8 max-w-[1600px] mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/40 shadow-sm">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-52" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <Skeleton className="h-11 w-40 rounded-xl" />
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, idx) => (
+          <div
+            key={idx}
+            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4"
+          >
+            <Skeleton className="w-12 h-12 rounded-xl shrink-0" />
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-7 w-10" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* View Toggle */}
+      <div className="flex justify-center sm:justify-start">
+        <div className="bg-gray-100/80 rounded-2xl p-1.5 inline-flex gap-1">
+          <Skeleton className="h-10 w-32 rounded-xl" />
+          <Skeleton className="h-10 w-24 rounded-xl" />
+        </div>
+      </div>
+
+      {/* Calendar/List placeholder */}
+      <div className="rounded-3xl border border-gray-100 bg-white/50 overflow-hidden">
+        <div className="border-b border-gray-100 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <Skeleton className="h-6 w-36" />
+            <Skeleton className="h-8 w-8 rounded-lg" />
+          </div>
+          <Skeleton className="h-6 w-24" />
+        </div>
+        <div className="grid grid-cols-7 divide-x divide-gray-100">
+          {Array.from({ length: 7 }).map((_, idx) => (
+            <div key={idx} className="p-3 space-y-2">
+              <Skeleton className="h-4 w-8 mx-auto" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
+          {Array.from({ length: 35 }).map((_, idx) => (
+            <div key={idx} className="h-24 p-2 space-y-1.5">
+              {/* Show a skeleton event bar in a fixed deterministic pattern */}
+              {(idx % 9 === 2 || idx % 11 === 3 || idx % 13 === 5) && (
+                <Skeleton className="h-6 w-full rounded-md" />
+              )}
             </div>
           ))}
         </div>

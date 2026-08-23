@@ -19,6 +19,7 @@ import {
   LayoutList,
 } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
+import { SchedulePageSkeleton } from "@/components/skeletons/page-skeletons";
 
 export default function SchedulesPage() {
   const { user } = useAuth();
@@ -231,15 +232,7 @@ export default function SchedulesPage() {
 
       {/* Content Area */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center h-[500px] bg-white/50 rounded-3xl border border-gray-100 backdrop-blur-sm">
-          <div className="relative w-16 h-16">
-            <div className="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
-          </div>
-          <p className="mt-4 font-medium text-indigo-600/80 animate-pulse">
-            Loading operations...
-          </p>
-        </div>
+        <SchedulePageSkeleton />
       ) : (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           {view === "calendar" && (

@@ -4,6 +4,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
+import "../../../core/ui/shared_widgets.dart";
 import "../../auth/presentation/auth_controller.dart";
 import "../../notifications/presentation/notification_providers.dart";
 import "../../notifications/presentation/notifications_screen.dart";
@@ -29,41 +30,6 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
     });
   }
 
-  Widget _buildBadgeIcon(IconData icon, int count) {
-    if (count <= 0) {
-      return Icon(icon);
-    }
-
-    final label = count > 9 ? "9+" : count.toString();
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(icon),
-        Positioned(
-          right: -6,
-          top: -4,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-            decoration: BoxDecoration(
-              color: AppColors.destructive,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   void _openProfile() {
     Navigator.of(context).push(
@@ -104,8 +70,8 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
         title: Text(
           titles[_index],
           style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            fontSize: 24,
             letterSpacing: -0.5,
           ),
         ),
@@ -190,8 +156,7 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
               surfaceTintColor: Colors.transparent,
               backgroundColor: Colors.transparent,
               indicatorColor: AppColors.tint(AppColors.primary, opacity: 0.16),
-              labelBehavior:
-                  NavigationDestinationLabelBehavior.onlyShowSelected,
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
               selectedIndex: _index,
               onDestinationSelected: _setTab,
               destinations: [
@@ -216,13 +181,13 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
                   label: "Schedule",
                 ),
                 NavigationDestination(
-                  icon: _buildBadgeIcon(
-                    Icons.notifications_outlined,
-                    unreadCount,
+                  icon: AppBadgeIcon(
+                    icon: Icons.notifications_outlined,
+                    count: unreadCount,
                   ),
-                  selectedIcon: _buildBadgeIcon(
-                    Icons.notifications,
-                    unreadCount,
+                  selectedIcon: AppBadgeIcon(
+                    icon: Icons.notifications,
+                    count: unreadCount,
                   ),
                   label: "Alerts",
                 ),

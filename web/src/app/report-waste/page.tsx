@@ -245,7 +245,10 @@ export default function ReportWastePage() {
         throw new Error(data.message || data.error || "Failed to analyze image");
       }
 
-      const reportTitle = `Waste report - ${data.categories?.[0] ? (CATEGORY_LABELS[data.categories[0]] ?? data.categories[0]) : (data.hasWaste ? "With Waste" : "No Waste")}`;
+      const rawCategoryLabel = data.categories?.[0] ? (CATEGORY_LABELS[data.categories[0]] ?? data.categories[0]) : (data.hasWaste ? "With Waste" : "No Waste");
+      const reportTitle = (rawCategoryLabel === "With Waste" || rawCategoryLabel === "No Waste")
+        ? "Waste report"
+        : `Waste report - ${rawCategoryLabel}`;
       const reportDescription = description.trim().length > 0
         ? description.trim()
         : (address.trim().length > 0 ? address.trim() : (data.reason || `Waste report submitted via quick capture.`));

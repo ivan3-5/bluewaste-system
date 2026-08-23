@@ -8,6 +8,7 @@ import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
 import { getReverseGeocodedLocation, formatAnalysisDetails } from "@/lib/utils";
 import { AiAnalysisPanel } from "@/components/AiAnalysisPanel";
 import Image from "next/image";
+import { ReportPhotoCarousel } from "@/components/ReportPhotoCarousel";
 import { CheckCircle2, CalendarDays } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -95,15 +96,9 @@ export default async function ReportDetailPage({ params }: PageProps) {
                 <figcaption className="border-b border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                   Citizen Submission
                 </figcaption>
-                <div className="relative h-72 w-full sm:h-80">
-                  <Image
-                    src={report.imageUrl}
-                    alt={report.locationName}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    className="object-cover"
-                  />
-                </div>
+                <ReportPhotoCarousel 
+                  images={report.images.filter(img => img.type === "REPORT" || img.type === "ANGLE")} 
+                />
               </figure>
 
               {cleanupImages.length > 0 ? (

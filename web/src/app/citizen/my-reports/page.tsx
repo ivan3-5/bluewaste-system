@@ -13,6 +13,7 @@ import {
 import { timeAgo } from "@/lib/utils";
 import Link from "next/link";
 import { X, ChevronLeft, ChevronRight, ImageIcon, EyeOff } from "lucide-react";
+import { ListCardsSkeleton } from "@/components/skeletons/page-skeletons";
 
 interface LightboxState {
   images: string[];
@@ -217,23 +218,7 @@ export default function MyReportsPage() {
       {/* Reports List */}
       <div className="space-y-4">
         {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse rounded-xl border border-gray-100 bg-white/50 p-5 shadow-sm">
-                <div className="flex gap-4">
-                  <div className="flex-1 space-y-3">
-                    <div className="h-5 w-1/3 rounded-md bg-gray-200"></div>
-                    <div className="h-4 w-2/3 rounded-md bg-gray-100"></div>
-                    <div className="flex gap-2 pt-2">
-                      <div className="h-6 w-20 rounded-full bg-gray-200"></div>
-                      <div className="h-6 w-24 rounded-full bg-gray-100"></div>
-                    </div>
-                  </div>
-                  <div className="h-20 w-20 rounded-xl bg-gray-200"></div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <ListCardsSkeleton rows={4} />
         ) : reports.length === 0 ? (
           <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-white/60 p-12 text-center shadow-lg shadow-blue-900/5 backdrop-blur-md transition-all">
             <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-300/20 blur-3xl" />

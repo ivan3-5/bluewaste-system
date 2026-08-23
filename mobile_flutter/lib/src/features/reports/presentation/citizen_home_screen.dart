@@ -3,6 +3,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
+import "../../../core/ui/shimmer_loading.dart";
 import "../../auth/presentation/auth_controller.dart";
 import "../../dashboard/data/dashboard_service.dart";
 import "../../notifications/presentation/notification_providers.dart";
@@ -31,7 +32,7 @@ class CitizenHomeScreen extends ConsumerWidget {
       children: [
         _WelcomeHeader(name: greetingName),
         const SizedBox(height: AppSpacing.md),
-        const _DashboardStatsSection(),
+        const RepaintBoundary(child: _DashboardStatsSection()),
         const SizedBox(height: AppSpacing.lg),
         _HeroReportBanner(
           onTap: () => onSelectTab(1),
@@ -42,44 +43,61 @@ class CitizenHomeScreen extends ConsumerWidget {
           subtitle: "Explore features and community services",
         ),
         const SizedBox(height: AppSpacing.sm),
-        GridView.builder(
-          shrinkWrap: true,
-          itemCount: _homeActions.length,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: AppSpacing.sm,
-            mainAxisSpacing: AppSpacing.sm,
-            childAspectRatio: 1.25,
-          ),
-          itemBuilder: (context, index) {
-            final action = _homeActions[index];
-            return _QuickActionCard(
-              action: action,
-              onTap: () {
-                if (action.tabIndex == -1) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => Scaffold(
-                        appBar: AppBar(title: const Text("My Reports")),
-                        body: const SafeArea(
-                          child: MyReportsScreen(),
+        // Use Column+Row instead of GridView with shrinkWrap:true inside a
+        // ListView — shrinkWrap forces a double layout pass on every build.
+        Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickActionCard(
+                    action: _homeActions[0],
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(title: const Text("My Reports")),
+                            body: const SafeArea(child: MyReportsScreen()),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                } else if (action.tabIndex == -2) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const SchedulesScreen(),
-                    ),
-                  );
-                } else {
-                  onSelectTab(action.tabIndex);
-                }
-              },
-            );
-          },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _QuickActionCard(
+                    action: _homeActions[1],
+                    onTap: () => onSelectTab(_homeActions[1].tabIndex),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickActionCard(
+                    action: _homeActions[2],
+                    onTap: () => onSelectTab(_homeActions[2].tabIndex),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _QuickActionCard(
+                    action: _homeActions[3],
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SchedulesScreen(showAppBar: true),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         const SizedBox(height: AppSpacing.lg),
         const _TipCard(),
@@ -293,21 +311,7 @@ class _DashboardStatsSection extends ConsumerWidget {
           ],
         );
       },
-      loading: () => Container(
-        height: 72,
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: const Center(
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2.5),
-          ),
-        ),
-      ),
+      loading: () => const ShimmerStatRow(),
       error: (e, st) => const SizedBox.shrink(),
     );
   }

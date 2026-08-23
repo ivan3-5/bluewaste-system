@@ -19,7 +19,8 @@ class WorkerTasksScreen extends ConsumerStatefulWidget {
   ConsumerState<WorkerTasksScreen> createState() => _WorkerTasksScreenState();
 }
 
-class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
+class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
+    with WidgetsBindingObserver {
   final DateFormat _dateFormat = DateFormat("MMM d, yyyy h:mm a");
   final ImagePicker _picker = ImagePicker();
 
@@ -31,12 +32,32 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadTasks();
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _loadTasks());
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _loadTasks());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadTasks();
+      _startPolling();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _timer?.cancel();
+      _timer = null;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
@@ -50,8 +71,17 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen> {
 
       if (!mounted) return;
 
+      // Data-diff guard: skip setState when task list is unchanged.
+      final newTasks = result.data;
+      final same = newTasks.length == _tasks.length &&
+          !_loading &&
+          (newTasks.isEmpty ||
+              newTasks.first.id == _tasks.first.id &&
+                  newTasks.last.id == _tasks.last.id);
+      if (same) return;
+
       setState(() {
-        _tasks = result.data;
+        _tasks = newTasks;
         _loading = false;
       });
     } catch (_) {

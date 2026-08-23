@@ -193,35 +193,43 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   }
 
   Future<void> _pickFromCamera() async {
+    if (_images.length >= 5) return;
+    
     final picked =
         await _picker.pickImage(source: ImageSource.camera, imageQuality: 75);
     if (picked == null) {
       return;
     }
 
-    // Replace any existing image — only one image is required/allowed.
     setState(() {
-      _images.clear();
       _images.add(picked);
-      _resetDetection();
+      if (_images.length == 1) {
+        _resetDetection();
+      }
     });
 
-    await _runDetection(picked);
+    if (_images.length == 1) {
+      await _runDetection(picked);
+    }
   }
 
   Future<void> _pickFromGallery() async {
-    // Pick a single image from gallery and replace any existing image.
+    if (_images.length >= 5) return;
+
     final picked =
         await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75);
     if (picked == null) return;
 
     setState(() {
-      _images.clear();
       _images.add(picked);
-      _resetDetection();
+      if (_images.length == 1) {
+        _resetDetection();
+      }
     });
 
-    await _runDetection(picked);
+    if (_images.length == 1) {
+      await _runDetection(picked);
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -268,6 +276,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
     final position = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
+      timeLimit: const Duration(seconds: 10),
     );
 
     // Validate against active reporting zones
@@ -389,13 +398,15 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       final effectiveIsSpam = isDirectSpamSubmit || _isSpamFlagged;
       final categoryLabel = wasteCategoryLabels[effectiveCategory] ??
           (effectiveCategory == "with_waste" ? "With Waste" : "No Waste");
-      final title = "Waste report - $categoryLabel";
+      final title = (effectiveCategory == "with_waste" || effectiveCategory == "no_waste" || categoryLabel == "With Waste")
+          ? "Waste report"
+          : "Waste report - $categoryLabel";
       final aiAnalysisReason = _detectResult?.reason ?? _detectResult?.message;
       final description = rawDescription.isNotEmpty
           ? rawDescription
           : (aiAnalysisReason != null && aiAnalysisReason.trim().isNotEmpty
               ? aiAnalysisReason
-              : "Waste report submitted via mobile capture. Category: $categoryLabel.");
+              : "Waste report submitted via mobile capture.");
 
       final report = await reportService.submitFullReport(
         data: {
@@ -679,7 +690,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  "Take a clear photo of coastal waste or upload one from your gallery. The system will automatically detect waste and classify the category.",
+                  "Take up to 5 photos of the waste from different angles. The primary image will be used to automatically detect and classify the category.",
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.mutedForeground,
                       ),
@@ -802,9 +813,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 const SizedBox(height: AppSpacing.sm),
                 _buildGuidelineRow(context, Icons.check_circle_outline, AppColors.success, "Center the waste item clearly in the frame."),
                 const SizedBox(height: AppSpacing.xs),
-                _buildGuidelineRow(context, Icons.check_circle_outline, AppColors.success, "Ensure good lighting and avoid blurry images."),
+                _buildGuidelineRow(context, Icons.check_circle_outline, AppColors.success, "Take up to 5 photos from different angles for better documentation."),
                 const SizedBox(height: AppSpacing.xs),
-                _buildGuidelineRow(context, Icons.info_outline, AppColors.primary, "The system will analyze and classify the waste upon selection."),
+                _buildGuidelineRow(context, Icons.info_outline, AppColors.primary, "The primary image will be analyzed to classify the waste."),
               ],
             ),
           ),
@@ -865,43 +876,82 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 subtitle: "The system verifies and categorizes your captured image.",
               ),
               const SizedBox(height: AppSpacing.md),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(_images.first.path),
-                      width: double.infinity,
-                      height: 220,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _images.clear();
-                          _resetDetection();
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: AppColors.destructive,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          size: 18,
-                          color: Colors.white,
+              SizedBox(
+                height: 220,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _images.length,
+                  itemBuilder: (context, index) {
+                    final isPrimary = index == 0;
+                    return RepaintBoundary(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: AppSpacing.sm),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                File(_images[index].path),
+                                width: MediaQuery.of(context).size.width * 0.75,
+                                height: 220,
+                                fit: BoxFit.cover,
+                                cacheWidth: 800,
+                              ),
+                            ),
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                isPrimary ? "Primary" : "Angle ${index + 1}",
+                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 10,
+                            right: 10,
+                            child: InkWell(
+                              onTap: () async {
+                                final wasPrimary = index == 0;
+                                setState(() {
+                                  _images.removeAt(index);
+                                  if (wasPrimary && _images.isNotEmpty) {
+                                    _resetDetection();
+                                  } else if (_images.isEmpty) {
+                                    _resetDetection();
+                                  }
+                                });
+                                if (wasPrimary && _images.isNotEmpty) {
+                                  await _runDetection(_images.first);
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.destructive,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                    );
+                  },
+                ),
               ),
               if (_detectedConfidence != null) ...[
                 const SizedBox(height: AppSpacing.sm),
@@ -912,25 +962,26 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 ),
               ],
               const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isDetecting ? null : _pickFromCamera,
-                      icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                      label: const Text("Retake Camera"),
+              if (_images.length < 5)
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isDetecting ? null : _pickFromCamera,
+                        icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                        label: const Text("Angle (Camera)"),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isDetecting ? null : _pickFromGallery,
-                      icon: const Icon(Icons.photo_library_outlined, size: 18),
-                      label: const Text("Replace Gallery"),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isDetecting ? null : _pickFromGallery,
+                        icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                        label: const Text("Angle (Gallery)"),
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
         ),

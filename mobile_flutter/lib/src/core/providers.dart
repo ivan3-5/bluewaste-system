@@ -15,20 +15,12 @@ final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(
     BaseOptions(
       baseUrl: AppEnv.apiBaseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 60),
-      sendTimeout: const Duration(seconds: 60),
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 30),
+      sendTimeout: const Duration(seconds: 45),
       headers: const {"Content-Type": "application/json"},
     ),
   );
-
-  // Debug log: show which API base URL the app is using on device.
-  // This helps verify the installed app was built with the expected API URL.
-  // Remove this in production.
-  try {
-    // ignore: avoid_print
-    print("[DEBUG] AppEnv.apiBaseUrl = ${AppEnv.apiBaseUrl}");
-  } catch (_) {}
 
   dio.interceptors.add(
     QueuedInterceptorsWrapper(

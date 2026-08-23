@@ -121,12 +121,13 @@ class ReportRecord {
         !description.toLowerCase().contains("ready to submit")) {
       return description;
     }
-    final categoryLabel = wasteCategoryLabels[category] ?? category;
     if (category == "no_waste" || category == "NO_WASTE") {
       return "AI Analysis: No visible waste or pollution detected in the submitted image.";
     }
     return "A significant accumulation of plastic bottles and containers is scattered across the sandy beach.";
   }
+
+  String get displayTitle => _cleanWasteTitle(title);
 
   factory ReportRecord.fromJson(Map<String, dynamic> json) {
     double parseDouble(dynamic value, double fallback) {
@@ -146,9 +147,11 @@ class ReportRecord {
         .map(ReportImage.fromJson)
         .toList(growable: false);
 
+    final rawTitle = (json["title"] ?? "").toString();
+
     return ReportRecord(
       id: (json["id"] ?? "").toString(),
-      title: (json["title"] ?? "").toString(),
+      title: _cleanWasteTitle(rawTitle),
       description: (json["description"] ?? "").toString(),
       category: (json["category"] ?? "with_waste").toString(),
       status: (json["status"] ?? "PENDING").toString(),
@@ -166,6 +169,18 @@ class ReportRecord {
           json["spamReason"]?.toString(),
     );
   }
+}
+
+String _cleanWasteTitle(String raw) {
+  var cleaned = raw.trim();
+  cleaned = cleaned.replaceAll(RegExp(r'\s*-\s*with[\s_]*waste\b', caseSensitive: false), '');
+  cleaned = cleaned.replaceAll(RegExp(r'\s*-\s*no[\s_]*waste\b', caseSensitive: false), '');
+  cleaned = cleaned.replaceAll(RegExp(r'\bwith[\s_]*waste\b', caseSensitive: false), '');
+  cleaned = cleaned.trim();
+  if (cleaned.isEmpty || cleaned == "-" || cleaned == "Waste report -") {
+    return "Waste report";
+  }
+  return cleaned;
 }
 
 const Map<String, String> statusLabels = {
@@ -196,3 +211,71 @@ const Map<String, String> wasteCategoryLabels = {
   "diaper": "Diaper / Sanitary",
   "cigarette_butt": "Cigarette Butt",
 };
+
+/// Mirrors the backend `GET /reports/incidents/map` response shape.
+/// One entry per grouped `WasteIncident` — multiple citizen reports
+/// within the same location radius are merged into a single incident.
+class IncidentMapData {
+  const IncidentMapData({
+    required this.id,
+    required this.category,
+    required this.status,
+    required this.latitude,
+    required this.longitude,
+    required this.contributorCount,
+    required this.reportIds,
+    required this.createdAt,
+    this.severity,
+    this.address,
+    this.imageUrl,
+  });
+
+  final String id;
+  final String category;
+  final String status;
+  final String? severity;
+  final double latitude;
+  final double longitude;
+  final String? address;
+
+  /// Number of unique citizen reports grouped into this incident.
+  final int contributorCount;
+
+  /// IDs of all linked Report rows.
+  final List<String> reportIds;
+
+  /// Thumbnail image from the first linked report.
+  final String? imageUrl;
+
+  final DateTime createdAt;
+
+  factory IncidentMapData.fromJson(Map<String, dynamic> json) {
+    double parseDouble(dynamic value, double fallback) {
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString() ?? "") ?? fallback;
+    }
+
+    DateTime parseDate(dynamic value) {
+      if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+      return DateTime.now();
+    }
+
+    final ids = (json["reportIds"] as List<dynamic>? ?? const [])
+        .map((e) => e.toString())
+        .toList(growable: false);
+
+    return IncidentMapData(
+      id: (json["id"] ?? "").toString(),
+      category: (json["category"] ?? "with_waste").toString(),
+      status: (json["status"] ?? "PENDING").toString(),
+      severity: json["severity"]?.toString(),
+      latitude: parseDouble(json["latitude"], 0),
+      longitude: parseDouble(json["longitude"], 0),
+      address: json["address"]?.toString(),
+      contributorCount: (json["contributorCount"] as num?)?.toInt() ?? 1,
+      reportIds: ids,
+      imageUrl: json["imageUrl"]?.toString(),
+      createdAt: parseDate(json["createdAt"]),
+    );
+  }
+}

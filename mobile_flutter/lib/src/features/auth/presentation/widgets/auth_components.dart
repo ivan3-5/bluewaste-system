@@ -1,5 +1,5 @@
-import "dart:ui";
 import "package:flutter/material.dart";
+
 
 import "../../../../core/theme/app_colors.dart";
 
@@ -25,6 +25,10 @@ class _FadeInSlideState extends State<FadeInSlide>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
+  // Cap the effective stagger delay so the last element never waits more
+  // than 350 ms — this cuts perceived auth-screen load nearly in half.
+  static const Duration _maxDelay = Duration(milliseconds: 350);
+
   @override
   void initState() {
     super.initState();
@@ -32,11 +36,12 @@ class _FadeInSlideState extends State<FadeInSlide>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     _slideAnimation = Tween<Offset>(
-            begin: const Offset(0, 0.2), end: Offset.zero)
+            begin: const Offset(0, 0.15), end: Offset.zero)
         .animate(CurvedAnimation(
             parent: _controller, curve: Curves.easeOutCubic));
 
-    Future.delayed(widget.delay, () {
+    final effectiveDelay = widget.delay > _maxDelay ? _maxDelay : widget.delay;
+    Future.delayed(effectiveDelay, () {
       if (mounted) _controller.forward();
     });
   }
@@ -207,6 +212,7 @@ class AnimatedGradientBackground extends StatelessWidget {
             ),
           ),
         ),
+        // Decorative top-right orb
         Positioned(
           top: -150,
           right: -100,
@@ -237,6 +243,7 @@ class AnimatedGradientBackground extends StatelessWidget {
             },
           ),
         ),
+        // Decorative bottom-left orb
         Positioned(
           bottom: -150,
           left: -100,
@@ -267,12 +274,10 @@ class AnimatedGradientBackground extends StatelessWidget {
             },
           ),
         ),
-        Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-            child: const SizedBox(),
-          ),
-        ),
+        // NOTE: The full-screen BackdropFilter(sigmaX:60) that was here has been
+        // removed. It required the engine to composite and blur every pixel on the
+        // screen each frame for no perceptible visual gain on a solid gradient
+        // background, causing GPU pressure during keyboard animations.
         child,
       ],
     );

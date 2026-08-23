@@ -11,8 +11,10 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import {
   ADMIN_REPORT_STATUS_LABELS,
   type AdminReport,
+  type IncidentMapData,
 } from "@/lib/admin-report";
 import { useAuth } from "@/providers/AuthProvider";
+import api from "@/lib/api";
 
 type MapViewProps = {
   reports: AdminReport[];
@@ -22,6 +24,9 @@ type MapViewProps = {
 };
 
 const DEFAULT_CENTER: [number, number] = [7.3132, 125.6844];
+const PLACEHOLDER_IMAGE = "https://placehold.co/400x300?text=No+Image";
+
+// ─── Icon builders ────────────────────────────────────────────────────────────
 
 function buildIcon(color: string) {
   return L.divIcon({
@@ -36,6 +41,48 @@ function buildIcon(color: string) {
     popupAnchor: [0, -12],
   });
 }
+
+/**
+ * Incident icon — larger + badge when count > 1.
+ * Single-contributor incidents look identical to regular report icons.
+ */
+function buildIncidentIcon(color: string, count: number) {
+  if (count <= 1) {
+    return buildIcon(color);
+  }
+
+  const badgeCount = count > 99 ? "99+" : String(count);
+  return L.divIcon({
+    className: "incident-marker",
+    html: `
+      <div style="position:relative;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:${color};border:3px solid white;box-shadow:0 8px 24px rgba(0,0,0,0.32)">
+        <div style="width:9px;height:9px;border-radius:999px;background:white"></div>
+        <div style="
+          position:absolute;
+          top:-6px;right:-8px;
+          min-width:18px;height:18px;
+          background:#1e3a5f;
+          color:#fff;
+          font-size:10px;font-weight:800;
+          border-radius:999px;
+          border:2px solid white;
+          display:flex;align-items:center;justify-content:center;
+          padding:0 4px;
+          box-shadow:0 2px 6px rgba(0,0,0,0.28);
+          font-family:system-ui,sans-serif;
+          letter-spacing:-0.3px;
+        ">
+          <span style="margin-top:-0.5px">${badgeCount}</span>
+        </div>
+      </div>
+    `,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -14],
+  });
+}
+
+// ─── HTML helpers ─────────────────────────────────────────────────────────────
 
 function escapeHtml(value: string) {
   return value
@@ -91,6 +138,48 @@ function buildPopupHtml(report: AdminReport) {
   `;
 }
 
+/** Popup HTML for a grouped waste incident marker */
+function buildIncidentPopupHtml(incident: IncidentMapData) {
+  const imageUrl = escapeHtml(incident.imageUrl || PLACEHOLDER_IMAGE);
+  const hasMultiple = incident.contributorCount > 1;
+
+  // If incident has a single report, link directly to it; otherwise show generic page
+  const primaryId = incident.reportIds[0];
+  const detailHref = primaryId
+    ? `/dashboard/reports/${encodeURIComponent(primaryId)}`
+    : `/dashboard/reports`;
+
+  const contributorBadge = hasMultiple
+    ? `<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:#1e3a5f;color:#fff;font-size:12px;font-weight:700;margin-bottom:2px">
+        <span style="font-size:14px">👥</span>
+        <span>${incident.contributorCount} citizens reported this</span>
+       </div>`
+    : "";
+
+  const addressLine = incident.address
+    ? `<p style="margin:0;font-size:11px;color:#64748b;line-height:1.3">${escapeHtml(incident.address)}</p>`
+    : "";
+
+  const viewLabel = hasMultiple
+    ? `View incident (${incident.reportIds.length} report${incident.reportIds.length !== 1 ? "s" : ""})`
+    : "View details";
+
+  return `
+    <div style="display:flex;flex-direction:column;gap:10px;min-width:230px">
+      <img src="${imageUrl}" alt="Incident image" loading="lazy" style="height:112px;width:100%;border-radius:12px;object-fit:cover" />
+      <div style="display:flex;flex-direction:column;gap:7px">
+        ${contributorBadge}
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${getCategoryPill(incident.category)}
+          ${getStatusPill(incident.status)}
+        </div>
+        ${addressLine}
+        <a href="${detailHref}" style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 14px;border-radius:10px;background:hsl(var(--primary));color:#ffffff;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 6px 14px rgba(0,102,204,0.28)">${viewLabel}</a>
+      </div>
+    </div>
+  `;
+}
+
 function isPointInPolygon(point: [number, number], vs: [number, number][]) {
   const x = point[0], y = point[1];
   let inside = false;
@@ -102,6 +191,8 @@ function isPointInPolygon(point: [number, number], vs: [number, number][]) {
   }
   return inside;
 }
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function MapView({
   reports,
@@ -115,7 +206,11 @@ export default function MapView({
   >("ALL");
   const [isEditingZone, setIsEditingZone] = useState(false);
   const [isDrawingZone, setIsDrawingZone] = useState(false);
+  const [groupedMode, setGroupedMode] = useState(true); // default: incident-grouped view
+  const [incidents, setIncidents] = useState<IncidentMapData[]>([]);
+  const [incidentsLoading, setIncidentsLoading] = useState(false);
   const { isAdmin } = useAuth();
+
   // lazy import hooks to avoid RSC issues from server components
   let reportingZonesHook: any = null;
   try {
@@ -156,6 +251,37 @@ export default function MapView({
     [],
   );
 
+  // ── Fetch grouped incident data ─────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!groupedMode) {
+      setIncidents([]);
+      return;
+    }
+
+    let cancelled = false;
+    setIncidentsLoading(true);
+
+    const params: Record<string, string> = {};
+    if (selectedStatus !== "ALL") params.status = selectedStatus;
+
+    api
+      .get<IncidentMapData[]>("/reports/incidents/map", { params })
+      .then((res) => {
+        if (!cancelled) setIncidents(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setIncidents([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIncidentsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [groupedMode, selectedStatus]);
+
+  // ── Filtered data ────────────────────────────────────────────────────────────
+
   const filteredReports = useMemo(() => {
     // Always hide cleaned reports from the map
     let result = reports.filter((report) => report.status !== "CLEANED");
@@ -183,6 +309,27 @@ export default function MapView({
 
     return result;
   }, [reports, selectedStatus, selectedZoneId, zones]);
+
+  const filteredIncidents = useMemo(() => {
+    let result = incidents.filter((inc) => inc.status !== "CLEANED");
+
+    if (selectedStatus !== "ALL") {
+      result = result.filter((inc) => inc.status === selectedStatus);
+    }
+
+    if (selectedZoneId) {
+      const zone = zones.find((z: any) => z.id === selectedZoneId);
+      if (zone) {
+        const polygonCoords = zone.coordinates.map((c: any) => [Number(c.lat), Number(c.lng)] as [number, number]);
+        result = result.filter((inc) =>
+          isPointInPolygon([Number(inc.latitude), Number(inc.longitude)], polygonCoords),
+        );
+      }
+    }
+    return result;
+  }, [incidents, selectedStatus, selectedZoneId, zones]);
+
+  // ── Map init ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -416,6 +563,8 @@ export default function MapView({
     mapRef.current.setView(center, zoom, { animate: false });
   }, [center, zoom]);
 
+  // ── Markers effect ─────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!markersLayerRef.current) {
       return;
@@ -426,25 +575,40 @@ export default function MapView({
 
     const newMarkers: L.Marker[] = [];
 
-    filteredReports.forEach((report) => {
-      const marker = L.marker([report.latitude, report.longitude], {
-        icon:
-          report.category === "with_waste" ? icons.withWaste : icons.noWaste,
+    if (groupedMode) {
+      // ── Incident-grouped mode ──────────────────────────────────────────────
+      filteredIncidents.forEach((incident) => {
+        const color = incident.category === "with_waste" ? "#ef4444" : "#22c55e";
+        const icon = buildIncidentIcon(color, incident.contributorCount);
+        const marker = L.marker([incident.latitude, incident.longitude], { icon });
+        marker.bindPopup(buildIncidentPopupHtml(incident), { maxWidth: 280 });
+        newMarkers.push(marker);
       });
-
-      marker.bindPopup(buildPopupHtml(report), { maxWidth: 260 });
-      newMarkers.push(marker);
-    });
+    } else {
+      // ── Raw per-report mode (original behaviour) ───────────────────────────
+      filteredReports.forEach((report) => {
+        const marker = L.marker([report.latitude, report.longitude], {
+          icon:
+            report.category === "with_waste" ? icons.withWaste : icons.noWaste,
+        });
+        marker.bindPopup(buildPopupHtml(report), { maxWidth: 260 });
+        newMarkers.push(marker);
+      });
+    }
 
     newMarkers.forEach((marker) => markersLayer.addLayer(marker));
 
+    const positions = groupedMode
+      ? filteredIncidents.map((i) => [i.latitude, i.longitude] as [number, number])
+      : filteredReports.map((r) => [r.latitude, r.longitude] as [number, number]);
+
     if (newMarkers.length > 0) {
-      const bounds = L.latLngBounds(filteredReports.map(r => [r.latitude, r.longitude]));
+      const bounds = L.latLngBounds(positions);
       if (bounds.isValid()) {
         mapRef.current?.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
       }
     }
-  }, [filteredReports, icons]);
+  }, [filteredReports, filteredIncidents, icons, groupedMode]);
 
   // render reporting zones as polygon layers (and put the selected one into editable group)
   useEffect(() => {
@@ -482,6 +646,10 @@ export default function MapView({
       });
     }
   }, [zones, selectedZoneId, isAdmin, hideControls]);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  const activeCount = groupedMode ? filteredIncidents.length : filteredReports.length;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -541,6 +709,28 @@ export default function MapView({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* Incident grouping toggle */}
+              <button
+                id="incident-group-toggle"
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                  groupedMode
+                    ? "bg-[hsl(var(--primary))] text-white shadow-md"
+                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+                onClick={() => setGroupedMode((v) => !v)}
+                title={
+                  groupedMode
+                    ? "Currently showing grouped waste incidents. Click to switch to raw reports view."
+                    : "Currently showing all individual reports. Click to switch to grouped incidents view."
+                }
+              >
+                <span>👥</span>
+                <span>{groupedMode ? "Grouped Incidents" : "Raw Reports"}</span>
+                {groupedMode && incidentsLoading && (
+                  <span className="ml-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                )}
+              </button>
+
               <button
                 className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
                   isDrawingZone
@@ -583,15 +773,18 @@ export default function MapView({
           {(selectedZoneId ||
             isDrawingZone ||
             isEditingZone ||
-            selectedStatus !== "ALL") && (
+            selectedStatus !== "ALL" ||
+            groupedMode) && (
             <p className="mt-2 text-xs text-slate-500">
               {isDrawingZone
                 ? "Drawing mode enabled: draw a polygon on the map."
                 : isEditingZone
                   ? "Editing mode enabled: drag vertices to adjust the selected zone."
-                  : selectedStatus !== "ALL"
-                    ? `Showing ${filteredReports.length} report${filteredReports.length !== 1 ? "s" : ""} with ${ADMIN_REPORT_STATUS_LABELS[selectedStatus]}.`
-                    : "Zone selected: you can start editing or drawing."}
+                  : groupedMode
+                    ? `Showing ${activeCount} grouped waste incident${activeCount !== 1 ? "s" : ""}${selectedStatus !== "ALL" ? ` with status "${ADMIN_REPORT_STATUS_LABELS[selectedStatus]}"` : ""}. Markers with a blue badge have multiple citizen reports.`
+                    : selectedStatus !== "ALL"
+                      ? `Showing ${activeCount} report${activeCount !== 1 ? "s" : ""} with ${ADMIN_REPORT_STATUS_LABELS[selectedStatus]}.`
+                      : "Zone selected: you can start editing or drawing."}
             </p>
           )}
         </div>

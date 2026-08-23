@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/ui/app_components.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/schedule_service.dart';
@@ -19,7 +20,9 @@ final mySchedulesProvider = FutureProvider.autoDispose<List<CleanupSchedule>>((r
 });
 
 class SchedulesScreen extends ConsumerStatefulWidget {
-  const SchedulesScreen({super.key});
+  const SchedulesScreen({super.key, this.showAppBar = false});
+
+  final bool showAppBar;
 
   @override
   ConsumerState<SchedulesScreen> createState() => _SchedulesScreenState();
@@ -57,55 +60,49 @@ class _SchedulesScreenState extends ConsumerState<SchedulesScreen> {
         ? ref.watch(mySchedulesProvider)
         : ref.watch(upcomingSchedulesProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isWorker ? 'My Schedules' : 'Upcoming Cleanups'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              if (isWorker) {
-                ref.invalidate(mySchedulesProvider);
-              } else {
-                ref.invalidate(upcomingSchedulesProvider);
-              }
-            },
-          ),
-        ],
-      ),
-      body: schedulesAsync.when(
+    final content = RefreshIndicator(
+      onRefresh: () async {
+        if (isWorker) {
+          ref.invalidate(mySchedulesProvider);
+        } else {
+          ref.invalidate(upcomingSchedulesProvider);
+        }
+      },
+      child: schedulesAsync.when(
         data: (schedules) {
           if (schedules.isEmpty) {
-            return const Center(
-              child: Text(
-                'No schedules found.',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [
+                SizedBox(height: 120),
+                AppEmptyState(
+                  icon: Icons.event_busy_outlined,
+                  title: 'No schedules found',
+                  subtitle: 'There are no cleanup schedules assigned right now.',
+                ),
+              ],
             );
           }
 
-          return RefreshIndicator(
-            onRefresh: () async {
-              if (isWorker) {
-                ref.invalidate(mySchedulesProvider);
-              } else {
-                ref.invalidate(upcomingSchedulesProvider);
-              }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            physics: const AlwaysScrollableScrollPhysics(),
+            itemCount: schedules.length,
+            itemBuilder: (context, index) {
+              final schedule = schedules[index];
+              return _ScheduleCard(schedule: schedule);
             },
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: schedules.length,
-              itemBuilder: (context, index) {
-                final schedule = schedules[index];
-                return _ScheduleCard(schedule: schedule);
-              },
-            ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primary,
+          ),
+        ),
         error: (e, st) => ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            const SizedBox(height: 140),
+            const SizedBox(height: 120),
             AppEmptyState(
               icon: Icons.error_outline,
               title: "Error loading schedules",
@@ -115,6 +112,20 @@ class _SchedulesScreenState extends ConsumerState<SchedulesScreen> {
         ),
       ),
     );
+
+    if (widget.showAppBar) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Upcoming Cleanups'),
+          backgroundColor: AppColors.card,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: content,
+      );
+    }
+
+    return content;
   }
 }
 
@@ -126,119 +137,199 @@ class _ScheduleCard extends StatelessWidget {
   Color _getStatusColor() {
     switch (schedule.status) {
       case CleanupScheduleStatus.upcoming:
-        return Colors.blue;
+        return const Color(0xFF0066CC);
       case CleanupScheduleStatus.ongoing:
-        return Colors.orange;
+        return const Color(0xFFF59E0B);
       case CleanupScheduleStatus.completed:
-        return Colors.green;
+        return const Color(0xFF10B981);
       case CleanupScheduleStatus.cancelled:
-        return Colors.red;
+        return const Color(0xFFEF4444);
     }
   }
 
   String _getStatusText() {
     switch (schedule.status) {
       case CleanupScheduleStatus.upcoming:
-        return 'UPCOMING';
+        return 'Upcoming';
       case CleanupScheduleStatus.ongoing:
-        return 'ONGOING';
+        return 'In Progress';
       case CleanupScheduleStatus.completed:
-        return 'COMPLETED';
+        return 'Completed';
       case CleanupScheduleStatus.cancelled:
-        return 'CANCELLED';
+        return 'Cancelled';
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ScheduleDetailScreen(scheduleId: schedule.id, initialSchedule: schedule),
+    final statusColor = _getStatusColor();
+    final statusText = _getStatusText();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ScheduleDetailScreen(
+                  scheduleId: schedule.id,
+                  initialSchedule: schedule,
+                ),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            statusText.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: statusColor,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 13,
+                      color: AppColors.mutedForeground,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  schedule.title,
+                  style: const TextStyle(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: AppColors.foreground,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.tint(AppColors.primary, opacity: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.location_on_rounded, size: 14, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        schedule.barangay,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.foreground,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.event_available_rounded, size: 14, color: Color(0xFF8B5CF6)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        DateFormat('MMM d, yyyy · h:mm a').format(schedule.scheduledAt.toLocal()),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.mutedForeground,
+                        ),
+                      ),
+                    ),
+                    if (schedule.workers.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.group_rounded, size: 13, color: AppColors.mutedForeground),
+                            const SizedBox(width: 4),
+                            Text(
+                              "${schedule.workers.length}",
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.mutedForeground,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
             ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      schedule.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor().withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _getStatusColor().withValues(alpha: 0.5)),
-                    ),
-                    child: Text(
-                      _getStatusText(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: _getStatusColor(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      schedule.barangay,
-                      style: const TextStyle(color: Colors.grey),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    DateFormat('MMM d, yyyy h:mm a').format(schedule.scheduledAt),
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(Icons.group, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${schedule.workers.length} workers assigned',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              )
-            ],
           ),
         ),
       ),

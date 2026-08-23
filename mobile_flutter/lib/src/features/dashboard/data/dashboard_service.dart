@@ -57,6 +57,6 @@ final dashboardServiceProvider = Provider<DashboardService>((ref) {
   return DashboardService(ref.watch(dioProvider));
 });
 
-final dashboardStatsProvider = FutureProvider<DashboardStats>((ref) async {
+final dashboardStatsProvider = FutureProvider.autoDispose<DashboardStats>((ref) async {
   return ref.watch(dashboardServiceProvider).getStats();
 });

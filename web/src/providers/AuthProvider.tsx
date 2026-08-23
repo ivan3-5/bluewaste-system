@@ -18,6 +18,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
+  updateUser: (updatedUser: Partial<User>) => void;
   isAdmin: boolean;
 }
 
@@ -84,6 +85,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("bluewaste_user");
   }, []);
 
+  const updateUser = useCallback((updatedUser: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const newUser = { ...prev, ...updatedUser };
+      localStorage.setItem("bluewaste_user", JSON.stringify(newUser));
+      return newUser;
+    });
+  }, []);
+
   const isAdmin = user?.role === "LGU_ADMIN" || user?.role === "FIELD_WORKER";
 
   return (
@@ -95,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         logout,
+        updateUser,
         isAdmin,
       }}
     >

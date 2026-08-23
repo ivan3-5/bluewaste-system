@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../theme/app_colors.dart";
 import "../theme/app_spacing.dart";
+export "shimmer_loading.dart";
 
 class AppSectionCard extends StatelessWidget {
   const AppSectionCard({
@@ -96,16 +97,25 @@ class AppEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: AppColors.secondary,
-              child: Icon(icon, color: AppColors.primary),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.tint(AppColors.primary, opacity: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 30,
+                color: AppColors.primary,
+              ),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             Text(
               title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
                   ),
               textAlign: TextAlign.center,
             ),

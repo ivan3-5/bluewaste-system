@@ -301,6 +301,39 @@ class ReportService {
     }
   }
 
+  /// Fetches grouped incident map data from `GET /reports/incidents/map`.
+  /// Returns one [IncidentMapData] per `WasteIncident`, with contributor count
+  /// and merged report IDs — the same data the web admin map uses.
+  Future<List<IncidentMapData>> getIncidentMapData({
+    int limit = 2000,
+    String? status,
+    String? category,
+  }) async {
+    final queryParameters = {
+      "limit": limit,
+      if (status != null && status.isNotEmpty) "status": status,
+      if (category != null && category.isNotEmpty) "category": category,
+    };
+
+    try {
+      final response = await _dio.get<dynamic>(
+        "/reports/incidents/map",
+        queryParameters: queryParameters,
+      );
+
+      final payload = response.data;
+      if (payload is List) {
+        return payload
+            .whereType<Map<String, dynamic>>()
+            .map(IncidentMapData.fromJson)
+            .toList(growable: false);
+      }
+      return const [];
+    } on DioException catch (error) {
+      throw ApiException.fromDioError(error);
+    }
+  }
+
   Future<List<ReportRecord>> getMapReports({
     int limit = 2000,
     String? status,

@@ -5,6 +5,7 @@ import "package:shared_preferences/shared_preferences.dart";
 
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
+import "../../../core/ui/shared_widgets.dart";
 import "../../auth/presentation/auth_controller.dart";
 import "../../notifications/presentation/notification_providers.dart";
 import "../../notifications/presentation/notifications_screen.dart";
@@ -24,46 +25,20 @@ class _CitizenShellScreenState extends ConsumerState<CitizenShellScreen> {
   int _index = 0;
   int _homeTapCount = 0;
   int _lastHomeTapMs = 0;
+  // Cached to avoid async getInstance() on every tab tap (issue #18).
+  SharedPreferences? _prefs;
 
-  Widget _buildBadgeIcon(IconData icon, int count) {
-    if (count <= 0) {
-      return Icon(icon);
-    }
-
-    final label = count > 9 ? "9+" : count.toString();
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(icon),
-        Positioned(
-          right: -6,
-          top: -4,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-            decoration: BoxDecoration(
-              color: AppColors.destructive,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+  @override
+  void initState() {
+    super.initState();
+    // Load prefs eagerly so the demo toggle is available immediately.
+    SharedPreferences.getInstance().then((p) => _prefs = p);
   }
+
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = ref.watch(unreadCountProvider).value ?? 0;
+    final unreadCount = ref.watch(unreadCountProvider).valueOrNull ?? 0;
     final user = ref.watch(authControllerProvider).user;
     final avatarUrl = (user?.avatarUrl ?? "").trim();
     final hasAvatar = avatarUrl.isNotEmpty;
@@ -208,7 +183,7 @@ class _CitizenShellScreenState extends ConsumerState<CitizenShellScreen> {
 
                   if (_homeTapCount >= 2) {
                     try {
-                      final prefs = await SharedPreferences.getInstance();
+                      final prefs = _prefs ?? await SharedPreferences.getInstance();
                       final current = prefs.getBool('demo_mode') ?? false;
                       final next = !current;
                       await prefs.setBool('demo_mode', next);
@@ -241,13 +216,13 @@ class _CitizenShellScreenState extends ConsumerState<CitizenShellScreen> {
                   label: "Map",
                 ),
                 NavigationDestination(
-                  icon: _buildBadgeIcon(
-                    Icons.notifications_outlined,
-                    unreadCount,
+                  icon: AppBadgeIcon(
+                    icon: Icons.notifications_outlined,
+                    count: unreadCount,
                   ),
-                  selectedIcon: _buildBadgeIcon(
-                    Icons.notifications,
-                    unreadCount,
+                  selectedIcon: AppBadgeIcon(
+                    icon: Icons.notifications,
+                    count: unreadCount,
                   ),
                   label: "Alerts",
                 ),

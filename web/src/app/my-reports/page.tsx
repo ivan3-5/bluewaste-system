@@ -10,6 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
 import type { WasteSeverityLegacy, WasteType } from "@/types";
+import {
+  ListCardsSkeleton,
+  PageHeadingSkeleton,
+} from "@/components/skeletons/page-skeletons";
 
 const WASTE_TYPE_STYLES: Record<WasteType, string> = {
   PLASTIC: "bg-blue-100 text-blue-800 border-blue-200",
@@ -75,11 +79,10 @@ export default function MyWasteReportsPage() {
 
         <div className="space-y-4">
           {isReportsLoading ? (
-            <Card>
-              <CardContent className="py-10 text-center text-sm text-gray-500">
-                Loading reports...
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              <PageHeadingSkeleton withSubtitle={false} />
+              <ListCardsSkeleton rows={4} />
+            </div>
           ) : reports.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-gray-500">
