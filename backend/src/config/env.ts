@@ -62,6 +62,9 @@ const envSchema = z.object({
   ALLOWED_ORIGINS: z.string().optional(),
   YOLO_API_URL: z.string().url().default("https://bluewaste-system.onrender.com/analyze"),
   SPAM_RETENTION_DAYS: z.coerce.number().int().min(1).default(3),
+  // Same-waste-incident deduplication distance threshold (meters).
+  // Default: 30m. Max enforced at 50m. Tune without code change.
+  DEDUP_DISTANCE_METERS: z.coerce.number().int().min(1).max(50).default(30),
   // Upstash Redis for distributed rate limiting (optional — falls back to in-memory)
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),

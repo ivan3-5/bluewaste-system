@@ -19,6 +19,23 @@ export type ReportMapData = {
   images: { imageUrl: string }[];
 };
 
+export type IncidentMapData = {
+  id: string;
+  category: WasteCategory;
+  status: ReportStatus;
+  severity?: Severity | null;
+  latitude: number;
+  longitude: number;
+  address: string | null;
+  /** Number of unique citizen reports grouped into this incident */
+  contributorCount: number;
+  /** IDs of all linked Report rows */
+  reportIds: string[];
+  /** Thumbnail image from the first linked report */
+  imageUrl: string | null;
+  createdAt: Date;
+};
+
 export class ReportGeoService {
   static async getMapData(filters?: {
     status?: ReportStatus;
@@ -148,5 +165,112 @@ export class ReportGeoService {
     await GeoCache.set(cacheKey, heatmapData);
 
     return heatmapData;
+  }
+
+  // ─── Incident-grouped map data ──────────────────────────────────────────────
+
+  /**
+   * Returns one entry per `WasteIncident` (deduplicated), instead of one per `Report`.
+   * Used by the Leaflet map to show grouped markers with contributor-count badges.
+   */
+  static async getIncidentMapData(filters?: {
+    status?: ReportStatus;
+    category?: WasteCategory;
+    limit?: string;
+  }) {
+    await ReportSpamService.purgeExpiredSpamIfDue();
+
+    const parsedLimit = Number.parseInt(filters?.limit || "", 10);
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 5000)
+      : 2000;
+
+    const cacheKey = `bluewaste:geo:incidents:${JSON.stringify({
+      status: filters?.status || null,
+      category: filters?.category || null,
+      limit,
+    })}`;
+
+    const cached = await GeoCache.get<IncidentMapData[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const where: Prisma.WasteIncidentWhereInput = {
+      isResolved: false,
+    };
+    if (filters?.status) where.status = filters.status;
+    if (filters?.category) where.category = filters.category;
+
+    let incidents: IncidentMapData[] = [];
+
+    try {
+      const raw = await prisma.wasteIncident.findMany({
+        where,
+        select: {
+          id: true,
+          category: true,
+          status: true,
+          severity: true,
+          latitude: true,
+          longitude: true,
+          address: true,
+          contributorCount: true,
+          createdAt: true,
+          reports: {
+            where: { isDeleted: false, isSpam: false },
+            select: {
+              id: true,
+              images: { take: 1, select: { imageUrl: true } },
+            },
+            orderBy: { createdAt: "asc" },
+            take: 50, // cap linked reports per incident for performance
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      });
+
+      incidents = raw.map((inc) => {
+        // Use the first report's image as the representative image
+        const firstImageUrl =
+          inc.reports.find((r) => r.images.length > 0)?.images[0]?.imageUrl ??
+          null;
+
+        return {
+          id: inc.id,
+          category: inc.category,
+          status: inc.status,
+          severity: inc.severity,
+          latitude: inc.latitude,
+          longitude: inc.longitude,
+          address: inc.address,
+          contributorCount: inc.contributorCount,
+          reportIds: inc.reports.map((r) => r.id),
+          imageUrl: firstImageUrl,
+          createdAt: inc.createdAt,
+        };
+      });
+    } catch (error) {
+      console.warn("getIncidentMapData failed:", error);
+      // Graceful fallback: return per-report map data as single-contributor incidents
+      const reports = await this.getMapData(filters);
+      incidents = reports.map((r) => ({
+        id: r.id,
+        category: r.category,
+        status: r.status,
+        severity: r.severity ?? null,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        address: r.address,
+        contributorCount: 1,
+        reportIds: [r.id],
+        imageUrl: r.images?.[0]?.imageUrl ?? null,
+        createdAt: r.createdAt,
+      }));
+    }
+
+    await GeoCache.set(cacheKey, incidents);
+    return incidents;
   }
 }

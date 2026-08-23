@@ -51,6 +51,7 @@ export class UserService {
           lastName: true,
           role: true,
           phone: true,
+          avatarUrl: true,
           isActive: true,
           createdAt: true,
           _count: { select: { reports: true, assignedReports: true } },
@@ -106,6 +107,7 @@ export class UserService {
         lastName: true,
         role: true,
         phone: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
         _count: { select: { reports: true, assignedReports: true } },
@@ -122,9 +124,10 @@ export class UserService {
       role?: string;
       phone?: string;
       isActive?: boolean;
+      avatarUrl?: string;
     },
   ) {
-    const { firstName, lastName, email, role, phone, isActive } = data;
+    const { firstName, lastName, email, role, phone, isActive, avatarUrl } = data;
 
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
@@ -151,6 +154,7 @@ export class UserService {
         ...(role !== undefined && { role: role as Role }),
         ...(phone !== undefined && { phone }),
         ...(isActive !== undefined && { isActive }),
+        ...(avatarUrl !== undefined && { avatarUrl }),
       },
       select: {
         id: true,
@@ -159,6 +163,7 @@ export class UserService {
         lastName: true,
         role: true,
         phone: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
         _count: { select: { reports: true, assignedReports: true } },

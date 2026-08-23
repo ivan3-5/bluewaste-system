@@ -23,6 +23,7 @@ export const updateUserSchema = z
     role: roleEnum.optional(),
     phone: z.string().max(30).optional(),
     isActive: z.boolean().optional(),
+    avatarUrl: z.string().url().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required",

@@ -28,6 +28,13 @@ router.get(
   validate(heatmapFilterSchema, "query"),
   ReportController.getHeatmapData,
 );
+// Incident-grouped map data (deduplication)
+router.get(
+  "/incidents/map",
+  optionalAuth,
+  validate(mapFilterSchema, "query"),
+  ReportController.getIncidentMapData,
+);
 
 // Public / optional auth report creation routes
 router.post(

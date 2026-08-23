@@ -4,6 +4,7 @@ import { getPaginationParams, buildPaginatedResponse } from "../utils/pagination
 import { NotificationService } from "./notification.service";
 import { GeoCache } from "../utils/geo-cache";
 import { ReportSpamService } from "./report-spam.service";
+import { ReportDedupService } from "./report-dedup.service";
 
 type Viewer = {
   id: string;
@@ -149,6 +150,25 @@ export class ReportCrudService {
             notes: "Report submitted",
           },
         });
+      }
+
+      // ── Same-waste incident deduplication ─────────────────────────────────
+      // Only run for genuine waste reports (not spam / no_waste)
+      if (!isSpam && data.category !== "no_waste") {
+        try {
+          await ReportDedupService.assignOrCreateIncident(
+            tx,
+            created.id,
+            data.latitude,
+            data.longitude,
+            data.category as WasteCategory,
+            (data.severity as Severity | null) ?? null,
+            data.address,
+          );
+        } catch (dedupError) {
+          // Dedup failure must never abort the main report creation
+          console.warn("[dedup] Failed to assign incident for report", created.id, dedupError);
+        }
       }
 
       return created;
@@ -370,6 +390,35 @@ export class ReportCrudService {
     }
 
     await GeoCache.invalidateAll();
+
+    // ── Sync parent WasteIncident status ─────────────────────────────────────
+    try {
+      const updatedReportFull = await prisma.report.findUnique({
+        where: { id: reportId },
+        select: { incidentId: true },
+      });
+      if (updatedReportFull?.incidentId) {
+        await ReportDedupService.syncIncidentStatus(updatedReportFull.incidentId);
+      }
+    } catch (syncError) {
+      console.warn("[dedup] Failed to sync incident status for report", reportId, syncError);
+    }
+
+    // ── Propagate status to all sibling reports in the same incident ─────────
+    // When an admin changes one report's status, all grouped reports follow.
+    try {
+      const { updatedCount } = await ReportDedupService.propagateStatusToSiblings(
+        reportId,
+        status,
+        changedById,
+      );
+      if (updatedCount > 0) {
+        console.log(`[dedup] Propagated status "${status}" to ${updatedCount} sibling report(s) in the same incident.`);
+      }
+    } catch (propagateError) {
+      console.warn("[dedup] Failed to propagate status to siblings for report", reportId, propagateError);
+    }
+
     return sanitizeReportForPrivacy(updatedReport);
   }
 
@@ -629,6 +678,21 @@ export class ReportCrudService {
         type: NotificationType.ASSIGNMENT,
         reportId,
       });
+    }
+
+    // ── Propagate worker assignment to all sibling reports in the same incident
+    // When an admin assigns workers to one grouped report, all siblings follow.
+    try {
+      const { updatedCount } = await ReportDedupService.propagateWorkersToSiblings(
+        reportId,
+        validWorkerIds,
+        primaryWorkerId,
+      );
+      if (updatedCount > 0) {
+        console.log(`[dedup] Propagated ${validWorkerIds.length} worker(s) to ${updatedCount} sibling report(s) in the same incident.`);
+      }
+    } catch (propagateError) {
+      console.warn("[dedup] Failed to propagate workers to siblings for report", reportId, propagateError);
     }
 
     return sanitizeReportForPrivacy(updatedReport!);

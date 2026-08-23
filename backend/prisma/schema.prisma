@@ -160,6 +160,10 @@ model Report {
   cleanupScheduleId String?
   cleanupSchedule   CleanupSchedule? @relation(fields: [cleanupScheduleId], references: [id], onDelete: SetNull)
 
+  // Same-incident grouping (deduplication)
+  incidentId String?
+  incident   WasteIncident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
   // Related records
   images        ReportImage[]
   statusHistory StatusHistory[]
@@ -171,6 +175,7 @@ model Report {
   @@index([reporterId])
   @@index([assignedToId])
   @@index([latitude, longitude])
+  @@index([incidentId])
   @@index([isDeleted, createdAt])
   @@index([isDeleted, status, createdAt])
   @@index([isDeleted, category, createdAt])
@@ -312,4 +317,37 @@ model ReportWorker {
   @@unique([reportId, workerId])
   @@index([workerId])
   @@index([reportId])
+}
+
+// ==================== WASTE INCIDENT GROUPING ====================
+
+/// A WasteIncident groups multiple citizen Report rows that refer to the same
+/// real-world waste problem (within the configurable GPS threshold + same category).
+/// All original Report data is preserved; this model only stores aggregate metadata.
+model WasteIncident {
+  id               String        @id @default(uuid())
+  category         WasteCategory
+  /// Centroid latitude — taken from the first (primary) report in the group
+  latitude         Float
+  /// Centroid longitude — taken from the first (primary) report in the group
+  longitude        Float
+  address          String?
+  /// How many unique citizen reports have been grouped into this incident
+  contributorCount Int           @default(1)
+  /// Mirrors the status of the oldest linked report (updated on status changes)
+  status           ReportStatus  @default(PENDING)
+  severity         Severity?
+  /// Whether the incident has been fully resolved (all linked reports cleaned/rejected)
+  isResolved       Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  reports          Report[]
+
+  @@index([category])
+  @@index([status])
+  @@index([isResolved])
+  @@index([latitude, longitude])
+  @@index([createdAt])
+  @@index([category, isResolved])
 }

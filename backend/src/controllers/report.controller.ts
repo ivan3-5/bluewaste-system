@@ -131,6 +131,27 @@ export class ReportController {
     }
   }
 
+  /**
+   * GET /reports/incidents/map
+   * Returns one entry per WasteIncident (deduplicated) for the Leaflet map.
+   * Each entry includes contributorCount and representativeImageUrl.
+   */
+  static async getIncidentMapData(req: AuthRequest, res: Response) {
+    try {
+      const query = (req.query || {}) as QueryFilters;
+      const incidents = await ReportGeoService.getIncidentMapData(query);
+      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+      res.json(incidents);
+    } catch (error) {
+      handleControllerError(
+        res,
+        error,
+        "Failed to fetch incident map data",
+        "INCIDENT_MAP_FETCH_FAILED",
+      );
+    }
+  }
+
   static async addImages(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;
