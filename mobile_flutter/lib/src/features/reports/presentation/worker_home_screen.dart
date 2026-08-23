@@ -808,7 +808,7 @@ class _QuickActionCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const Spacer(),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 action.title,
                 maxLines: 1,

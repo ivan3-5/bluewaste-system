@@ -81,6 +81,121 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  void _confirmLogout() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.tint(AppColors.destructive, opacity: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.logout_rounded,
+                    color: AppColors.destructive,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  "Log Out",
+                  style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  "Are you sure you want to sign out of your account?",
+                  textAlign: TextAlign.center,
+                  style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.mutedForeground,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.border),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text(
+                            "Cancel",
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.foreground,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: FilledButton(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            _logout();
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.destructive,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text(
+                            "Log Out",
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _pickAndUploadAvatar(ImageSource source) async {
     if (_uploadingAvatar || _saving) {
       return;
@@ -536,24 +651,50 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: isBusy ? null : _logout,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.destructive,
-                side: BorderSide(
-                  color: AppColors.destructive.withValues(alpha: 0.4),
+          const SizedBox(height: AppSpacing.md),
+          // Logout Button Card
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isBusy ? null : _confirmLogout,
+              borderRadius: BorderRadius.circular(16),
+              child: Ink(
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.tint(AppColors.destructive, opacity: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.destructive.withValues(alpha: 0.22),
+                    width: 1.2,
+                  ),
                 ),
-              ),
-              icon: const Icon(Icons.logout_rounded, size: 20),
-              label: const Text(
-                "Logout",
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.tint(AppColors.destructive, opacity: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.logout_rounded,
+                        size: 18,
+                        color: AppColors.destructive,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    const Text(
+                      "Log Out",
+                      style: TextStyle(
+                        color: AppColors.destructive,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

@@ -6,7 +6,6 @@ import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/shimmer_loading.dart";
 import "../../auth/presentation/auth_controller.dart";
 import "../../dashboard/data/dashboard_service.dart";
-import "../../notifications/presentation/notification_providers.dart";
 import "../../schedules/presentation/schedules_screen.dart";
 import "my_reports_screen.dart";
 
@@ -415,7 +414,7 @@ const List<_HomeAction> _homeActions = [
     tabIndex: -1,
   ),
   _HomeAction(
-    title: "Hotspot Map",
+    title: "Map",
     subtitle: "View report pins",
     icon: Icons.map_rounded,
     color: AppColors.info,
@@ -468,18 +467,14 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _QuickActionCard extends ConsumerWidget {
+class _QuickActionCard extends StatelessWidget {
   const _QuickActionCard({required this.action, required this.onTap});
 
   final _HomeAction action;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final unreadCount = action.tabIndex == 3
-        ? (ref.watch(unreadCountProvider).value ?? 0)
-        : 0;
-
+  Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -505,47 +500,14 @@ class _QuickActionCard extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.tint(action.color, opacity: 0.14),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(action.icon, size: 20, color: action.color),
-                      ),
-                      if (unreadCount > 0)
-                        Positioned(
-                          right: -4,
-                          top: -4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 2),
-                            constraints: const BoxConstraints(
-                                minWidth: 18, minHeight: 18),
-                            decoration: BoxDecoration(
-                              color: AppColors.destructive,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: AppColors.card,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Text(
-                              unreadCount > 9 ? "9+" : "$unreadCount",
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.tint(action.color, opacity: 0.14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(action.icon, size: 20, color: action.color),
                   ),
                   Icon(
                     Icons.arrow_forward_rounded,
@@ -554,7 +516,7 @@ class _QuickActionCard extends ConsumerWidget {
                   ),
                 ],
               ),
-              const Spacer(),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 action.title,
                 maxLines: 1,
