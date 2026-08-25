@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "leaflet-draw";
-import "leaflet-draw/dist/leaflet.draw.css";
+// leaflet-draw is imported dynamically inside the map useEffect (client-only)
+// to ensure L is fully initialised before the plugin patches it.
 import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
@@ -209,7 +209,7 @@ export default function MapView({
   const [groupedMode, setGroupedMode] = useState(true); // default: incident-grouped view
   const [incidents, setIncidents] = useState<IncidentMapData[]>([]);
   const [incidentsLoading, setIncidentsLoading] = useState(false);
-  const { isAdmin } = useAuth();
+  const { isAdmin, isLguAdmin } = useAuth();
 
   // lazy import hooks to avoid RSC issues from server components
   let reportingZonesHook: any = null;
@@ -363,6 +363,16 @@ export default function MapView({
     mapRef.current = map;
     markersLayerRef.current = markersLayer;
     zoneLayersRef.current = zoneLayerGroup;
+
+    // Dynamically import leaflet-draw AFTER the map is created so the plugin
+    // can patch L.Control.Draw on the live Leaflet instance.
+    Promise.all([
+      import("leaflet-draw"),
+      import("leaflet-draw/dist/leaflet.draw.css" as any),
+    ]).catch(() => {
+      console.warn("leaflet-draw failed to load — zone drawing will be unavailable.");
+    });
+
     requestAnimationFrame(() => map.invalidateSize({ pan: false }));
 
     return () => {
@@ -401,8 +411,17 @@ export default function MapView({
 
     if (!isEditingZone) return;
 
+    // Obtain Draw constructor — may not be available yet if dynamic import
+    // hasn't resolved; guard with a clear error.
     const DrawControl = (L as any).Control?.Draw;
-    if (!DrawControl || !zoneEditableGroupRef.current) return;
+    if (!DrawControl) {
+      console.warn(
+        "[MapView] L.Control.Draw is not available yet — leaflet-draw may still be loading. " +
+        "If draw never works, check that leaflet-draw is installed (npm ls leaflet-draw)."
+      );
+      return;
+    }
+    if (!zoneEditableGroupRef.current) return;
 
     editControlRef.current = new DrawControl({
       position: "topright",
@@ -466,8 +485,15 @@ export default function MapView({
 
     if (!isDrawingZone) return;
 
+    // Guard — leaflet-draw may still be loading on first render.
     const DrawControl = (L as any).Control?.Draw;
-    if (!DrawControl) return;
+    if (!DrawControl) {
+      console.warn(
+        "[MapView] L.Control.Draw is not available yet. " +
+        "Try clicking 'Draw Zone' again in a moment."
+      );
+      return;
+    }
 
     drawControlRef.current = new DrawControl({
       position: "topright",
@@ -731,32 +757,37 @@ export default function MapView({
                 )}
               </button>
 
-              <button
-                className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                  isDrawingZone
-                    ? "bg-[hsl(var(--primary))] text-white hover:opacity-90"
-                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-                onClick={() => {
-                  setIsEditingZone(false);
-                  setIsDrawingZone((v) => !v);
-                }}
-              >
-                {isDrawingZone ? "Stop Drawing" : "Draw Zone"}
-              </button>
-              <button
-                className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                  isEditingZone
-                    ? "bg-amber-500 text-white hover:bg-amber-600"
-                    : "border border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
-                }`}
-                onClick={() => {
-                  setIsDrawingZone(false);
-                  setIsEditingZone((v) => !v);
-                }}
-              >
-                {isEditingZone ? "Stop Editing" : "Edit Zone"}
-              </button>
+              {/* Draw / Edit zone controls — LGU_ADMIN only */}
+              {isLguAdmin && (
+                <>
+                  <button
+                    className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                      isDrawingZone
+                        ? "bg-[hsl(var(--primary))] text-white hover:opacity-90"
+                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                    onClick={() => {
+                      setIsEditingZone(false);
+                      setIsDrawingZone((v) => !v);
+                    }}
+                  >
+                    {isDrawingZone ? "Stop Drawing" : "Draw Zone"}
+                  </button>
+                  <button
+                    className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                      isEditingZone
+                        ? "bg-amber-500 text-white hover:bg-amber-600"
+                        : "border border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
+                    }`}
+                    onClick={() => {
+                      setIsDrawingZone(false);
+                      setIsEditingZone((v) => !v);
+                    }}
+                  >
+                    {isEditingZone ? "Stop Editing" : "Edit Zone"}
+                  </button>
+                </>
+              )}
               <button
                 className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
                 onClick={() => {

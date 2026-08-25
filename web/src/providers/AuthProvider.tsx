@@ -19,7 +19,10 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   updateUser: (updatedUser: Partial<User>) => void;
+  /** True for both LGU_ADMIN and FIELD_WORKER — general admin dashboard access */
   isAdmin: boolean;
+  /** True ONLY for LGU_ADMIN — required for zone create/update/delete */
+  isLguAdmin: boolean;
 }
 
 interface RegisterData {
@@ -95,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isAdmin = user?.role === "LGU_ADMIN" || user?.role === "FIELD_WORKER";
+  const isLguAdmin = user?.role === "LGU_ADMIN";
 
   return (
     <AuthContext.Provider
@@ -107,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         updateUser,
         isAdmin,
+        isLguAdmin,
       }}
     >
       {children}
