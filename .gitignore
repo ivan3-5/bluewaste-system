@@ -36,6 +36,7 @@ mobile_flutter/.flutter-plugins
 mobile_flutter/.flutter-plugins-dependencies
 mobile_flutter/.packages
 mobile_flutter/build/
+web/src/generated/
 
 # Expo
 .expo/
