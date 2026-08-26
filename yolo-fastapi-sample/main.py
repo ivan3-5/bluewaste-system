@@ -70,13 +70,11 @@ _detect_model_lock = Lock()
 # ── Hybrid /analyze pipeline constants ─────────────────────────────────────
 # Layer 1: minimum YOLO confidence to count an object as "present"
 ANALYZE_YOLO_MIN_CONF = float(os.getenv("ANALYZE_YOLO_MIN_CONF", "0.15"))
-# Layer 2: Cloud Vision waste keyword list
-WASTE_KEYWORDS = {
-    "waste", "garbage", "litter", "pollution", "debris", "trash",
-    "plastic", "rubbish", "dump", "contamination", "refuse",
-    "junk", "sewage", "landfill", "compost", "recycle",
-}
-# Severity thresholds (Cloud Vision top confidence, 0.0–1.0)
+# Layer 2: custom waste model (weights/best.pt)
+# Classes: plastic, glass, metal, paper, organic, other
+CUSTOM_MODEL_PATH = os.getenv("CUSTOM_MODEL_PATH", "weights/best.pt")
+CUSTOM_CONF_THRESHOLD = float(os.getenv("CUSTOM_CONF", "0.20"))
+# Severity thresholds (top detection confidence, 0.0–1.0)
 SEVERITY_CRITICAL_THRESHOLD = 0.90
 SEVERITY_HIGH_THRESHOLD = 0.70
 SEVERITY_MODERATE_THRESHOLD = 0.50
@@ -406,6 +404,27 @@ def _get_detect_model() -> Any:
     return _detect_model
 
 
+# ── Custom waste model for /analyze Layer 2 ──────────────────────────────────
+_custom_model: Optional[Any] = None
+_custom_model_lock = Lock()
+
+
+def _get_custom_model() -> Any:
+    """Lazy-load weights/best.pt for /analyze Layer 2."""
+    global _custom_model
+    if _custom_model is None:
+        with _custom_model_lock:
+            if _custom_model is None:
+                if not os.path.isfile(CUSTOM_MODEL_PATH):
+                    raise FileNotFoundError(
+                        f"Custom waste model not found at '{CUSTOM_MODEL_PATH}'. "
+                        "Ensure weights/best.pt is present in the Space repo."
+                    )
+                from ultralytics import YOLO
+                _custom_model = YOLO(CUSTOM_MODEL_PATH)
+    return _custom_model
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "model_loaded": _model is not None}
@@ -653,44 +672,46 @@ def _score_to_severity(confidence: float) -> Literal["CRITICAL", "HIGH", "MODERA
     return "SPAM"
 
 
-def _run_cloud_vision_labels(image_bytes: bytes) -> List[DetectedLabel]:
+def _run_custom_waste_model(frame: Any) -> List["DetectedLabel"]:
     """
-    Call Google Cloud Vision label detection and return all labels sorted
-    by descending confidence.  Requires GOOGLE_APPLICATION_CREDENTIALS or
-    GOOGLE_CLOUD_API_KEY environment variable.
+    Layer 2 of the /analyze pipeline.
+
+    Runs the custom-trained weights/best.pt waste model on the already-decoded
+    OpenCV frame.  Returns a list of DetectedLabel (class name + confidence)
+    sorted by descending confidence.
+
+    Classes trained: plastic, glass, metal, paper, organic, other.
+    Each unique class is returned at most once (highest confidence box kept).
     """
-    try:
-        from google.cloud import vision as gcv
-    except ImportError:
-        raise RuntimeError(
-            "google-cloud-vision is not installed. "
-            "Run: pip install google-cloud-vision"
-        )
+    model = _get_custom_model()
+    results = model.predict(
+        source=frame,
+        conf=CUSTOM_CONF_THRESHOLD,
+        iou=0.45,
+        verbose=False,
+    )
 
-    api_key = os.getenv("GOOGLE_CLOUD_API_KEY", "").strip()
-    if api_key:
-        client = gcv.ImageAnnotatorClient(
-            client_options={"api_key": api_key}
-        )
-    else:
-        # Falls back to GOOGLE_APPLICATION_CREDENTIALS env var (service account JSON)
-        client = gcv.ImageAnnotatorClient()
+    labels: List[DetectedLabel] = []
+    seen: set = set()
 
-    image = gcv.Image(content=image_bytes)
-    response = client.label_detection(image=image, max_results=20)
+    if not results or len(results) == 0:
+        return labels
 
-    if response.error.message:
-        raise RuntimeError(
-            f"Cloud Vision API error: {response.error.message}"
+    for box in results[0].boxes:
+        cls_idx = int(box.cls.item())
+        names = results[0].names
+        class_name = (
+            names[cls_idx] if isinstance(names, list) else names.get(cls_idx, str(cls_idx))
         )
+        confidence = float(box.conf.item())
 
-    return [
-        DetectedLabel(
-            label=label.description.lower().strip(),
-            confidence=round(label.score, 4),
-        )
-        for label in response.label_annotations
-    ]
+        if class_name not in seen:
+            seen.add(class_name)
+            labels.append(
+                DetectedLabel(label=class_name.lower(), confidence=round(confidence, 4))
+            )
+
+    return sorted(labels, key=lambda lbl: lbl.confidence, reverse=True)
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
@@ -768,23 +789,21 @@ async def analyze(image: UploadFile = File(...)):
         )
 
     # ══════════════════════════════════════════════════════════════════════════
-    # LAYER 2 — Google Cloud Vision label detection
+    # LAYER 2 — Custom waste model (weights/best.pt)
     # ══════════════════════════════════════════════════════════════════════════
     try:
-        all_labels = _run_cloud_vision_labels(image_bytes)
-    except RuntimeError as exc:
+        all_labels = _run_custom_waste_model(frame)
+    except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Cloud Vision error: {exc}",
+            detail=f"Custom model inference error: {exc}",
         )
 
-    # Filter labels that match any waste keyword
-    waste_labels = [
-        lbl for lbl in all_labels
-        if any(keyword in lbl.label for keyword in WASTE_KEYWORDS)
-    ]
+    # All detected classes from best.pt are waste-specific by definition —
+    # no keyword filtering needed.
+    waste_labels = all_labels
 
     if not waste_labels:
         return AnalyzeResponse(

@@ -21,7 +21,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY main.py ./
+COPY yolov8n.pt ./
+COPY weights/ ./weights/
+COPY config/ ./config/
 
-EXPOSE 8080
+# HuggingFace Spaces requires port 7860
+EXPOSE 7860
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]

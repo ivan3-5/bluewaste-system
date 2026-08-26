@@ -1,44 +1,59 @@
-# Node modules
+# ─── Node ────────────────────────────────────────────────────────────────────
 node_modules/
 
-# Environment variables
+# ─── Environment variables ───────────────────────────────────────────────────
+# Ignore actual env files; keep .env.example / .env.local.example tracked
 .env
 .env.local
 .env.production
+.env.production.local
+.env.development.local
+.env.test.local
 
-# Build output
+# ─── Build output ────────────────────────────────────────────────────────────
 dist/
 .next/
 out/
+build/
 
-# Logs
+# ─── TypeScript ──────────────────────────────────────────────────────────────
+*.tsbuildinfo
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Database files (if any)
+# ─── Database ────────────────────────────────────────────────────────────────
 *.db
+*.sqlite
 
-# Cloudinary uploads (if stored locally before upload)
+# ─── Uploads ─────────────────────────────────────────────────────────────────
 uploads/
 
-# IDE files
+# ─── IDE ─────────────────────────────────────────────────────────────────────
 .vscode/*
 !.vscode/tasks.json
 .idea/
 
-# OS files
+# ─── OS ──────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Flutter generated files
+# ─── Flutter generated files ─────────────────────────────────────────────────
 mobile_flutter/.dart_tool/
 mobile_flutter/.flutter-plugins
 mobile_flutter/.flutter-plugins-dependencies
 mobile_flutter/.packages
 mobile_flutter/build/
+
+# ─── Next.js generated ───────────────────────────────────────────────────────
 web/src/generated/
 
-# Expo
+# ─── Expo ────────────────────────────────────────────────────────────────────
 .expo/
 *.jks
 *.p8
@@ -47,18 +62,27 @@ web/src/generated/
 *.mobileprovision
 *.orig.*
 
-# Testing
+# ─── Testing & coverage ──────────────────────────────────────────────────────
 coverage/
 .vercel
 
-# Documentation
-*.md
-!/README.md
+# ─── Python (yolo-fastapi-sample) ────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
 
-# Prisma seed files
-**/seed.ts
+# YOLO training run artifacts (large output folders, not needed in repo)
+yolo-fastapi-sample/runs/
+yolo-fastapi-sample/datasets/
 
+# Keep the experiment tracker template but ignore filled-in csvs
+yolo-fastapi-sample/experiment-tracker-*.csv
+!yolo-fastapi-sample/experiment-tracker-template.csv
 # Please put here any additional files or directories that should be ignored by Git.
-
-
-

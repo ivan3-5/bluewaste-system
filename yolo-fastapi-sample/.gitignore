@@ -1,0 +1,40 @@
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ─── Virtual environments ─────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ─── YOLO training artifacts (large, not needed in the Space repo) ────────────
+runs/
+datasets/
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ─── Environment / secrets ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Experiment tracker (keep template, ignore filled-in copies) ──────────────
+experiment-tracker-*.csv
+!experiment-tracker-template.csv
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/

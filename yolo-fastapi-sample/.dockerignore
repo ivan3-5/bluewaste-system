@@ -1,9 +1,42 @@
+# Git
 .git
 .gitignore
+
+# Python cache
 __pycache__
 *.pyc
 *.pyo
 *.pyd
+
+# Virtual environments (never needed in Docker)
 .venv
 venv
+env
+ENV
+
+# YOLO training artifacts (large, not part of the service)
+runs/
+datasets/
+
+# Development / test files
+experiment-tracker-template.csv
+experiment-tracker-*.csv
+config/train-yolo11s.yaml
+
+# IDE
+.idea/
+.vscode/
+
+# Secrets
 .env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# NOTE: weights/ is intentionally NOT ignored — best.pt is required at runtime
