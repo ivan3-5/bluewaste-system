@@ -112,75 +112,107 @@ function normalizeImageContentType(value: string | null) {
 }
 
 export class ReportAnalysisService {
+  /**
+   * Call the Gradio ZeroGPU Space's /call/analyze endpoint.
+   *
+   * Gradio named-call API (4.x / 5.x):
+   *   1. POST /call/analyze  { data: ["data:<mime>;base64,<b64>"] }
+   *      → { event_id: "<id>" }
+   *   2. GET  /call/analyze/<id>  (SSE stream)
+   *      → lines: "event: ...\ndata: ..." until "event: complete"
+   *      → complete data line contains the result array JSON
+   */
   private static async requestYoloAnalysis(imageUrl: string) {
+    // ── 1. Fetch the image ──────────────────────────────────────────────────
     const imageResponse = await fetch(imageUrl);
     if (!imageResponse.ok) {
       throw new Error("Failed to fetch report image for analysis");
     }
-
     const contentType = normalizeImageContentType(
       imageResponse.headers.get("content-type"),
     );
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    const b64 = imageBuffer.toString("base64");
+    const dataUrl = `data:${contentType};base64,${b64}`;
 
-    const yoloBody = new FormData();
-    yoloBody.append(
-      "image",
-      new Blob([imageBuffer], { type: contentType }),
-      "report-image.jpg",
-    );
+    // ── 2. Resolve the Gradio Space base URL ────────────────────────────────
+    const baseUrl = env.YOLO_API_URL
+      .replace(/\/(call|api)\/.+$/, "")   // strip any path suffix
+      .replace(/\/+$/, "");               // strip trailing slash
 
-    const targetYoloUrl =
-      env.YOLO_API_URL.endsWith("/analyze") ||
-      env.YOLO_API_URL.endsWith("/detect") ||
-      env.YOLO_API_URL.endsWith("/predict")
-        ? env.YOLO_API_URL
-        : `${env.YOLO_API_URL.replace(/\/+$/, "")}/analyze`;
-
-    let yoloResponse: Response;
+    // ── 3. POST to /call/analyze to get event_id ────────────────────────────
+    let eventId: string;
     try {
-      yoloResponse = await fetch(targetYoloUrl, {
+      const submitRes = await fetch(`${baseUrl}/call/analyze`, {
         method: "POST",
-        body: yoloBody,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: [dataUrl] }),
       });
-    } catch {
+      if (!submitRes.ok) {
+        const errText = await submitRes.text();
+        throw new Error(`Gradio submit error ${submitRes.status}: ${errText}`);
+      }
+      const submitJson = await submitRes.json() as { event_id: string };
+      eventId = submitJson.event_id;
+      if (!eventId) throw new Error("Gradio returned no event_id");
+    } catch (err) {
+      if (err instanceof Error) throw err;
       throw new Error(
-        "YOLO service is unavailable. Start the YOLO API service and verify YOLO_API_URL.",
+        "YOLO Gradio Space is unavailable. Check YOLO_API_URL and Space status.",
       );
     }
 
-    const yoloText = await yoloResponse.text();
-    const yoloJson = toSafeJson(yoloText) as YoloApiResponse | null ?? {};
-
-    if (!yoloResponse.ok) {
-      const message =
-        yoloJson?.detail ||
-        yoloJson?.message ||
-        yoloJson?.error ||
-        "YOLO API request failed";
-      throw new Error(`YOLO API error: ${message}`);
+    // ── 4. Poll SSE stream until 'complete' event ────────────────────────────
+    const sseRes = await fetch(`${baseUrl}/call/analyze/${eventId}`);
+    if (!sseRes.ok || !sseRes.body) {
+      throw new Error(`Gradio SSE stream error ${sseRes.status}`);
     }
 
-    // ── Parse /analyze response (hybrid pipeline) ──────────────────────────
+    // Read SSE stream line-by-line (Node.js ReadableStream)
+    const reader = sseRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let yoloJson: YoloApiResponse = {};
+
+    outer: while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";   // keep incomplete last line
+
+      let eventType = "";
+      for (const line of lines) {
+        if (line.startsWith("event:")) {
+          eventType = line.slice(6).trim();
+        } else if (line.startsWith("data:")) {
+          const rawData = line.slice(5).trim();
+          if (eventType === "error") {
+            throw new Error(`Gradio inference error: ${rawData}`);
+          }
+          if (eventType === "complete") {
+            // data is a JSON array; first element is our result dict
+            const parsed = toSafeJson(rawData) as unknown[];
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              yoloJson = parsed[0] as YoloApiResponse;
+            }
+            break outer;
+          }
+        }
+      }
+    }
+
+    // ── 5. Parse response (same shape as original /analyze) ─────────────────
     const severity: string | null =
-      typeof yoloJson?.severity === "string"
-        ? yoloJson.severity
-        : null;
+      typeof yoloJson?.severity === "string" ? yoloJson.severity : null;
 
     const hasWaste: boolean = yoloJson?.has_waste === true;
-    const confidence: number | null = toFiniteNumberOrNull(
-      yoloJson?.confidence,
-    );
+    const confidence: number | null = toFiniteNumberOrNull(yoloJson?.confidence);
     const layer1Passed: boolean = yoloJson?.layer1_passed !== false;
     const spamReason: string | null =
-      typeof yoloJson?.spam_reason === "string"
-        ? yoloJson.spam_reason
-        : null;
+      typeof yoloJson?.spam_reason === "string" ? yoloJson.spam_reason : null;
 
-    // Collect waste-matched labels for display
-    const rawLabels = Array.isArray(yoloJson?.labels)
-      ? yoloJson!.labels
-      : [];
+    const rawLabels = Array.isArray(yoloJson?.labels) ? yoloJson!.labels : [];
     const labels: string[] = rawLabels
       .map((l: YoloLabel | string) =>
         typeof l === "string"
@@ -191,7 +223,6 @@ export class ReportAnalysisService {
       )
       .filter((l: string) => l.length > 0);
 
-    // Determine DIRTY / CLEAN for backward compat with analyzeReport()
     const status: "DIRTY" | "CLEAN" =
       hasWaste && severity !== "SPAM" ? "DIRTY" : "CLEAN";
 
@@ -205,12 +236,12 @@ export class ReportAnalysisService {
       inferenceMs: null,
       annotatedImageUrl: null,
       annotatedImagePublicId: null,
-      // New fields from /analyze
       severity,
       layer1Passed,
       spamReason,
     };
   }
+
 
   static async analyzeReport(reportId: string) {
     const report = await prisma.report.findUnique({

@@ -1,19 +1,22 @@
 ---
 title: BlueWaste YOLO Analyzer
-emoji: 🗑️
+emoji: ♻️
 colorFrom: blue
 colorTo: green
-sdk: docker
-app_port: 7860
+sdk: gradio
+sdk_version: "5.38.0"
+app_file: app.py
+pinned: false
 tags:
   - yolo
   - yolov8
   - waste-detection
-  - fastapi
+  - gradio
+  - zerogpu
   - object-detection
   - garbage-classification
 license: mit
-short_description: YOLOv8 waste detection API for BlueWaste smart waste management
+short_description: YOLOv8 waste detection API for BlueWaste system
 ---
 
 # BlueWaste YOLO Analyzer
