@@ -9,27 +9,57 @@ import "package:tflite_flutter/tflite_flutter.dart";
 import "detect_service.dart";
 import "../domain/report_models.dart";
 
-// ── COCO class-ID → waste-category mapping ──────────────────────────────────
-// YOLOv8n is trained on 80 COCO classes (IDs 0-79).
-// We map the ones relevant to waste / pollution.
+// ── Custom Marine Debris / Waste Classes (from weights/best.pt - YOLO26-seg) ─
+// 0: box_shaped_case, 1: buoy, 2: fishing_net, 3: fragment, 4: other_bottle,
+// 5: other_container, 6: other_fishing_gear, 7: other_string, 8: others,
+// 9: pet_bottle, 10: plastic_bag, 11: rope, 12: styrene_foam.
+const int _numCustomWasteClasses = 13;
+
+const Map<int, String> _customClassIdToWasteCategory = {
+  0: "other",          // box_shaped_case
+  1: "other",          // buoy
+  2: "fishing_net",    // fishing_net
+  3: "other",          // fragment
+  4: "plastic_bottle", // other_bottle
+  5: "other",          // other_container
+  6: "fishing_net",    // other_fishing_gear
+  7: "rope",           // other_string
+  8: "other",          // others
+  9: "plastic_bottle", // pet_bottle
+  10: "plastic_bag",   // plastic_bag
+  11: "rope",          // rope
+  12: "styrofoam",     // styrene_foam
+};
+
+const Map<int, String> _customClassIdToLabel = {
+  0: "Case Debris",
+  1: "Buoy Debris",
+  2: "Fishing Net",
+  3: "Debris Fragment",
+  4: "Plastic Bottle",
+  5: "Waste Container",
+  6: "Fishing Gear Debris",
+  7: "String Debris",
+  8: "Marine Debris",
+  9: "PET Plastic Bottle",
+  10: "Plastic Bag",
+  11: "Rope",
+  12: "Styrofoam",
+};
+
+// ── COCO fallback mapping (if standard yolov8n.tflite is loaded) ────────────
 const Map<int, String> _cocoIdToWasteCategory = {
-  // -- Plastic / containers
   39: "plastic_bottle",  // bottle
   41: "cup",             // cup
   45: "bowl",            // bowl
-  // -- Glass
   40: "glass",           // wine glass
   75: "glass",           // vase
-  // -- Metal / cans
-  33: "metal",           // kite (round, often metallic)
-  // -- Paper / cardboard
+  33: "metal",           // kite
   73: "paper",           // book
-  // -- Organic
   46: "organic",         // banana
   47: "organic",         // apple
   48: "organic",         // sandwich
   49: "organic",         // orange
-  // -- General trash indicators
   53: "other",           // pizza
   54: "other",           // donut
   26: "other",           // handbag
@@ -42,7 +72,7 @@ const double _confThreshold = 0.20;
 // NMS IoU threshold.
 const double _nmsIouThreshold = 0.45;
 
-// Input image size expected by the YOLOv8n TFLite model.
+// Input image size expected by the YOLO TFLite model.
 const int _inputSize = 640;
 
 // ── Box helper ───────────────────────────────────────────────────────────────
@@ -87,15 +117,24 @@ class TFLiteService {
   bool _isInitialized = false;
 
   // Cached tensor shapes resolved after model load
-  bool _isNHWC = false;
+  bool _isNHWC = true;
   int _numPreds = 8400;
-  int _numAttrs = 84;
+  int _numAttrs = 49;
+  bool _isCustomModel = true;
 
-  /// Loads the TFLite model from assets. Must be called before [runInference].
+  /// Loads the TFLite model from assets. Prefers custom best.tflite, falls back to yolov8n.tflite.
   Future<void> initialize() async {
     if (_isInitialized) return;
     try {
-      final modelData = await rootBundle.load("assets/models/yolov8n.tflite");
+      ByteData modelData;
+      try {
+        modelData = await rootBundle.load("assets/models/best.tflite");
+        _isCustomModel = true;
+      } catch (_) {
+        modelData = await rootBundle.load("assets/models/yolov8n.tflite");
+        _isCustomModel = false;
+      }
+
       final buffer = modelData.buffer.asUint8List(
         modelData.offsetInBytes,
         modelData.lengthInBytes,
@@ -111,6 +150,11 @@ class TFLiteService {
       if (outputShape.length >= 3) {
         _numAttrs = outputShape[1];
         _numPreds = outputShape[2];
+        if (_numAttrs == 49) {
+          _isCustomModel = true;
+        } else if (_numAttrs == 84) {
+          _isCustomModel = false;
+        }
       }
 
       _isInitialized = true;
@@ -119,7 +163,7 @@ class TFLiteService {
     }
   }
 
-  /// Runs YOLOv8n inference on [imageFile] and returns a [DetectResult].
+  /// Runs on-device YOLO inference on [imageFile] and returns a [DetectResult].
   Future<DetectResult> runInference(File imageFile) async {
     if (!_isInitialized || _interpreter == null) {
       await initialize();
@@ -173,7 +217,32 @@ class TFLiteService {
     final inputTensor = _isNHWC
         ? _reshapeNHWC(inputBuffer)
         : _reshapeNCHW(inputBuffer);
-    interpreter.run(inputTensor, outputData);
+
+    try {
+      interpreter.run(inputTensor, outputData);
+    } catch (_) {
+      // Fallback for multi-output models (e.g. segmentation output tensor)
+      final outputs = <int, Object>{0: outputData};
+      final outCount = interpreter.getOutputTensors().length;
+      if (outCount > 1) {
+        for (int i = 1; i < outCount; i++) {
+          final s = interpreter.getOutputTensor(i).shape;
+          if (s.length == 4) {
+            outputs[i] = List.generate(
+              s[0],
+              (_) => List.generate(
+                s[1],
+                (_) => List.generate(
+                  s[2],
+                  (_) => List.filled(s[3], 0.0),
+                ),
+              ),
+            );
+          }
+        }
+      }
+      interpreter.runForMultipleInputs([inputTensor], outputs);
+    }
 
     // ── 5. Decode + NMS + map to DetectResult ────────────────────────────
     final boxes = _decodeBoxes(outputData[0]);
@@ -213,10 +282,12 @@ class TFLiteService {
     ];
   }
 
-  // ── Decode raw YOLOv8 output tensor ───────────────────────────────────────
+  // ── Decode raw YOLO output tensor ─────────────────────────────────────────
 
   List<_Box> _decodeBoxes(List<List<double>> output) {
     final boxes = <_Box>[];
+    final classCount = _isCustomModel ? _numCustomWasteClasses : (_numAttrs - 4);
+
     for (int i = 0; i < _numPreds; i++) {
       final cx = output[0][i];
       final cy = output[1][i];
@@ -225,7 +296,7 @@ class TFLiteService {
 
       double bestConf = 0;
       int bestClass = -1;
-      for (int c = 4; c < _numAttrs; c++) {
+      for (int c = 4; c < 4 + classCount && c < _numAttrs; c++) {
         final score = output[c][i];
         if (score > bestConf) {
           bestConf = score;
@@ -285,9 +356,10 @@ class TFLiteService {
       );
     }
 
-    // Filter to waste-related COCO detections
-    final wasteBoxes =
-        boxes.where((b) => _cocoIdToWasteCategory.containsKey(b.classId)).toList();
+    // Filter to waste-related detections
+    final wasteBoxes = _isCustomModel
+        ? boxes.where((b) => _customClassIdToWasteCategory.containsKey(b.classId)).toList()
+        : boxes.where((b) => _cocoIdToWasteCategory.containsKey(b.classId)).toList();
 
     if (wasteBoxes.isEmpty) {
       return const DetectResult(
@@ -305,22 +377,30 @@ class TFLiteService {
 
     double maxConf = 0;
     final categorySet = <String>{};
+    final labelConfidenceMap = <String, double>{};
+
     for (final b in wasteBoxes) {
       if (b.confidence > maxConf) maxConf = b.confidence;
-      final cat = _cocoIdToWasteCategory[b.classId];
-      if (cat != null) categorySet.add(cat);
+      final cat = _isCustomModel
+          ? _customClassIdToWasteCategory[b.classId]
+          : _cocoIdToWasteCategory[b.classId];
+      if (cat != null) {
+        categorySet.add(cat);
+        final labelText = _isCustomModel
+            ? (_customClassIdToLabel[b.classId] ?? wasteCategoryLabels[cat] ?? cat.replaceAll("_", " "))
+            : (wasteCategoryLabels[cat] ?? cat.replaceAll("_", " "));
+        if (!labelConfidenceMap.containsKey(labelText) || b.confidence > labelConfidenceMap[labelText]!) {
+          labelConfidenceMap[labelText] = b.confidence;
+        }
+      }
     }
 
     final categories = categorySet.toList();
     final severity = _confidenceToSeverity(maxConf);
-    final labels = categories
-        .map(
-          (cat) => WasteLabel(
-            label: wasteCategoryLabels[cat] ?? cat.replaceAll("_", " "),
-            confidence: maxConf,
-          ),
-        )
-        .toList();
+    final labels = labelConfidenceMap.entries
+        .map((e) => WasteLabel(label: e.key, confidence: e.value))
+        .toList()
+      ..sort((a, b) => b.confidence.compareTo(a.confidence));
 
     final message = _buildMessage(List.from(categories), maxConf);
 
@@ -333,7 +413,9 @@ class TFLiteService {
       categories: categories,
       labels: labels,
       allLabels: labels,
-      spamReason: null,
+      spamReason: severity == WasteSeverity.spam
+          ? "Waste detected with low confidence."
+          : null,
       reason: message,
     );
   }
