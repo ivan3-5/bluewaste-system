@@ -44,5 +44,5 @@ final dioProvider = Provider<Dio>((ref) {
 });
 
 final detectServiceProvider = Provider<DetectService>((ref) {
-  return DetectService(ref.watch(dioProvider));
+  return DetectService();
 });

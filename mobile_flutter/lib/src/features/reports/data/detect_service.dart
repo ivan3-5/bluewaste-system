@@ -1,9 +1,8 @@
 import "dart:io";
 
-import "package:dio/dio.dart";
-
 import "../../../core/network/api_exception.dart";
 import "../domain/report_models.dart";
+import "tflite_service.dart";
 
 // ── Severity levels from the AI pipeline ────────────────────────────────────
 enum WasteSeverity {
@@ -100,9 +99,8 @@ class WasteLabel {
   }
 }
 
-/// Result from the backend `/ai/analyze-report` Gemini Vision endpoint.
-/// Note: Unlike legacy edge inference models, Gemini returns overall category classifications
-/// without spatial bounding-box coordinates or real-time camera overlays.
+/// Result from on-device TFLite YOLOv8n inference.
+/// Matches the shape expected by the UI layer.
 class DetectResult {
   const DetectResult({
     required this.hasWaste,
@@ -123,19 +121,19 @@ class DetectResult {
   /// Whether waste-related categories were detected.
   final bool hasWaste;
 
-  /// Human-readable result or reason string from the server.
+  /// Human-readable result or reason string.
   final String message;
 
   /// Overall AI confidence as a fraction (0.0 – 1.0).
   final double confidence;
 
-  /// Severity level determined by Gemini Vision.
+  /// Severity level determined by on-device inference.
   final WasteSeverity severity;
 
-  /// Whether AI detection passed cleanly.
+  /// Whether inference passed the object-presence layer.
   final bool layer1Passed;
 
-  /// Detected waste category identifiers from Gemini.
+  /// Detected waste category identifiers.
   final List<String> categories;
 
   /// Mapped display labels for cards and lists.
@@ -147,16 +145,16 @@ class DetectResult {
   /// Human-readable spam reason, if spam-flagged.
   final String? spamReason;
 
-  /// Detailed reasoning provided by Gemini Vision.
+  /// Detailed reasoning.
   final String? reason;
 
-  /// Server-generated report draft ID if returned during analysis.
+  /// Not used by on-device path — retained for API compatibility.
   final String? reportId;
 
-  /// Uploaded Cloudinary image URL if returned during analysis.
+  /// Not used by on-device path — retained for API compatibility.
   final String? imageUrl;
 
-  /// Initial report status assigned by the backend.
+  /// Initial report status.
   final String? status;
 
   /// Confidence as a percentage string, e.g. "87.3%"
@@ -229,19 +227,23 @@ class DetectResult {
   bool get isSpam => severity == WasteSeverity.spam;
 }
 
-/// Thrown when the AI server cannot be reached (network/timeout).
+/// Thrown when the TFLite model cannot be loaded or fails to run.
 class DetectServerUnreachableException extends ApiException {
   DetectServerUnreachableException(
-      [super.message = "The detection service is unreachable."]);
+      [super.message = "The on-device detection model is unavailable."]);
 }
 
-/// Thrown when the AI server responds with an error status.
+/// Thrown when inference produces an unexpected error.
 class DetectServerException extends ApiException {
   DetectServerException(super.message, [int? statusCode])
       : super(statusCode: statusCode);
 }
 
-/// HTTP client that calls the backend `/ai/analyze-report` endpoint.
+/// On-device image analysis service backed by YOLOv8n TFLite.
+///
+/// Replaces the previous HTTP call to the backend's `/ai/analyze-report`
+/// endpoint and the HuggingFace Gradio Space. All inference now runs
+/// locally on the device — no network request is required for detection.
 ///
 /// Usage:
 /// ```dart
@@ -250,16 +252,16 @@ class DetectServerException extends ApiException {
 /// if (result.hasWaste) { ... }
 /// ```
 class DetectService {
-  DetectService(this._dio);
+  DetectService();
 
-  final Dio _dio;
-
-  /// Sends [imageFile] along with geolocation and metadata to `/ai/analyze-report`
-  /// and returns a [DetectResult].
+  /// Runs on-device YOLOv8n TFLite inference on [imageFile].
+  ///
+  /// [latitude], [longitude], [description], and [citizenId] are accepted for
+  /// API-surface compatibility but are not used during local inference.
   ///
   /// Throws:
-  ///   [DetectServerUnreachableException] — network error, server down, timeout
-  ///   [ApiException]                     — server returned an error response
+  ///   [DetectServerUnreachableException] — model failed to load
+  ///   [DetectServerException]            — inference error
   Future<DetectResult> detect({
     required File imageFile,
     required double latitude,
@@ -267,84 +269,16 @@ class DetectService {
     String? description,
     String? citizenId,
   }) async {
-    final filename = imageFile.path.split(Platform.pathSeparator).last;
-
-    final formData = FormData.fromMap({
-      "image": await MultipartFile.fromFile(
-        imageFile.path,
-        filename: filename,
-      ),
-      "latitude": latitude.toString(),
-      "longitude": longitude.toString(),
-      if (description != null && description.trim().isNotEmpty)
-        "description": description.trim(),
-      if (citizenId != null && citizenId.trim().isNotEmpty)
-        "citizenId": citizenId.trim(),
-    });
-
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        "/ai/analyze-report",
-        data: formData,
-        options: Options(
-          headers: {"Accept": "application/json"},
-        ),
-      );
-
-      final body = response.data;
-      if (body == null) {
-        throw DetectServerException(
-            "Empty response from detection service.");
-      }
-
-      return DetectResult.fromJson(body);
-    } on DioException catch (e) {
-      switch (e.type) {
-        case DioExceptionType.connectionTimeout:
-        case DioExceptionType.sendTimeout:
-        case DioExceptionType.receiveTimeout:
-          throw DetectServerUnreachableException(
-            "Photo analysis timed out. Please check your network connection.",
-          );
-        case DioExceptionType.connectionError:
-          throw DetectServerUnreachableException(
-            "Cannot reach the analysis service. Please verify your connection.",
-          );
-        case DioExceptionType.badResponse:
-          final status = e.response?.statusCode ?? 0;
-          final detail = _extractDetail(e.response?.data);
-          if (status == 503) {
-            throw DetectServerException(
-              "Photo analysis service is not ready (503). $detail",
-              status,
-            );
-          }
-          if (status == 429) {
-            throw DetectServerException(
-              "Analysis rate limit exceeded. Please wait a moment and try again.",
-              status,
-            );
-          }
-          throw ApiException.fromDioError(e);
-        default:
-          throw DetectServerUnreachableException(
-            "Unexpected network error: ${e.message}",
-          );
-      }
+      return await TFLiteService.instance.runInference(imageFile);
     } catch (e) {
-      if (e is ApiException) {
-        rethrow;
+      if (e is ApiException) rethrow;
+      if (e.toString().contains("load") || e.toString().contains("model")) {
+        throw DetectServerUnreachableException(
+          "Could not load the on-device detection model. Please reinstall the app.",
+        );
       }
-      throw DetectServerException("Photo analysis failed: $e");
+      throw DetectServerException("On-device photo analysis failed: $e");
     }
-  }
-
-  static String _extractDetail(dynamic data) {
-    if (data is Map) {
-      return (data["detail"] ?? data["message"] ?? data["error"] ?? "")
-          .toString();
-    }
-    if (data is String) return data;
-    return "";
   }
 }

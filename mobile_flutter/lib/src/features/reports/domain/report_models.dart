@@ -200,6 +200,7 @@ const Map<String, String> wasteCategoryLabels = {
   "GLASS_WASTE": "Glass Waste",
   "METAL_WASTE": "Metal Waste",
   "PAPER_WASTE": "Paper Waste",
+  // Legacy / server-side categories
   "plastic_bottle": "Plastic Bottle",
   "plastic_bag": "Plastic Bag",
   "fishing_net": "Fishing Net",
@@ -210,6 +211,13 @@ const Map<String, String> wasteCategoryLabels = {
   "battery": "Battery / Hazardous",
   "diaper": "Diaper / Sanitary",
   "cigarette_butt": "Cigarette Butt",
+  // On-device TFLite (COCO-mapped) categories
+  "cup": "Cup / Container",
+  "bowl": "Bowl / Container",
+  "metal": "Metal Waste",
+  "paper": "Paper Waste",
+  "organic": "Organic Waste",
+  "other": "Other Waste",
 };
 
 /// Mirrors the backend `GET /reports/incidents/map` response shape.
