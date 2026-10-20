@@ -486,7 +486,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
       if (report == null) {
         _showMessage(
-          "You're offline. Report saved on this phone and will upload automatically once you're back online.",
+          "Report saved on this phone. It will finish uploading automatically once you're online.",
         );
       } else if (isDirectSpamSubmit) {
         _showMessage(

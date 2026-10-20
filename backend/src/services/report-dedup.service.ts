@@ -193,7 +193,7 @@ export class ReportDedupService {
       });
 
       // 2. Find the primary (oldest) report of this incident to copy
-      //    its status and assigned workers to the newly grouped report.
+      //    its assigned workers to the newly grouped report.
       const primaryReport = await (tx as typeof prisma).report.findFirst({
         where: { incidentId: nearby.id, isDeleted: false },
         select: {
@@ -212,12 +212,8 @@ export class ReportDedupService {
 
       const reportUpdateData: Record<string, unknown> = {
         incidentId: nearby.id,
-        // Inherit the incident's current status so the new report
-        // isn't left as PENDING while the incident is IN_PROGRESS, etc.
-        ...(primaryReport?.status &&
-          primaryReport.status !== "PENDING" && {
-            status: primaryReport.status,
-          }),
+        // The new report keeps its default PENDING status so it goes through
+        // verification itself, even if the incident is already IN_PROGRESS.
         // Inherit the primary assigned worker (legacy single-worker FK)
         ...(primaryReport?.assignedToId && {
           assignedToId: primaryReport.assignedToId,

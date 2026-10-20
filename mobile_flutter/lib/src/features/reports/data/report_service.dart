@@ -101,6 +101,17 @@ class ReportService {
     );
   }
 
+  Future<ReportRecord> getReportById(String reportId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        "/reports/$reportId",
+      );
+      return ReportRecord.fromJson(response.data ?? <String, dynamic>{});
+    } on DioException catch (error) {
+      throw ApiException.fromDioError(error);
+    }
+  }
+
   /// Returns null when the report was queued for upload instead of sent.
   Future<ReportRecord?> submitFullReport({
     required Map<String, dynamic> data,
@@ -116,17 +127,27 @@ class ReportService {
     }
 
     ReportRecord? created;
+    var uploaded = 0;
     try {
       created = await createReportFromData(data);
-      await uploadReportImages(reportId: created.id, images: images);
+      // One image per request so a failure part-way keeps what already landed.
+      for (final image in images) {
+        await uploadReportImages(reportId: created.id, images: [image]);
+        uploaded++;
+      }
       return created;
     } on ApiException catch (e) {
-      if (e.isTimeoutOrNetworkError) {
-        // Keep the server-side id so the retry only uploads the images.
+      final reportExists = created != null;
+      if (e.isTimeoutOrNetworkError || reportExists) {
+        // Keep the server-side id and progress so the retry only finishes
+        // what is missing instead of creating a duplicate report.
         await offlineService.queueReport(
           data: data,
           imagePaths: imagePaths,
           remoteReportId: created?.id,
+          uploadedCount: uploaded,
+          maybeCreated: created == null,
+          lastError: e.message,
         );
         return null;
       }

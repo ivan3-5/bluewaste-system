@@ -10,7 +10,14 @@ import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../data/report_service.dart";
 import "../domain/report_models.dart";
+import "worker_home_screen.dart";
 import "worker_route_screen.dart";
+
+/// Bumped by the worker shell when a tab is selected so the (kept-alive)
+/// tasks tab reloads instead of showing stale data.
+final workerTasksRefreshProvider = StateProvider<int>((ref) => 0);
+
+const int _maxCleanupPhotos = 5;
 
 class WorkerTasksScreen extends ConsumerStatefulWidget {
   const WorkerTasksScreen({super.key});
@@ -28,6 +35,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
   bool _loading = true;
   String _activeFilter = "all";
   Timer? _timer;
+  final Set<String> _uploadingTaskIds = {};
 
   @override
   void initState() {
@@ -62,23 +70,26 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
     super.dispose();
   }
 
+  /// Fingerprint of everything the task cards display, so a status change or
+  /// new photo is detected (not just a change in list length or order).
+  String _signature(List<ReportRecord> tasks) => tasks
+      .map(
+        (t) =>
+            "${t.id}|${t.status}|${t.updatedAt.microsecondsSinceEpoch}|"
+            "${t.images.map((i) => "${i.id}:${i.type}").join(",")}",
+      )
+      .join(";");
+
   Future<void> _loadTasks() async {
     try {
-      final result = await ref.read(reportServiceProvider).getAssignedReports(
-            page: 1,
-            limit: 100,
-          );
+      final result = await ref
+          .read(reportServiceProvider)
+          .getAssignedReports(page: 1, limit: 100);
 
       if (!mounted) return;
 
-      // Data-diff guard: skip setState when task list is unchanged.
       final newTasks = result.data;
-      final same = newTasks.length == _tasks.length &&
-          !_loading &&
-          (newTasks.isEmpty ||
-              newTasks.first.id == _tasks.first.id &&
-                  newTasks.last.id == _tasks.last.id);
-      if (same) return;
+      if (!_loading && _signature(newTasks) == _signature(_tasks)) return;
 
       setState(() {
         _tasks = newTasks;
@@ -90,9 +101,17 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
     }
   }
 
+  /// Reloads this tab and the home tab, which shares the same assigned data.
+  Future<void> _refreshAll() async {
+    ref.invalidate(workerAssignedReportsProvider);
+    await _loadTasks();
+  }
+
   Future<void> _updateStatus(ReportRecord report, String status) async {
     try {
-      await ref.read(reportServiceProvider).updateStatus(
+      await ref
+          .read(reportServiceProvider)
+          .updateStatus(
             reportId: report.id,
             status: status,
             notes: "Updated from Flutter mobile app",
@@ -103,8 +122,11 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
         SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.check_circle_outline,
-                  color: Colors.white, size: 18),
+              const Icon(
+                Icons.check_circle_outline,
+                color: Colors.white,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Text("Status updated to ${statusLabels[status] ?? status}."),
             ],
@@ -116,7 +138,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
           ),
         ),
       );
-      await _loadTasks();
+      await _refreshAll();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -132,49 +154,112 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
     }
   }
 
-  Future<void> _uploadCleanupPhoto(String reportId) async {
-    final photo =
-        await _picker.pickImage(source: ImageSource.camera, imageQuality: 75);
-    if (photo == null) return;
+  void _showSnack(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? AppColors.destructive : AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
 
+  Future<ImageSource?> _chooseSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            0,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Add cleanup proof photos",
+                style: Theme.of(
+                  ctx,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text("Take Photo"),
+                onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text("Choose from Gallery"),
+                onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Lets the worker attach 1–5 cleanup photos in total per task.
+  Future<void> _uploadCleanupPhotos(String reportId, int existingCount) async {
+    final remaining = _maxCleanupPhotos - existingCount;
+    if (remaining <= 0) {
+      _showSnack(
+        "You can attach up to $_maxCleanupPhotos cleanup photos.",
+        error: true,
+      );
+      return;
+    }
+
+    final source = await _chooseSource();
+    if (source == null || !mounted) return;
+
+    List<XFile> photos;
+    if (source == ImageSource.camera) {
+      final photo = await _picker.pickImage(source: source, imageQuality: 75);
+      photos = photo == null ? const [] : [photo];
+    } else if (remaining == 1) {
+      final photo = await _picker.pickImage(source: source, imageQuality: 75);
+      photos = photo == null ? const [] : [photo];
+    } else {
+      photos = await _picker.pickMultiImage(imageQuality: 75, limit: remaining);
+    }
+    if (photos.isEmpty || !mounted) return;
+
+    final overLimit = photos.length > remaining;
+    if (overLimit) photos = photos.sublist(0, remaining);
+
+    setState(() => _uploadingTaskIds.add(reportId));
     try {
-      await ref.read(reportServiceProvider).uploadReportImages(
+      await ref
+          .read(reportServiceProvider)
+          .uploadReportImages(
             reportId: reportId,
-            images: [photo],
+            images: photos,
             type: "CLEANUP",
           );
       if (!mounted) return;
-      await _loadTasks();
+      await _refreshAll();
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.camera_alt_outlined, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text("Cleanup proof photo uploaded successfully!"),
-            ],
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+      final count = photos.length;
+      _showSnack(
+        overLimit
+            ? "Uploaded $count photos (limit is $_maxCleanupPhotos per task)."
+            : count == 1
+            ? "Cleanup proof photo uploaded successfully!"
+            : "$count cleanup proof photos uploaded successfully!",
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString()),
-          backgroundColor: AppColors.destructive,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      _showSnack(error.toString(), error: true);
+    } finally {
+      if (mounted) setState(() => _uploadingTaskIds.remove(reportId));
     }
   }
 
@@ -188,10 +273,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
               targetReport != null
                   ? "Route to ${targetReport.title}"
                   : "Route Map",
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
             ),
             backgroundColor: AppColors.card,
             surfaceTintColor: Colors.transparent,
@@ -234,6 +316,8 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(workerTasksRefreshProvider, (_, __) => _loadTasks());
+
     if (_loading) {
       return const Center(
         child: CircularProgressIndicator(
@@ -248,7 +332,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
     final displayTasks = _filteredTasks;
 
     return RefreshIndicator(
-      onRefresh: _loadTasks,
+      onRefresh: _refreshAll,
       child: Stack(
         children: [
           Column(
@@ -319,8 +403,9 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                               task.status == "IN_PROGRESS" && cleanupCount == 0;
 
                           return Container(
-                            margin:
-                                const EdgeInsets.only(bottom: AppSpacing.md),
+                            margin: const EdgeInsets.only(
+                              bottom: AppSpacing.md,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.card,
                               borderRadius: BorderRadius.circular(20),
@@ -350,17 +435,19 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                         ),
                                         decoration: BoxDecoration(
                                           color: AppColors.categoryColor(
-                                                  task.category)
-                                              .withValues(alpha: 0.12),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
+                                            task.category,
+                                          ).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
                                         ),
                                         child: Text(
                                           wasteCategoryLabels[task.category] ??
                                               task.category,
                                           style: TextStyle(
                                             color: AppColors.categoryColor(
-                                                task.category),
+                                              task.category,
+                                            ),
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
                                           ),
@@ -373,10 +460,11 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                         ),
                                         decoration: BoxDecoration(
                                           color: AppColors.statusColor(
-                                                  task.status)
-                                              .withValues(alpha: 0.12),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
+                                            task.status,
+                                          ).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
@@ -386,7 +474,8 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                               height: 6,
                                               decoration: BoxDecoration(
                                                 color: AppColors.statusColor(
-                                                    task.status),
+                                                  task.status,
+                                                ),
                                                 shape: BoxShape.circle,
                                               ),
                                             ),
@@ -396,7 +485,8 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                                   task.status,
                                               style: TextStyle(
                                                 color: AppColors.statusColor(
-                                                    task.status),
+                                                  task.status,
+                                                ),
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w800,
                                               ),
@@ -452,8 +542,9 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                               .where((i) => i.type == "REPORT")
                                               .elementAt(idx);
                                           return ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                             child: Image.network(
                                               image.imageUrl,
                                               width: 84,
@@ -461,15 +552,16 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                               fit: BoxFit.cover,
                                               errorBuilder: (_, __, ___) =>
                                                   Container(
-                                                width: 84,
-                                                height: 84,
-                                                color: AppColors.muted,
-                                                child: const Icon(
-                                                  Icons.broken_image_rounded,
-                                                  color: AppColors
-                                                      .mutedForeground,
-                                                ),
-                                              ),
+                                                    width: 84,
+                                                    height: 84,
+                                                    color: AppColors.muted,
+                                                    child: const Icon(
+                                                      Icons
+                                                          .broken_image_rounded,
+                                                      color: AppColors
+                                                          .mutedForeground,
+                                                    ),
+                                                  ),
                                             ),
                                           );
                                         },
@@ -557,15 +649,43 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: OutlinedButton.icon(
-                                            onPressed: () =>
-                                                _uploadCleanupPhoto(task.id),
-                                            icon: const Icon(
-                                              Icons.camera_alt_outlined,
-                                              size: 18,
+                                            onPressed:
+                                                _uploadingTaskIds.contains(
+                                                      task.id,
+                                                    ) ||
+                                                    cleanupCount >=
+                                                        _maxCleanupPhotos
+                                                ? null
+                                                : () => _uploadCleanupPhotos(
+                                                    task.id,
+                                                    cleanupCount,
+                                                  ),
+                                            icon:
+                                                _uploadingTaskIds.contains(
+                                                  task.id,
+                                                )
+                                                ? const SizedBox(
+                                                    width: 16,
+                                                    height: 16,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  )
+                                                : const Icon(
+                                                    Icons.camera_alt_outlined,
+                                                    size: 18,
+                                                  ),
+                                            label: Text(
+                                              _uploadingTaskIds.contains(
+                                                    task.id,
+                                                  )
+                                                  ? "Uploading…"
+                                                  : "Add Photos ($cleanupCount/$_maxCleanupPhotos)",
                                             ),
-                                            label: const Text("Upload Photo"),
                                             style: OutlinedButton.styleFrom(
-                                              foregroundColor: AppColors.primary,
+                                              foregroundColor:
+                                                  AppColors.primary,
                                               side: BorderSide(
                                                 color: AppColors.primary
                                                     .withValues(alpha: 0.4),
@@ -576,8 +696,8 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                               ),
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                vertical: 11,
-                                              ),
+                                                    vertical: 11,
+                                                  ),
                                               textStyle: const TextStyle(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w600,
@@ -600,10 +720,12 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                         ),
                                         decoration: BoxDecoration(
                                           color: AppColors.tint(
-                                              AppColors.warning,
-                                              opacity: 0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
+                                            AppColors.warning,
+                                            opacity: 0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: const Row(
                                           children: [
@@ -615,7 +737,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                             SizedBox(width: 6),
                                             Expanded(
                                               child: Text(
-                                                "Upload a cleanup photo to enable completion.",
+                                                "Upload 1–$_maxCleanupPhotos cleanup photos to enable completion.",
                                                 style: TextStyle(
                                                   fontSize: 11,
                                                   color: AppColors.warning,
@@ -640,7 +762,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
-                                                "Cleanup proof photo attached ($cleanupCount)",
+                                                "Cleanup proof photos attached ($cleanupCount/$_maxCleanupPhotos)",
                                                 style: const TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w700,
@@ -658,7 +780,8 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                               separatorBuilder: (_, __) =>
                                                   const SizedBox(width: 6),
                                               itemBuilder: (context, idx) {
-                                                final image = cleanupImages[idx];
+                                                final image =
+                                                    cleanupImages[idx];
                                                 return ClipRRect(
                                                   borderRadius:
                                                       BorderRadius.circular(8),
@@ -682,16 +805,16 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                     ...actions.map((action) {
                                       final isDisabled =
                                           action.requiresCleanupPhoto &&
-                                              cleanupCount == 0;
+                                          cleanupCount == 0;
                                       return SizedBox(
                                         width: double.infinity,
                                         child: FilledButton.icon(
                                           onPressed: isDisabled
                                               ? null
                                               : () => _updateStatus(
-                                                    task,
-                                                    action.nextStatus,
-                                                  ),
+                                                  task,
+                                                  action.nextStatus,
+                                                ),
                                           icon: Icon(
                                             action.nextStatus == "CLEANED"
                                                 ? Icons.check_circle_rounded
@@ -702,8 +825,8 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                                           style: FilledButton.styleFrom(
                                             backgroundColor:
                                                 action.nextStatus == "CLEANED"
-                                                    ? AppColors.success
-                                                    : AppColors.primary,
+                                                ? AppColors.success
+                                                : AppColors.primary,
                                             disabledBackgroundColor:
                                                 AppColors.muted,
                                             disabledForegroundColor:

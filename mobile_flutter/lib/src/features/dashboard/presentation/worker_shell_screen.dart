@@ -28,15 +28,18 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
     setState(() {
       _index = value;
     });
+    // Home and Tasks stay mounted in the IndexedStack, so reload them on entry.
+    if (value == 0) {
+      ref.invalidate(workerAssignedReportsProvider);
+    } else if (value == 1) {
+      ref.read(workerTasksRefreshProvider.notifier).state++;
+    }
   }
 
-
   void _openProfile() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const ProfileScreen(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ProfileScreen()));
   }
 
   @override
@@ -50,13 +53,12 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
       profileImage = NetworkImage(avatarUrl);
     }
     final firstName = (user?.firstName ?? "").trim();
-    final initials =
-        firstName.isEmpty ? "U" : firstName.substring(0, 1).toUpperCase();
+    final initials = firstName.isEmpty
+        ? "U"
+        : firstName.substring(0, 1).toUpperCase();
 
     final pages = <Widget>[
-      WorkerHomeScreen(
-        onSelectTab: (tab) => setState(() => _index = tab),
-      ),
+      WorkerHomeScreen(onSelectTab: _setTab),
       const WorkerTasksScreen(),
       const WorkerRouteScreen(),
       const SchedulesScreen(),
@@ -102,8 +104,10 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
                   ),
                   child: CircleAvatar(
                     radius: 18,
-                    backgroundColor:
-                        AppColors.tint(AppColors.primary, opacity: 0.1),
+                    backgroundColor: AppColors.tint(
+                      AppColors.primary,
+                      opacity: 0.1,
+                    ),
                     foregroundImage: profileImage,
                     child: profileImage == null
                         ? Text(

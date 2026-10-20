@@ -40,16 +40,12 @@ export class ReportImageService {
       throw new Error("Insufficient permissions.");
     }
 
-    const uploadPromises = files.map(async (file, index) => {
+    const uploadPromises = files.map(async (file) => {
       const result = await CloudinaryService.uploadImage(file.buffer);
 
-      // If typeParam is explicitly passed as something else (e.g. "AFTER_CLEANUP"), respect it.
-      // Otherwise, the first image is "REPORT", and subsequent images are "ANGLE".
-      let imageType = typeParam;
-      if (!imageType || imageType === "REPORT") {
-        imageType = index === 0 ? "REPORT" : "ANGLE";
-      }
-
+      // The ImageType enum only has REPORT and CLEANUP, so every report photo
+      // is stored as REPORT unless the client explicitly asks for another type.
+      const imageType = typeParam === "CLEANUP" ? "CLEANUP" : "REPORT";
       return prisma.reportImage.create({
         data: {
           reportId,
