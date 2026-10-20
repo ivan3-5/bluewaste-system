@@ -1,5 +1,8 @@
 import "dart:io";
 
+import "package:dio/dio.dart";
+
+import "../../../core/config/app_env.dart";
 import "../../../core/network/api_exception.dart";
 import "../domain/report_models.dart";
 import "tflite_service.dart";
@@ -269,6 +272,16 @@ class DetectService {
     String? description,
     String? citizenId,
   }) async {
+    if (AppEnv.useGemini) {
+      return _detectWithGemini(
+        imageFile: imageFile,
+        latitude: latitude,
+        longitude: longitude,
+        description: description,
+        citizenId: citizenId,
+      );
+    }
+
     try {
       return await TFLiteService.instance.runInference(imageFile);
     } catch (e) {
@@ -279,6 +292,51 @@ class DetectService {
         );
       }
       throw DetectServerException("On-device photo analysis failed: $e");
+    }
+  }
+
+  /// Sends [imageFile] to the backend's Gemini endpoint (`/ai/analyze-report`).
+  Future<DetectResult> _detectWithGemini({
+    required File imageFile,
+    required double latitude,
+    required double longitude,
+    String? description,
+    String? citizenId,
+  }) async {
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: AppEnv.apiBaseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        sendTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
+      ),
+    );
+
+    try {
+      final form = FormData.fromMap({
+        "image": await MultipartFile.fromFile(imageFile.path),
+        "latitude": latitude.toString(),
+        "longitude": longitude.toString(),
+        if (description != null) "description": description,
+        if (citizenId != null) "citizenId": citizenId,
+      });
+      final response = await dio.post<Map<String, dynamic>>(
+        "/ai/analyze-report",
+        data: form,
+      );
+      final data = response.data;
+      if (data == null) {
+        throw DetectServerException("Gemini returned an empty response.");
+      }
+      return DetectResult.fromJson(data);
+    } on DioException catch (error) {
+      final apiError = ApiException.fromDioError(error);
+      if (apiError.isTimeoutOrNetworkError) {
+        throw DetectServerUnreachableException(
+          "Could not reach the Gemini analysis service. Check your connection.",
+        );
+      }
+      throw DetectServerException(apiError.message, apiError.statusCode);
     }
   }
 }

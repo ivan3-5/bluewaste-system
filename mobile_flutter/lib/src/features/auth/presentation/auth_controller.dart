@@ -68,7 +68,9 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> login({required String email, required String password}) async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    // The login screen tracks its own loading state; a global isLoading would
+    // swap it for the splash screen and drop the error message on failure.
+    state = state.copyWith(clearError: true);
 
     try {
       final session = await _authService.login(
@@ -100,7 +102,7 @@ class AuthController extends StateNotifier<AuthState> {
     String? phone,
     required String address,
   }) async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    state = state.copyWith(clearError: true);
 
     try {
       final session = await _authService.register(

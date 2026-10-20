@@ -1105,11 +1105,12 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 minLines: 3,
                 maxLines: 5,
               ),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.secondary,
+              Material(
+                color: AppColors.secondary,
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
+                  side: BorderSide(
                     color: _isAnonymous
                         ? AppColors.primary.withValues(alpha: 0.5)
                         : AppColors.border,

@@ -73,6 +73,8 @@ class OfflineService {
   static const String boxName = "offline_reports";
   bool _isSyncing = false;
   StreamSubscription<ConnectivityResult>? _connectivitySub;
+  Timer? _retryTimer;
+  static const Duration _retryInterval = Duration(seconds: 30);
 
   /// Persists the report and copies its images out of the picker's cache,
   /// which the OS may clear before connectivity returns.
@@ -220,6 +222,10 @@ class OfflineService {
         syncOfflineReports();
       }
     });
+    // Reports can also fail while online (e.g. a server error), which no
+    // connectivity change would retry, so keep trying periodically.
+    _retryTimer?.cancel();
+    _retryTimer = Timer.periodic(_retryInterval, (_) => syncOfflineReports());
     // Flush anything queued before the app was last closed.
     syncOfflineReports();
   }

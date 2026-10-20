@@ -90,10 +90,6 @@ export async function POST(request: NextRequest) {
       console.error("[AI] DATABASE_URL is not set in environment variables");
       return jsonError(500, "Server misconfiguration: DATABASE_URL is not set. Contact the administrator.");
     }
-    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-      console.error("[AI] Cloudinary env vars are not set in environment variables");
-      return jsonError(500, "Server misconfiguration: Cloudinary credentials are not set. Contact the administrator.");
-    }
 
     // ── 1. Parse multipart form data ──────────────────────────────────────
     let formData: FormData;
@@ -179,16 +175,15 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 6. Upload image to Cloudinary ─────────────────────────────────────
-    let imageUrl: string;
-    let cloudinaryPublicId: string;
+    // Best effort: clients upload the report image separately, so a storage
+    // failure must not block the AI analysis.
+    let imageUrl: string | null = null;
 
     try {
       const uploaded = await uploadToCloudinary(imageBuffer, "bluewaste/ai-reports");
       imageUrl = uploaded.secureUrl;
-      cloudinaryPublicId = uploaded.publicId;
     } catch (err) {
-      console.error("[AI] Cloudinary upload failed:", err);
-      return jsonError(502, "Failed to upload image to storage. Please try again.");
+      console.error("[AI] Cloudinary upload failed — continuing without stored image:", err);
     }
 
     // ── 7. Compress image for Gemini if needed ────────────────────────────

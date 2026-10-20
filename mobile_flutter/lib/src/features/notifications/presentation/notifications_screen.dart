@@ -78,7 +78,7 @@ class NotificationsScreen extends ConsumerWidget {
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final notification = notifications[index];
-                    return Container(
+                    return Material(
                       color: notification.isRead
                           ? Colors.transparent
                           : AppColors.primary.withValues(alpha: 0.05),
