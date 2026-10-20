@@ -68,8 +68,8 @@ class ReportService {
     return const [];
   }
 
-  Future<void> createReportFromOffline(Map<String, dynamic> data, List<String> imagePaths) async {
-    final report = await createReport(
+  Future<ReportRecord> createReportFromData(Map<String, dynamic> data) {
+    return createReport(
       title: data["title"] as String,
       description: data["description"] as String,
       category: data["category"] as String,
@@ -84,80 +84,53 @@ class ReportService {
       analysisConfidence: (data["analysisConfidence"] as num?)?.toDouble(),
       analysisWasteCount: data["analysisWasteCount"] as int?,
       aiModel: data["aiModel"] as String?,
-      aiCategories: (data["aiCategories"] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+      aiCategories: (data["aiCategories"] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
       aiReason: data["aiReason"] as String?,
     );
-
-    if (imagePaths.isNotEmpty) {
-      final xfiles = imagePaths.map((p) => XFile(p)).toList();
-      await uploadReportImages(reportId: report.id, images: xfiles);
-    }
   }
 
+  Future<void> uploadQueuedImages({
+    required String reportId,
+    required List<String> imagePaths,
+  }) {
+    return uploadReportImages(
+      reportId: reportId,
+      images: imagePaths.map(XFile.new).toList(),
+    );
+  }
+
+  /// Returns null when the report was queued for upload instead of sent.
   Future<ReportRecord?> submitFullReport({
     required Map<String, dynamic> data,
     required List<XFile> images,
     required OfflineService offlineService,
   }) async {
+    final imagePaths = images.map((e) => e.path).toList();
+
     final connectivity = await Connectivity().checkConnectivity();
     if (connectivity == ConnectivityResult.none) {
-      final payload = OfflineReportPayload(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        data: data,
-        imagePaths: images.map((e) => e.path).toList(),
-      );
-      await offlineService.queueReport(payload);
-      return null; // Indicates it was queued offline
+      await offlineService.queueReport(data: data, imagePaths: imagePaths);
+      return null;
     }
 
+    ReportRecord? created;
     try {
-      final report = await createReport(
-        title: data["title"] as String,
-        description: data["description"] as String,
-        category: data["category"] as String,
-        latitude: (data["latitude"] as num).toDouble(),
-        longitude: (data["longitude"] as num).toDouble(),
-        address: data["address"] as String?,
-        isAnonymous: data["isAnonymous"] as bool? ?? false,
-        isSpamFlagged: data["isSpamFlagged"] as bool? ?? false,
-        spamReason: data["spamReason"] as String?,
-        severity: data["severity"] as String?,
-        analysisStatus: data["analysisStatus"] as String?,
-        analysisConfidence: (data["analysisConfidence"] as num?)?.toDouble(),
-        analysisWasteCount: data["analysisWasteCount"] as int?,
-        aiModel: data["aiModel"] as String?,
-        aiCategories: (data["aiCategories"] as List<dynamic>?)?.map((e) => e.toString()).toList(),
-        aiReason: data["aiReason"] as String?,
-      );
-
-      if (images.isNotEmpty) {
-        await uploadReportImages(reportId: report.id, images: images);
-      }
-      return report;
+      created = await createReportFromData(data);
+      await uploadReportImages(reportId: created.id, images: images);
+      return created;
     } on ApiException catch (e) {
       if (e.isTimeoutOrNetworkError) {
-        final payload = OfflineReportPayload(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+        // Keep the server-side id so the retry only uploads the images.
+        await offlineService.queueReport(
           data: data,
-          imagePaths: images.map((img) => img.path).toList(),
+          imagePaths: imagePaths,
+          remoteReportId: created?.id,
         );
-        await offlineService.queueReport(payload);
         return null;
       }
       rethrow;
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.unknown) {
-        final payload = OfflineReportPayload(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          data: data,
-          imagePaths: images.map((img) => img.path).toList(),
-        );
-        await offlineService.queueReport(payload);
-        return null;
-      }
-      throw ApiException.fromDioError(e);
     }
   }
 
@@ -195,8 +168,10 @@ class ReportService {
           if (isSpamFlagged && spamReason != null) "spamReason": spamReason,
           if (severity != null) "severity": severity,
           if (analysisStatus != null) "analysisStatus": analysisStatus,
-          if (analysisConfidence != null) "analysisConfidence": analysisConfidence,
-          if (analysisWasteCount != null) "analysisWasteCount": analysisWasteCount,
+          if (analysisConfidence != null)
+            "analysisConfidence": analysisConfidence,
+          if (analysisWasteCount != null)
+            "analysisWasteCount": analysisWasteCount,
           if (aiModel != null) "aiModel": aiModel,
           if (aiCategories != null) "aiCategories": aiCategories,
           if (aiReason != null) "aiReason": aiReason,
@@ -221,17 +196,11 @@ class ReportService {
     try {
       final parts = await Future.wait(
         images.map(
-          (img) => MultipartFile.fromFile(
-            img.path,
-            filename: img.name,
-          ),
+          (img) => MultipartFile.fromFile(img.path, filename: img.name),
         ),
       );
 
-      final formData = FormData.fromMap({
-        "images": parts,
-        "type": type,
-      });
+      final formData = FormData.fromMap({"images": parts, "type": type});
 
       await _dio.post<void>(
         "/reports/$reportId/images",
@@ -376,10 +345,7 @@ class ReportService {
     try {
       final response = await _dio.put<Map<String, dynamic>>(
         "/reports/$reportId/status",
-        data: {
-          "status": status,
-          "notes": notes,
-        },
+        data: {"status": status, "notes": notes},
       );
 
       return ReportRecord.fromJson(response.data ?? <String, dynamic>{});

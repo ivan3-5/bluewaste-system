@@ -71,10 +71,15 @@ class AuthController extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      final session =
-          await _authService.login(email: email, password: password);
+      final session = await _authService.login(
+        email: email,
+        password: password,
+      );
       await _storage.writeSession(
-          token: session.token, user: session.user.toJson());
+        token: session.token,
+        user: session.user.toJson(),
+        refreshToken: session.refreshToken,
+      );
 
       state = AuthState(
         isLoading: false,
@@ -82,10 +87,7 @@ class AuthController extends StateNotifier<AuthState> {
         user: session.user,
       );
     } catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.toString(),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
       rethrow;
     }
   }
@@ -111,7 +113,10 @@ class AuthController extends StateNotifier<AuthState> {
       );
 
       await _storage.writeSession(
-          token: session.token, user: session.user.toJson());
+        token: session.token,
+        user: session.user.toJson(),
+        refreshToken: session.refreshToken,
+      );
 
       state = AuthState(
         isLoading: false,
@@ -119,10 +124,7 @@ class AuthController extends StateNotifier<AuthState> {
         user: session.user,
       );
     } catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.toString(),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
       rethrow;
     }
   }
@@ -134,10 +136,7 @@ class AuthController extends StateNotifier<AuthState> {
 
     try {
       final profile = await _authService.getProfile();
-      await _storage.writeSession(
-        token: state.token!,
-        user: profile.toJson(),
-      );
+      await _storage.writeSession(token: state.token!, user: profile.toJson());
       state = state.copyWith(user: profile, clearError: true);
     } catch (_) {
       // Keep previous local session if profile refresh fails.
@@ -167,15 +166,9 @@ class AuthController extends StateNotifier<AuthState> {
 
       await _storage.writeSession(token: state.token!, user: updated.toJson());
 
-      state = state.copyWith(
-        isLoading: false,
-        user: updated,
-      );
+      state = state.copyWith(isLoading: false, user: updated);
     } catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.toString(),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
       rethrow;
     }
   }
@@ -200,15 +193,9 @@ class AuthController extends StateNotifier<AuthState> {
 
       await _storage.writeSession(token: state.token!, user: updated.toJson());
 
-      state = state.copyWith(
-        isLoading: false,
-        user: updated,
-      );
+      state = state.copyWith(isLoading: false, user: updated);
     } catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.toString(),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
       rethrow;
     }
   }
@@ -219,13 +206,16 @@ class AuthController extends StateNotifier<AuthState> {
   }
 }
 
-final authControllerProvider =
-    StateNotifierProvider<AuthController, AuthState>((ref) {
-  return AuthController(
-    ref.watch(authServiceProvider),
-    ref.watch(sessionStorageProvider),
-  );
-});
+final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
+  (ref) {
+    final controller = AuthController(
+      ref.watch(authServiceProvider),
+      ref.watch(sessionStorageProvider),
+    );
+    ref.listen<int>(sessionExpiredProvider, (_, __) => controller.logout());
+    return controller;
+  },
+);
 
 final currentUserProvider = Provider<AsyncValue<AppUser?>>((ref) {
   final authState = ref.watch(authControllerProvider);

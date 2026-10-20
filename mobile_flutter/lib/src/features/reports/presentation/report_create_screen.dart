@@ -17,6 +17,7 @@ import "../data/report_service.dart";
 import "../data/offline_service.dart";
 import "../data/detect_service.dart";
 import "../domain/report_models.dart";
+import "widgets/pending_reports_banner.dart";
 import "widgets/report_result_card.dart";
 import "widgets/report_step_indicator.dart";
 import "my_reports_screen.dart";
@@ -60,8 +61,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   bool get _hasLocation => _latitude != null && _longitude != null;
 
   /// Detection must have run successfully before submission is allowed.
-  bool get _detectionReady =>
-      _detectedConfidence != null && !_detectionFailed;
+  bool get _detectionReady => _detectedConfidence != null && !_detectionFailed;
   // ── helpers ───────────────────────────────────────────────────────────────
 
   /// Resets all detection state to pristine (call when image is removed).
@@ -136,7 +136,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     }
 
     final detectedResult = result!;
-    final detectedCategory = detectedResult.hasWaste ? "with_waste" : "no_waste";
+    final detectedCategory = detectedResult.hasWaste
+        ? "with_waste"
+        : "no_waste";
     setState(() {
       _isDetecting = false;
       _detectedConfidence = detectedResult.confidence;
@@ -194,9 +196,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
   Future<void> _pickFromCamera() async {
     if (_images.length >= 5) return;
-    
-    final picked =
-        await _picker.pickImage(source: ImageSource.camera, imageQuality: 75);
+
+    final picked = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 75,
+    );
     if (picked == null) {
       return;
     }
@@ -216,8 +220,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   Future<void> _pickFromGallery() async {
     if (_images.length >= 5) return;
 
-    final picked =
-        await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75);
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 75,
+    );
     if (picked == null) return;
 
     setState(() {
@@ -302,11 +308,13 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   /// Falls back to false (allow) on network errors so offline users aren't blocked.
   Future<bool> _checkOutsideZones(double lat, double lng) async {
     try {
-      final dio = Dio(BaseOptions(
-        baseUrl: AppEnv.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 6),
-        receiveTimeout: const Duration(seconds: 6),
-      ));
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: AppEnv.apiBaseUrl,
+          connectTimeout: const Duration(seconds: 6),
+          receiveTimeout: const Duration(seconds: 6),
+        ),
+      );
       final response = await dio.get<List<dynamic>>(
         "/reporting-zones",
         queryParameters: <String, dynamic>{"activeOnly": "true"},
@@ -315,10 +323,12 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       if (zones == null || zones.isEmpty) return false;
       for (final zone in zones) {
         final coords = (zone["coordinates"] as List<dynamic>)
-            .map((c) => <String, double>{
-                  "lat": (c["lat"] as num).toDouble(),
-                  "lng": (c["lng"] as num).toDouble(),
-                })
+            .map(
+              (c) => <String, double>{
+                "lat": (c["lat"] as num).toDouble(),
+                "lng": (c["lng"] as num).toDouble(),
+              },
+            )
             .toList();
         if (_pointInPolygon(lat, lng, coords)) return false;
       }
@@ -342,7 +352,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       final yi = polygon[i]["lat"]!;
       final xj = polygon[j]["lng"]!;
       final yj = polygon[j]["lat"]!;
-      final intersect = ((yi > lat) != (yj > lat)) &&
+      final intersect =
+          ((yi > lat) != (yj > lat)) &&
           (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
       if (intersect) inside = !inside;
       j = i;
@@ -353,7 +364,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   Future<void> _submitReport({bool isDirectSpamSubmit = false}) async {
     final rawDescription = _descriptionController.text.trim();
 
-    if (!isDirectSpamSubmit && rawDescription.isNotEmpty && rawDescription.length < 10) {
+    if (!isDirectSpamSubmit &&
+        rawDescription.isNotEmpty &&
+        rawDescription.length < 10) {
       _showMessage("Description must be at least 10 characters when provided.");
       return;
     }
@@ -377,7 +390,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     }
 
     if (!_detectionReady && !isDirectSpamSubmit) {
-      _showMessage("Please wait for detection to complete or retake the photo.");
+      _showMessage(
+        "Please wait for detection to complete or retake the photo.",
+      );
       return;
     }
 
@@ -396,17 +411,21 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
       final effectiveCategory = isDirectSpamSubmit ? "no_waste" : _category;
       final effectiveIsSpam = isDirectSpamSubmit || _isSpamFlagged;
-      final categoryLabel = wasteCategoryLabels[effectiveCategory] ??
+      final categoryLabel =
+          wasteCategoryLabels[effectiveCategory] ??
           (effectiveCategory == "with_waste" ? "With Waste" : "No Waste");
-      final title = (effectiveCategory == "with_waste" || effectiveCategory == "no_waste" || categoryLabel == "With Waste")
+      final title =
+          (effectiveCategory == "with_waste" ||
+              effectiveCategory == "no_waste" ||
+              categoryLabel == "With Waste")
           ? "Waste report"
           : "Waste report - $categoryLabel";
       final aiAnalysisReason = _detectResult?.reason ?? _detectResult?.message;
       final description = rawDescription.isNotEmpty
           ? rawDescription
           : (aiAnalysisReason != null && aiAnalysisReason.trim().isNotEmpty
-              ? aiAnalysisReason
-              : "Waste report submitted via mobile capture.");
+                ? aiAnalysisReason
+                : "Waste report submitted via mobile capture.");
 
       final report = await reportService.submitFullReport(
         data: {
@@ -418,12 +437,20 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           "isAnonymous": _isAnonymous,
           "isSpamFlagged": effectiveIsSpam,
           "spamReason": effectiveIsSpam
-              ? (_detectResult?.spamReason ?? "No visible waste detected during photo analysis")
+              ? (_detectResult?.spamReason ??
+                    "No visible waste detected during photo analysis")
               : null,
-          "severity": isDirectSpamSubmit ? "SPAM" : _detectResult?.severity.dbValue,
-          "analysisStatus": isDirectSpamSubmit ? "CLEAN" : (_detectResult?.hasWaste == true ? "DIRTY" : "CLEAN"),
+          "severity": isDirectSpamSubmit
+              ? "SPAM"
+              : _detectResult?.severity.dbValue,
+          "analysisStatus": isDirectSpamSubmit
+              ? "CLEAN"
+              : (_detectResult?.hasWaste == true ? "DIRTY" : "CLEAN"),
           "analysisConfidence": _detectResult?.confidence,
-          "analysisWasteCount": (_detectResult?.hasWaste == true && !isDirectSpamSubmit) ? (_detectResult?.labels.length ?? 1) : 0,
+          "analysisWasteCount":
+              (_detectResult?.hasWaste == true && !isDirectSpamSubmit)
+              ? (_detectResult?.labels.length ?? 1)
+              : 0,
           "aiModel": _detectResult != null ? "gemini-3.5-flash" : null,
           "aiCategories": _detectResult?.categories.isNotEmpty == true
               ? _detectResult!.categories
@@ -457,10 +484,14 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         }
       });
 
-      if (report == null && submittedResult == null) {
-        _showMessage("You are offline. Report queued and will sync later.");
+      if (report == null) {
+        _showMessage(
+          "You're offline. Report saved on this phone and will upload automatically once you're back online.",
+        );
       } else if (isDirectSpamSubmit) {
-        _showMessage("Spam report submitted directly. Screen refreshed so you can submit again.");
+        _showMessage(
+          "Spam report submitted directly. Screen refreshed so you can submit again.",
+        );
       } else {
         _startSuccessCountdown();
       }
@@ -478,9 +509,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _startSuccessCountdown() {
@@ -517,15 +548,18 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       MaterialPageRoute<void>(
         builder: (_) => Scaffold(
           appBar: AppBar(title: const Text("My Reports")),
-          body: const SafeArea(
-            child: MyReportsScreen(),
-          ),
+          body: const SafeArea(child: MyReportsScreen()),
         ),
       ),
     );
   }
 
-  Widget _buildGuidelineRow(BuildContext context, IconData icon, Color color, String text) {
+  Widget _buildGuidelineRow(
+    BuildContext context,
+    IconData icon,
+    Color color,
+    String text,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -535,8 +569,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           child: Text(
             text,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.secondaryForeground,
-                ),
+              color: AppColors.secondaryForeground,
+            ),
           ),
         ),
       ],
@@ -559,7 +593,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     if (_images.isNotEmpty && !_detectionReady) {
       missingRequirements.add("Detection");
     }
-    final canSubmit = !_isSubmitting &&
+    final canSubmit =
+        !_isSubmitting &&
         !_isDetecting &&
         missingRequirements.isEmpty &&
         _images.isNotEmpty;
@@ -588,17 +623,17 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 const SizedBox(height: AppSpacing.lg),
                 Text(
                   "Report Submitted Successfully!",
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   "Thank you for helping protect our coastal areas. Your waste report has been received and queued for review.",
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.mutedForeground,
-                      ),
+                    color: AppColors.mutedForeground,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -657,6 +692,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       return ListView(
         padding: AppSpacing.screen,
         children: [
+          const PendingReportsBanner(),
           if (_showResultCard && _submittedResult != null) ...[
             ReportResultCard(
               result: _submittedResult!,
@@ -692,8 +728,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 Text(
                   "Take up to 5 photos of the waste from different angles. The primary image will be used to automatically detect and classify the category.",
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.mutedForeground,
-                      ),
+                    color: AppColors.mutedForeground,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.xl),
@@ -705,7 +741,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                     icon: const Icon(Icons.photo_camera_rounded, size: 22),
                     label: const Text(
                       "Take a Photo",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -718,7 +757,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                     icon: const Icon(Icons.photo_library_rounded, size: 22),
                     label: const Text(
                       "Choose from Gallery",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -748,7 +790,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                         ? AppColors.tint(AppColors.success, opacity: 0.1)
                         : AppColors.secondary,
                     border: Border.all(
-                      color: _hasLocation ? AppColors.success : AppColors.border,
+                      color: _hasLocation
+                          ? AppColors.success
+                          : AppColors.border,
                     ),
                   ),
                   child: Row(
@@ -768,7 +812,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                           _hasLocation
                               ? "${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}"
                               : "Acquiring coastal coordinates...",
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
                                 color: _hasLocation
                                     ? AppColors.success
                                     : AppColors.mutedForeground,
@@ -786,16 +831,18 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   Text(
                     "⚠️ Location outside designated coastal zone (Allowed for testing demonstration).",
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.info,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: AppColors.info,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.sm),
                 FilledButton.tonalIcon(
                   onPressed: _getCurrentLocation,
                   icon: const Icon(Icons.my_location),
-                  label: Text(_hasLocation ? "Update Location" : "Capture Location"),
+                  label: Text(
+                    _hasLocation ? "Update Location" : "Capture Location",
+                  ),
                 ),
               ],
             ),
@@ -808,14 +855,30 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 ReportFormSectionHeader(
                   icon: Icons.tips_and_updates_outlined,
                   title: "Photo Guidelines",
-                  subtitle: "Ensure accurate detection by following these quick tips.",
+                  subtitle:
+                      "Ensure accurate detection by following these quick tips.",
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                _buildGuidelineRow(context, Icons.check_circle_outline, AppColors.success, "Center the waste item clearly in the frame."),
+                _buildGuidelineRow(
+                  context,
+                  Icons.check_circle_outline,
+                  AppColors.success,
+                  "Center the waste item clearly in the frame.",
+                ),
                 const SizedBox(height: AppSpacing.xs),
-                _buildGuidelineRow(context, Icons.check_circle_outline, AppColors.success, "Take up to 5 photos from different angles for better documentation."),
+                _buildGuidelineRow(
+                  context,
+                  Icons.check_circle_outline,
+                  AppColors.success,
+                  "Take up to 5 photos from different angles for better documentation.",
+                ),
                 const SizedBox(height: AppSpacing.xs),
-                _buildGuidelineRow(context, Icons.info_outline, AppColors.primary, "The primary image will be analyzed to classify the waste."),
+                _buildGuidelineRow(
+                  context,
+                  Icons.info_outline,
+                  AppColors.primary,
+                  "The primary image will be analyzed to classify the waste.",
+                ),
               ],
             ),
           ),
@@ -873,7 +936,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               ReportFormSectionHeader(
                 icon: Icons.photo_camera_rounded,
                 title: "Review Photo & Analysis",
-                subtitle: "The system verifies and categorizes your captured image.",
+                subtitle:
+                    "The system verifies and categorizes your captured image.",
               ),
               const SizedBox(height: AppSpacing.md),
               SizedBox(
@@ -899,54 +963,61 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                                 cacheWidth: 800,
                               ),
                             ),
-                          Positioned(
-                            top: 8,
-                            left: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                isPrimary ? "Primary" : "Angle ${index + 1}",
-                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: 10,
-                            right: 10,
-                            child: InkWell(
-                              onTap: () async {
-                                final wasPrimary = index == 0;
-                                setState(() {
-                                  _images.removeAt(index);
-                                  if (wasPrimary && _images.isNotEmpty) {
-                                    _resetDetection();
-                                  } else if (_images.isEmpty) {
-                                    _resetDetection();
-                                  }
-                                });
-                                if (wasPrimary && _images.isNotEmpty) {
-                                  await _runDetection(_images.first);
-                                }
-                              },
+                            Positioned(
+                              top: 8,
+                              left: 8,
                               child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.destructive,
-                                  shape: BoxShape.circle,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
                                 ),
-                                child: const Icon(
-                                  Icons.close,
-                                  size: 18,
-                                  color: Colors.white,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  isPrimary ? "Primary" : "Angle ${index + 1}",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                            Positioned(
+                              top: 10,
+                              right: 10,
+                              child: InkWell(
+                                onTap: () async {
+                                  final wasPrimary = index == 0;
+                                  setState(() {
+                                    _images.removeAt(index);
+                                    if (wasPrimary && _images.isNotEmpty) {
+                                      _resetDetection();
+                                    } else if (_images.isEmpty) {
+                                      _resetDetection();
+                                    }
+                                  });
+                                  if (wasPrimary && _images.isNotEmpty) {
+                                    await _runDetection(_images.first);
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.destructive,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 18,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -976,7 +1047,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _isDetecting ? null : _pickFromGallery,
-                        icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                        icon: const Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 18,
+                        ),
                         label: const Text("Angle (Gallery)"),
                       ),
                     ),
@@ -1111,13 +1185,13 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                             ? "${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}"
                             : "No location captured yet.",
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: _hasLocation
-                                  ? AppColors.success
-                                  : AppColors.mutedForeground,
-                              fontWeight: _hasLocation
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                            ),
+                          color: _hasLocation
+                              ? AppColors.success
+                              : AppColors.mutedForeground,
+                          fontWeight: _hasLocation
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
@@ -1128,17 +1202,18 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 Text(
                   "⚠️ Location outside designated coastal zone (Allowed for testing demonstration).",
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.info,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: AppColors.info,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
               const SizedBox(height: AppSpacing.sm),
               FilledButton.tonalIcon(
                 onPressed: _getCurrentLocation,
                 icon: const Icon(Icons.my_location),
-                label:
-                    Text(_hasLocation ? "Update Location" : "Capture Location"),
+                label: Text(
+                  _hasLocation ? "Update Location" : "Capture Location",
+                ),
               ),
             ],
           ),
@@ -1165,7 +1240,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                       : const Icon(Icons.send_rounded, size: 20),
                   label: Text(
                     _isSubmitting ? "Submitting Report…" : "Submit Report",
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -1173,14 +1251,14 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               Text(
                 missingRequirements.isEmpty
                     ? _isSpamFlagged
-                        ? "⚠️ Submitting as spam-flagged report."
-                        : "Ready to submit. Please review details before sending."
+                          ? "⚠️ Submitting as spam-flagged report."
+                          : "Ready to submit. Please review details before sending."
                     : "Complete required fields: ${missingRequirements.join(", ")}",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: _isSpamFlagged
-                          ? AppColors.destructive
-                          : AppColors.mutedForeground,
-                    ),
+                  color: _isSpamFlagged
+                      ? AppColors.destructive
+                      : AppColors.mutedForeground,
+                ),
               ),
             ],
           ),
@@ -1190,4 +1268,3 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     );
   }
 }
-

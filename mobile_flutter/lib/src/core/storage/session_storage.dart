@@ -4,16 +4,25 @@ import "package:flutter_secure_storage/flutter_secure_storage.dart";
 
 class SessionStorage {
   SessionStorage({FlutterSecureStorage? secureStorage})
-      : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   static const String tokenKey = "bluewaste_token";
   static const String userKey = "bluewaste_user";
+  static const String refreshTokenKey = "bluewaste_refresh_token";
   static const String onboardingSeenKey = "bluewaste_onboarding_seen";
 
   final FlutterSecureStorage _secureStorage;
 
   Future<String?> readToken() {
     return _secureStorage.read(key: tokenKey);
+  }
+
+  Future<String?> readRefreshToken() {
+    return _secureStorage.read(key: refreshTokenKey);
+  }
+
+  Future<void> writeToken(String token) {
+    return _secureStorage.write(key: tokenKey, value: token);
   }
 
   Future<Map<String, dynamic>?> readUserJson() async {
@@ -48,10 +57,14 @@ class SessionStorage {
   Future<void> writeSession({
     required String token,
     required Map<String, dynamic> user,
+    String? refreshToken,
   }) async {
     await Future.wait([
       _secureStorage.write(key: tokenKey, value: token),
       _secureStorage.write(key: userKey, value: jsonEncode(user)),
+      // Omitted on profile updates so the existing refresh token is kept.
+      if (refreshToken != null && refreshToken.isNotEmpty)
+        _secureStorage.write(key: refreshTokenKey, value: refreshToken),
     ]);
   }
 
@@ -59,6 +72,7 @@ class SessionStorage {
     await Future.wait([
       _secureStorage.delete(key: tokenKey),
       _secureStorage.delete(key: userKey),
+      _secureStorage.delete(key: refreshTokenKey),
     ]);
   }
 }

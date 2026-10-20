@@ -8,6 +8,8 @@ import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../data/report_service.dart";
+import "../data/offline_service.dart";
+import "widgets/pending_reports_banner.dart";
 import "../../../core/network/api_exception.dart";
 import "../domain/report_models.dart";
 
@@ -129,7 +131,8 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen>
       // Data-diff guard: skip setState when nothing changed to avoid
       // rebuilding the entire list on every poll.
       final newData = result.data;
-      final same = newData.length == _reports.length &&
+      final same =
+          newData.length == _reports.length &&
           !_loading &&
           _errorMessage == null &&
           (newData.isEmpty ||
@@ -169,18 +172,19 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen>
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _ReportDetailSheet(
-        report: report,
-        detailFormat: _detailFormat,
-      ),
+      builder: (ctx) =>
+          _ReportDetailSheet(report: report, detailFormat: _detailFormat),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(reportsSyncedProvider, (_, __) => _loadReports());
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const PendingReportsBanner(),
         const SizedBox(height: AppSpacing.sm),
         // Filter Chips Horizontal Scroll View
         SizedBox(
@@ -199,7 +203,11 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen>
                 selected: isSelected,
                 showCheckmark: false,
                 avatar: isSelected
-                    ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      )
                     : null,
                 labelStyle: TextStyle(
                   color: isSelected ? Colors.white : AppColors.foreground,
@@ -247,9 +255,9 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen>
                     ? "All Reports"
                     : "${statusLabels[_statusFilter] ?? _statusFilter} Reports",
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.foreground,
-                    ),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.foreground,
+                ),
               ),
               const SizedBox(width: 6),
               Container(
@@ -261,9 +269,9 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen>
                 child: Text(
                   "${_reports.length}",
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const Spacer(),
@@ -273,7 +281,9 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen>
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                   ),
                 )
               else
@@ -291,9 +301,9 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen>
                     Text(
                       "Live updates",
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppColors.mutedForeground,
-                            fontSize: 11,
-                          ),
+                        color: AppColors.mutedForeground,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -317,76 +327,76 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen>
                     itemBuilder: (_, __) => const _ReportCardSkeleton(),
                   )
                 : _errorMessage != null
-                    ? ListView(
-                        children: [
-                          const SizedBox(height: 100),
-                          AppEmptyState(
-                            icon: Icons.cloud_off_outlined,
-                            title: "Unable to load reports",
-                            subtitle: _errorMessage!,
-                            action: OutlinedButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  _loading = true;
-                                });
-                                _loadReports();
-                              },
-                              icon: const Icon(Icons.refresh_rounded, size: 16),
-                              label: const Text("Retry"),
-                            ),
-                          ),
-                        ],
-                      )
-                    : _reports.isEmpty
-                        ? ListView(
-                            children: [
-                              const SizedBox(height: 100),
-                              AppEmptyState(
-                                icon: Icons.assignment_outlined,
-                                title: _statusFilter.isEmpty
-                                    ? "No reports submitted yet"
-                                    : "No ${_statusFilter.toLowerCase().replaceAll('_', ' ')} reports",
-                                subtitle: _statusFilter.isEmpty
-                                    ? "Create your first report to start tracking waste cleanup."
-                                    : "Try changing your status filter to see other reports.",
-                                action: _statusFilter.isNotEmpty
-                                    ? OutlinedButton.icon(
-                                        onPressed: () {
-                                          setState(() {
-                                            _statusFilter = "";
-                                            _loading = true;
-                                          });
-                                          _loadReports();
-                                        },
-                                        icon: const Icon(
-                                          Icons.filter_alt_off_outlined,
-                                          size: 16,
-                                        ),
-                                        label: const Text("Clear Status Filter"),
-                                      )
-                                    : null,
-                              ),
-                            ],
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.md,
-                              AppSpacing.xs,
-                              AppSpacing.md,
-                              AppSpacing.md,
-                            ),
-                            itemCount: _reports.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: AppSpacing.xs),
-                            itemBuilder: (context, index) {
-                              final report = _reports[index];
-                              return _ReportCardItem(
-                                report: report,
-                                dateFormat: _dateFormat,
-                                onTap: () => _showReportDetail(report),
-                              );
-                            },
-                          ),
+                ? ListView(
+                    children: [
+                      const SizedBox(height: 100),
+                      AppEmptyState(
+                        icon: Icons.cloud_off_outlined,
+                        title: "Unable to load reports",
+                        subtitle: _errorMessage!,
+                        action: OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _loading = true;
+                            });
+                            _loadReports();
+                          },
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: const Text("Retry"),
+                        ),
+                      ),
+                    ],
+                  )
+                : _reports.isEmpty
+                ? ListView(
+                    children: [
+                      const SizedBox(height: 100),
+                      AppEmptyState(
+                        icon: Icons.assignment_outlined,
+                        title: _statusFilter.isEmpty
+                            ? "No reports submitted yet"
+                            : "No ${_statusFilter.toLowerCase().replaceAll('_', ' ')} reports",
+                        subtitle: _statusFilter.isEmpty
+                            ? "Create your first report to start tracking waste cleanup."
+                            : "Try changing your status filter to see other reports.",
+                        action: _statusFilter.isNotEmpty
+                            ? OutlinedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _statusFilter = "";
+                                    _loading = true;
+                                  });
+                                  _loadReports();
+                                },
+                                icon: const Icon(
+                                  Icons.filter_alt_off_outlined,
+                                  size: 16,
+                                ),
+                                label: const Text("Clear Status Filter"),
+                              )
+                            : null,
+                      ),
+                    ],
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.xs,
+                      AppSpacing.md,
+                      AppSpacing.md,
+                    ),
+                    itemCount: _reports.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: AppSpacing.xs),
+                    itemBuilder: (context, index) {
+                      final report = _reports[index];
+                      return _ReportCardItem(
+                        report: report,
+                        dateFormat: _dateFormat,
+                        onTap: () => _showReportDetail(report),
+                      );
+                    },
+                  ),
           ),
         ),
       ],
@@ -413,8 +423,9 @@ class _ReportCardItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusColor = AppColors.statusColor(report.status);
     final categoryColor = AppColors.categoryColor(report.category);
-    final reportImages =
-        report.images.where((i) => i.type == "REPORT").toList();
+    final reportImages = report.images
+        .where((i) => i.type == "REPORT")
+        .toList();
     final hasImage = reportImages.isNotEmpty;
 
     return Container(
@@ -451,7 +462,10 @@ class _ReportCardItem extends StatelessWidget {
                             reportImages.first.imageUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Container(
-                              color: AppColors.tint(categoryColor, opacity: 0.12),
+                              color: AppColors.tint(
+                                categoryColor,
+                                opacity: 0.12,
+                              ),
                               child: Icon(
                                 _getCategoryIcon(report.category),
                                 color: categoryColor,
@@ -485,7 +499,8 @@ class _ReportCardItem extends StatelessWidget {
                               child: Row(
                                 children: [
                                   AppStatusPill(
-                                    label: statusLabels[report.status] ??
+                                    label:
+                                        statusLabels[report.status] ??
                                         report.status,
                                     color: statusColor,
                                     icon: _getStatusIcon(report.status),
@@ -493,8 +508,9 @@ class _ReportCardItem extends StatelessWidget {
                                   if (report.category != "with_waste") ...[
                                     const SizedBox(width: 6),
                                     AppStatusPill(
-                                      label: wasteCategoryLabels[
-                                              report.category] ??
+                                      label:
+                                          wasteCategoryLabels[report
+                                              .category] ??
                                           report.category,
                                       color: categoryColor,
                                     ),
@@ -527,7 +543,8 @@ class _ReportCardItem extends StatelessWidget {
                         report.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
                               letterSpacing: -0.2,
@@ -541,10 +558,10 @@ class _ReportCardItem extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.mutedForeground,
-                              height: 1.25,
-                              fontSize: 12,
-                            ),
+                          color: AppColors.mutedForeground,
+                          height: 1.25,
+                          fontSize: 12,
+                        ),
                       ),
                       const SizedBox(height: 8),
 
@@ -565,9 +582,7 @@ class _ReportCardItem extends StatelessWidget {
                                   : "${report.latitude.toStringAsFixed(4)}, ${report.longitude.toStringAsFixed(4)}",
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
+                              style: Theme.of(context).textTheme.labelSmall
                                   ?.copyWith(
                                     color: AppColors.mutedForeground,
                                     fontSize: 11,
@@ -583,9 +598,7 @@ class _ReportCardItem extends StatelessWidget {
                           const SizedBox(width: 3),
                           Text(
                             dateFormat.format(report.createdAt),
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
+                            style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
                                   color: AppColors.mutedForeground,
                                   fontSize: 11,
@@ -691,10 +704,7 @@ class _ReportCardSkeleton extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ReportDetailSheet extends StatelessWidget {
-  const _ReportDetailSheet({
-    required this.report,
-    required this.detailFormat,
-  });
+  const _ReportDetailSheet({required this.report, required this.detailFormat});
 
   final ReportRecord report;
   final DateFormat detailFormat;
@@ -717,9 +727,7 @@ class _ReportDetailSheet extends StatelessWidget {
             IconButton(
               onPressed: () => Navigator.of(ctx).pop(),
               icon: const Icon(Icons.close, color: Colors.white, size: 28),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.black54,
-              ),
+              style: IconButton.styleFrom(backgroundColor: Colors.black54),
             ),
           ],
         ),
@@ -731,10 +739,12 @@ class _ReportDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusColor = AppColors.statusColor(report.status);
     final categoryColor = AppColors.categoryColor(report.category);
-    final reportImages =
-        report.images.where((i) => i.type == "REPORT").toList();
-    final cleanupImages =
-        report.images.where((i) => i.type == "CLEANUP").toList();
+    final reportImages = report.images
+        .where((i) => i.type == "REPORT")
+        .toList();
+    final cleanupImages = report.images
+        .where((i) => i.type == "CLEANUP")
+        .toList();
 
     return DraggableScrollableSheet(
       initialChildSize: 0.65,
@@ -776,13 +786,13 @@ class _ReportDetailSheet extends StatelessWidget {
                       runSpacing: AppSpacing.xs,
                       children: [
                         AppStatusPill(
-                          label:
-                              statusLabels[report.status] ?? report.status,
+                          label: statusLabels[report.status] ?? report.status,
                           color: statusColor,
                           icon: _getStatusIcon(report.status),
                         ),
                         AppStatusPill(
-                          label: wasteCategoryLabels[report.category] ??
+                          label:
+                              wasteCategoryLabels[report.category] ??
                               report.category,
                           color: categoryColor,
                         ),
@@ -792,8 +802,8 @@ class _ReportDetailSheet extends StatelessWidget {
                             color: report.severity == "CRITICAL"
                                 ? AppColors.destructive
                                 : report.severity == "HIGH"
-                                    ? AppColors.warning
-                                    : AppColors.mutedForeground,
+                                ? AppColors.warning
+                                : AppColors.mutedForeground,
                           ),
                         if (report.isAnonymous)
                           const AppStatusPill(
@@ -809,9 +819,9 @@ class _ReportDetailSheet extends StatelessWidget {
                     Text(
                       report.title,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.4,
-                          ),
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
 
@@ -827,9 +837,7 @@ class _ReportDetailSheet extends StatelessWidget {
                         children: [
                           Text(
                             "ANALYSIS DETAILS",
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
+                            style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
                                   color: AppColors.mutedForeground,
                                   fontWeight: FontWeight.bold,
@@ -839,9 +847,9 @@ class _ReportDetailSheet extends StatelessWidget {
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             report.displayDescription,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  height: 1.4,
-                                ),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(height: 1.4),
                           ),
                         ],
                       ),
@@ -863,14 +871,15 @@ class _ReportDetailSheet extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.location_on,
-                                    size: 18, color: AppColors.primary),
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 18,
+                                  color: AppColors.primary,
+                                ),
                                 const SizedBox(width: AppSpacing.xs),
                                 Text(
                                   "Location Details",
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleSmall
+                                  style: Theme.of(context).textTheme.titleSmall
                                       ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                               ],
@@ -885,15 +894,16 @@ class _ReportDetailSheet extends StatelessWidget {
                             const SizedBox(height: AppSpacing.xs),
                             Row(
                               children: [
-                                const Icon(Icons.my_location_outlined,
-                                    size: 14, color: AppColors.mutedForeground),
+                                const Icon(
+                                  Icons.my_location_outlined,
+                                  size: 14,
+                                  color: AppColors.mutedForeground,
+                                ),
                                 const SizedBox(width: AppSpacing.xs),
                                 Text(
                                   "${report.latitude.toStringAsFixed(5)}, "
                                   "${report.longitude.toStringAsFixed(5)}",
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
+                                  style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
                                         color: AppColors.mutedForeground,
                                       ),
@@ -945,14 +955,15 @@ class _ReportDetailSheet extends StatelessWidget {
                       const SizedBox(height: AppSpacing.lg),
                       Row(
                         children: [
-                          const Icon(Icons.photo_library_outlined,
-                              size: 18, color: AppColors.foreground),
+                          const Icon(
+                            Icons.photo_library_outlined,
+                            size: 18,
+                            color: AppColors.foreground,
+                          ),
                           const SizedBox(width: AppSpacing.xs),
                           Text(
                             "Report Photos (${reportImages.length})",
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
+                            style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -967,7 +978,9 @@ class _ReportDetailSheet extends StatelessWidget {
                               const SizedBox(width: AppSpacing.xs),
                           itemBuilder: (_, i) => GestureDetector(
                             onTap: () => _showImagePreview(
-                                context, reportImages[i].imageUrl),
+                              context,
+                              reportImages[i].imageUrl,
+                            ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: Image.network(
@@ -979,8 +992,10 @@ class _ReportDetailSheet extends StatelessWidget {
                                   width: 130,
                                   height: 130,
                                   color: AppColors.secondary,
-                                  child: const Icon(Icons.broken_image,
-                                      color: AppColors.mutedForeground),
+                                  child: const Icon(
+                                    Icons.broken_image,
+                                    color: AppColors.mutedForeground,
+                                  ),
                                 ),
                               ),
                             ),
@@ -994,14 +1009,15 @@ class _ReportDetailSheet extends StatelessWidget {
                       const SizedBox(height: AppSpacing.lg),
                       Row(
                         children: [
-                          const Icon(Icons.task_alt_rounded,
-                              size: 18, color: AppColors.success),
+                          const Icon(
+                            Icons.task_alt_rounded,
+                            size: 18,
+                            color: AppColors.success,
+                          ),
                           const SizedBox(width: AppSpacing.xs),
                           Text(
                             "Cleanup Proof Photos (${cleanupImages.length})",
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
+                            style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.success,
@@ -1019,7 +1035,9 @@ class _ReportDetailSheet extends StatelessWidget {
                               const SizedBox(width: AppSpacing.xs),
                           itemBuilder: (_, i) => GestureDetector(
                             onTap: () => _showImagePreview(
-                                context, cleanupImages[i].imageUrl),
+                              context,
+                              cleanupImages[i].imageUrl,
+                            ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: Image.network(
@@ -1031,8 +1049,10 @@ class _ReportDetailSheet extends StatelessWidget {
                                   width: 130,
                                   height: 130,
                                   color: AppColors.secondary,
-                                  child: const Icon(Icons.broken_image,
-                                      color: AppColors.mutedForeground),
+                                  child: const Icon(
+                                    Icons.broken_image,
+                                    color: AppColors.mutedForeground,
+                                  ),
                                 ),
                               ),
                             ),
@@ -1075,18 +1095,16 @@ class _DetailRow extends StatelessWidget {
         const SizedBox(width: AppSpacing.xs),
         Text(
           label,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: AppColors.mutedForeground),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.mutedForeground),
         ),
         const Spacer(),
         Text(
           value,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(fontWeight: FontWeight.w600),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
         ),
       ],
     );

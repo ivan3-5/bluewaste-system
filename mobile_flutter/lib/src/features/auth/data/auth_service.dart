@@ -6,18 +6,38 @@ import "../../../core/providers.dart";
 import "../domain/app_user.dart";
 
 class AuthSession {
-  const AuthSession({required this.token, required this.user});
+  const AuthSession({
+    required this.token,
+    required this.user,
+    this.refreshToken,
+  });
 
   final String token;
   final AppUser user;
+  final String? refreshToken;
 
-  factory AuthSession.fromJson(Map<String, dynamic> json) {
+  factory AuthSession.fromJson(
+    Map<String, dynamic> json, {
+    String? refreshToken,
+  }) {
     return AuthSession(
       token: (json["token"] ?? "").toString(),
       user: AppUser.fromJson(
-          (json["user"] ?? <String, dynamic>{}) as Map<String, dynamic>),
+        (json["user"] ?? <String, dynamic>{}) as Map<String, dynamic>,
+      ),
+      refreshToken: refreshToken,
     );
   }
+}
+
+/// The backend delivers the refresh token only as an HttpOnly cookie.
+String? extractRefreshToken(Headers headers) {
+  final cookies = headers.map["set-cookie"];
+  if (cookies == null) return null;
+  final match = RegExp(
+    r"refresh_token=([^;,\s]+)",
+  ).firstMatch(cookies.join(","));
+  return match?.group(1);
 }
 
 class AuthService {
@@ -32,13 +52,13 @@ class AuthService {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         "/auth/login",
-        data: {
-          "email": email,
-          "password": password,
-        },
+        data: {"email": email, "password": password},
       );
 
-      return AuthSession.fromJson(response.data ?? <String, dynamic>{});
+      return AuthSession.fromJson(
+        response.data ?? <String, dynamic>{},
+        refreshToken: extractRefreshToken(response.headers),
+      );
     } on DioException catch (error) {
       throw ApiException.fromDioError(error);
     }
@@ -65,7 +85,10 @@ class AuthService {
         },
       );
 
-      return AuthSession.fromJson(response.data ?? <String, dynamic>{});
+      return AuthSession.fromJson(
+        response.data ?? <String, dynamic>{},
+        refreshToken: extractRefreshToken(response.headers),
+      );
     } on DioException catch (error) {
       throw ApiException.fromDioError(error);
     }
