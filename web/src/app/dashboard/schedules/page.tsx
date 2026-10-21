@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
 import { SchedulePageSkeleton } from "@/components/skeletons/page-skeletons";
-import { ADMIN_ALLOWED_BARANGAY_NAMES } from "@/lib/adminBarangays";
+
 
 // Dynamically load Leaflet Map without SSR to prevent window errors
 const ScheduleMap = dynamic(
@@ -67,7 +67,6 @@ export default function SchedulesPage() {
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [barangayFilter, setBarangayFilter] = useState<string>("ALL");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Queries
@@ -225,29 +224,17 @@ export default function SchedulesPage() {
         }
       }
 
-      // Barangay filter
-      if (barangayFilter !== "ALL") {
-        if (
-          !schedule.barangay ||
-          !schedule.barangay.toLowerCase().includes(barangayFilter.toLowerCase())
-        ) {
-          return false;
-        }
-      }
-
       return true;
     });
-  }, [schedulesData, searchQuery, statusFilter, barangayFilter]);
+  }, [schedulesData, searchQuery, statusFilter]);
 
   const hasActiveFilters =
     searchQuery.trim() !== "" ||
-    statusFilter !== "ALL" ||
-    barangayFilter !== "ALL";
+    statusFilter !== "ALL";
 
   const clearAllFilters = () => {
     setSearchQuery("");
     setStatusFilter("ALL");
-    setBarangayFilter("ALL");
   };
 
   return (
@@ -303,7 +290,7 @@ export default function SchedulesPage() {
               className="flex-1 sm:flex-none h-11 px-6 gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/25 transition-all duration-200 hover:scale-[1.02] active:scale-95 rounded-2xl font-bold text-sm border-none"
             >
               <Plus className="w-5 h-5 stroke-[2.5]" />
-              Deploy New Schedule
+              Create Cleanup Schedule
             </Button>
           </div>
         </div>
@@ -472,22 +459,6 @@ export default function SchedulesPage() {
               <option value="ONGOING">Ongoing</option>
               <option value="COMPLETED">Completed</option>
               <option value="CANCELLED">Cancelled</option>
-            </select>
-          </div>
-
-          {/* Barangay Filter */}
-          <div className="relative shrink-0">
-            <select
-              value={barangayFilter}
-              onChange={(e) => setBarangayFilter(e.target.value)}
-              className="h-10 rounded-2xl border border-gray-200/90 bg-gray-50/60 px-3.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-            >
-              <option value="ALL">All Barangays</option>
-              {ADMIN_ALLOWED_BARANGAY_NAMES.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
             </select>
           </div>
 

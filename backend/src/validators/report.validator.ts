@@ -98,6 +98,7 @@ export const reportFilterSchema = z.object({
     .optional(),
   category: z.enum(["with_waste", "no_waste"]).optional(),
   isSpam: z.enum(["true", "false"]).optional(),
+  hasCleanupSchedule: z.enum(["true", "false"]).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   search: z.string().max(200).optional(),

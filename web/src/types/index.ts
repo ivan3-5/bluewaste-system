@@ -47,6 +47,13 @@ export interface Report {
     phone?: string;
   };
   assignedWorkers?: ReportWorker[];
+  cleanupScheduleId?: string | null;
+  cleanupSchedule?: {
+    id: string;
+    title: string;
+    status: string;
+    scheduledAt: string;
+  } | null;
   images: ReportImage[];
   statusHistory?: StatusHistory[];
   _count?: { images: number; statusHistory?: number };

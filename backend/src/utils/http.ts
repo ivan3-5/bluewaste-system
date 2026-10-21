@@ -53,6 +53,13 @@ export function handleControllerError(
   if (message === "Report is marked as spam") return sendError(res, 400, message, "REPORT_SPAM");
   if (message === "One or more worker IDs are invalid") return sendError(res, 400, message, "INVALID_WORKER_IDS");
   if (message === "Cannot create schedule for a past date") return sendError(res, 400, message, "SCHEDULE_VALIDATION_FAILED");
+  if (
+    message.startsWith("Cannot create schedule:") ||
+    message.startsWith("Cannot update schedule:") ||
+    message.includes("already assigned to")
+  ) {
+    return sendError(res, 400, message, "REPORT_ALREADY_SCHEDULED");
+  }
   if (message === "Zone name is required" || message.startsWith("A zone needs")) {
     return sendError(res, 400, message, "ZONE_VALIDATION_FAILED");
   }

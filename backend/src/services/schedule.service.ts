@@ -74,6 +74,49 @@ export class ScheduleService {
       throw new Error("Cannot create schedule for a past date");
     }
 
+    // Validate that none of the selected waste reports are already assigned to a cleanup schedule
+    if (data.reportIds && data.reportIds.length > 0) {
+      const existingReports = await prisma.report.findMany({
+        where: {
+          id: { in: data.reportIds },
+          isDeleted: false,
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          cleanupScheduleId: true,
+          cleanupSchedule: {
+            select: { id: true, title: true },
+          },
+        },
+      });
+
+      if (existingReports.length !== data.reportIds.length) {
+        throw new Error("One or more selected waste reports do not exist or were deleted");
+      }
+
+      const alreadyAssigned = existingReports.filter(
+        (r) =>
+          r.cleanupScheduleId !== null ||
+          r.status === "CLEANUP_SCHEDULED" ||
+          r.status === "IN_PROGRESS" ||
+          r.status === "CLEANED",
+      );
+
+      if (alreadyAssigned.length > 0) {
+        const conflictTitles = alreadyAssigned
+          .map(
+            (r) =>
+              `"${r.title}" (already in "${r.cleanupSchedule?.title || r.status}")`,
+          )
+          .join(", ");
+        throw new Error(
+          `Cannot create schedule: Waste report(s) already assigned to a cleanup schedule: ${conflictTitles}`,
+        );
+      }
+    }
+
     const schedule = await prisma.cleanupSchedule.create({
       data: {
         title: data.title,
@@ -203,6 +246,70 @@ export class ScheduleService {
     if (data.equipment !== undefined) updateData.equipment = data.equipment;
 
     if (data.reportIds !== undefined) {
+      if (data.reportIds.length > 0) {
+        const existingReports = await prisma.report.findMany({
+          where: {
+            id: { in: data.reportIds },
+            isDeleted: false,
+          },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            cleanupScheduleId: true,
+            cleanupSchedule: {
+              select: { id: true, title: true },
+            },
+          },
+        });
+
+        if (existingReports.length !== data.reportIds.length) {
+          throw new Error("One or more selected waste reports do not exist or were deleted");
+        }
+
+        // Validate that none of the reports belong to another cleanup schedule
+        const assignedToOther = existingReports.filter(
+          (r) => r.cleanupScheduleId !== null && r.cleanupScheduleId !== id,
+        );
+
+        if (assignedToOther.length > 0) {
+          const conflictTitles = assignedToOther
+            .map(
+              (r) =>
+                `"${r.title}" (assigned to "${r.cleanupSchedule?.title || "another schedule"}")`,
+            )
+            .join(", ");
+          throw new Error(
+            `Cannot update schedule: Waste report(s) are already assigned to another cleanup schedule: ${conflictTitles}`,
+          );
+        }
+      }
+
+      // Handle unlinking: any report currently linked to this schedule that is removed must be reverted to VERIFIED
+      const currentLinkedReports = await prisma.report.findMany({
+        where: { cleanupScheduleId: id },
+        select: { id: true },
+      });
+      const currentLinkedIds = currentLinkedReports.map((r) => r.id);
+      const unassignedReportIds = currentLinkedIds.filter(
+        (rId) => !data.reportIds!.includes(rId),
+      );
+
+      if (unassignedReportIds.length > 0) {
+        await prisma.report.updateMany({
+          where: { id: { in: unassignedReportIds } },
+          data: { status: "VERIFIED", cleanupScheduleId: null },
+        });
+
+        const unassignHistory = unassignedReportIds.map((reportId) => ({
+          reportId,
+          newStatus: "VERIFIED" as const,
+          notes: `Unlinked from Cleanup Schedule "${data.title ?? existing.title}". Returned to verified pool.`,
+          changedById: adminId,
+        }));
+        await prisma.statusHistory.createMany({ data: unassignHistory });
+      }
+
       updateData.reports = {
         set: data.reportIds.map((id) => ({ id })),
       };
@@ -367,6 +474,25 @@ export class ScheduleService {
         }));
         await prisma.statusHistory.createMany({ data: historyData });
       }
+    } else if (status === "CANCELLED") {
+      const reports = await prisma.report.findMany({
+        where: { cleanupScheduleId: id },
+      });
+
+      if (reports.length > 0) {
+        await prisma.report.updateMany({
+          where: { cleanupScheduleId: id },
+          data: { status: "VERIFIED", cleanupScheduleId: null },
+        });
+
+        const historyData = reports.map((r) => ({
+          reportId: r.id,
+          newStatus: "VERIFIED" as const,
+          notes: `Cleanup Schedule cancelled (${notes || "No reason specified"}). Report returned to verified pool.`,
+          changedById: userId,
+        }));
+        await prisma.statusHistory.createMany({ data: historyData });
+      }
     }
 
     // Notify assigned workers about status change
@@ -400,6 +526,12 @@ export class ScheduleService {
     if (!existing) {
       throw new Error("Schedule not found");
     }
+
+    // Revert any linked reports back to VERIFIED and clear their cleanupScheduleId
+    await prisma.report.updateMany({
+      where: { cleanupScheduleId: id },
+      data: { status: "VERIFIED", cleanupScheduleId: null },
+    });
 
     await prisma.cleanupSchedule.delete({ where: { id } });
 

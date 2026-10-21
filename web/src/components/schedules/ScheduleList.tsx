@@ -42,7 +42,7 @@ export function ScheduleList({
           No Cleanup Operations Found
         </h3>
         <p className="text-gray-500 text-sm mt-1 max-w-sm">
-          No operations match the selected criteria. Adjust your search or deploy
+          No operations match the selected criteria. Adjust your search or create
           a new cleanup schedule.
         </p>
       </div>
@@ -90,7 +90,7 @@ export function ScheduleList({
               <tr>
                 <th className="px-6 py-4">Operation & Site</th>
                 <th className="px-6 py-4">Scheduled Window</th>
-                <th className="px-6 py-4">Field Crew</th>
+                <th className="px-6 py-4">Assigned Workers</th>
                 <th className="px-6 py-4">Equipment & Reports</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Action</th>

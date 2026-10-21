@@ -104,6 +104,27 @@ export class ReportCrudService {
             ? data.aiReason
             : "Waste report submitted via mobile capture.";
 
+      let resolvedAddress = data.address?.trim() || null;
+      if (!resolvedAddress || resolvedAddress.toLowerCase().startsWith("waste report")) {
+        try {
+          const geoRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${data.latitude}&lon=${data.longitude}&zoom=18&addressdetails=1`,
+            {
+              headers: { "User-Agent": "BlueWaste-System/1.0" },
+              signal: AbortSignal.timeout(3000),
+            }
+          );
+          if (geoRes.ok) {
+            const geoData = (await geoRes.json()) as any;
+            if (geoData?.display_name) {
+              resolvedAddress = geoData.display_name;
+            }
+          }
+        } catch {
+          // fallback to null if geocoding fails or times out
+        }
+      }
+
       const created = await tx.report.create({
         data: {
           title: data.title,
@@ -111,7 +132,7 @@ export class ReportCrudService {
           category: data.category,
           latitude: data.latitude,
           longitude: data.longitude,
-          address: data.address,
+          address: resolvedAddress,
           isAnonymous: Boolean(data.isAnonymous || !data.reporterId),
           isSpam,
           spamMarkedAt: isSpam ? new Date() : null,
@@ -428,6 +449,7 @@ export class ReportCrudService {
     status?: ReportStatus;
     category?: WasteCategory;
     isSpam?: string;
+    hasCleanupSchedule?: string;
     startDate?: string;
     endDate?: string;
     search?: string;
@@ -454,6 +476,12 @@ export class ReportCrudService {
 
     if (filters.status) where.status = filters.status;
     if (filters.category) where.category = filters.category;
+
+    if (filters.hasCleanupSchedule === "true") {
+      where.cleanupScheduleId = { not: null };
+    } else if (filters.hasCleanupSchedule === "false") {
+      where.cleanupScheduleId = null;
+    }
 
     const createdAt: Prisma.DateTimeFilter = {};
     if (filters.startDate) {
@@ -541,6 +569,14 @@ export class ReportCrudService {
               },
             },
             orderBy: { assignedAt: "asc" },
+          },
+          cleanupSchedule: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              scheduledAt: true,
+            },
           },
           images: { take: 1 },
           _count: { select: { images: true, statusHistory: true } },

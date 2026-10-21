@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -125,27 +125,30 @@ export function ScheduleDetail({
   const { data: eligibleReports = [], isFetching: fetchingReports } = useQuery({
     queryKey: ["reports", "eligible-for-schedule"],
     queryFn: async () => {
-      const [verified, scheduled] = await Promise.all([
-        api.get("/reports?status=VERIFIED&limit=100"),
-        api.get("/reports?status=CLEANUP_SCHEDULED&limit=100"),
-      ]);
-      const combined = [
-        ...(verified.data.data as Report[]),
-        ...(scheduled.data.data as Report[]),
-      ];
-      return combined.filter(
-        (r, i, arr) => arr.findIndex((x) => x.id === r.id) === i,
+      // Only fetch verified reports not yet assigned to any cleanup schedule
+      const res = await api.get(
+        "/reports?status=VERIFIED&hasCleanupSchedule=false&limit=100",
       );
+      const list = (res.data.data as Report[]) || [];
+      return list.filter((r) => !r.cleanupScheduleId);
     },
     enabled: isLinkingReports,
   });
 
+  const availableReportsToLink = useMemo(() => {
+    const currentReports = (schedule.reports ?? []) as Report[];
+    const unassigned = eligibleReports.filter(
+      (er) =>
+        !er.cleanupScheduleId &&
+        !currentReports.some((cr: any) => cr.id === er.id),
+    );
+    return [...currentReports, ...unassigned];
+  }, [schedule.reports, eligibleReports]);
+
   const linkReportsMutation = useMutation({
     mutationFn: async (reportIds: string[]) => {
-      const existingIds = (schedule.reports ?? []).map((r: any) => r.id);
-      const mergedIds = Array.from(new Set([...existingIds, ...reportIds]));
       const res = await api.put(`/schedules/${schedule.id}`, {
-        reportIds: mergedIds,
+        reportIds,
         workerIds: schedule.workers.map((w) => w.workerId),
         title: schedule.title,
         description: schedule.description,
@@ -327,7 +330,7 @@ export function ScheduleDetail({
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-indigo-500" />
-                  Assigned Field Crew ({schedule.workers.length})
+                  Assigned Field Workers ({schedule.workers.length})
                 </h4>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -335,7 +338,7 @@ export function ScheduleDetail({
                   <div className="col-span-2 p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs font-medium flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                     No field workers assigned yet. Click &quot;Edit Operation&quot; to
-                    assign crew members.
+                    assign field workers.
                   </div>
                 ) : (
                   schedule.workers.map((w) => (
@@ -375,7 +378,7 @@ export function ScheduleDetail({
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-indigo-500" />
-                  Linked Waste Reports ({schedule.reports?.length || 0})
+                  Waste Reports ({schedule.reports?.length || 0})
                 </h4>
                 {isAdmin && !isLinkingReports && (
                   <button
@@ -406,43 +409,73 @@ export function ScheduleDetail({
                     <p className="text-xs text-gray-500 py-3 animate-pulse">
                       Loading eligible reports...
                     </p>
-                  ) : eligibleReports.length === 0 ? (
+                  ) : availableReportsToLink.length === 0 ? (
                     <p className="text-xs text-gray-500 py-2">
-                      No eligible waste reports found.
+                      No eligible unassigned waste reports found.
                     </p>
                   ) : (
                     <div className="max-h-56 overflow-y-auto space-y-1.5 bg-white p-2 rounded-xl border border-indigo-100">
-                      {eligibleReports.map((r) => (
-                        <label
-                          key={r.id}
-                          className="flex items-center gap-3 p-2 rounded-xl hover:bg-indigo-50/50 cursor-pointer transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={linkDraftIds.includes(r.id)}
-                            onChange={() => toggleLinkDraft(r.id)}
-                            className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                          />
-                          {r.images?.[0]?.imageUrl && (
-                            <Image
-                              src={r.images[0].imageUrl}
-                              alt={r.title}
-                              width={40}
-                              height={40}
-                              unoptimized
-                              className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-gray-200"
+                      {availableReportsToLink.map((r) => {
+                        const isAssignedToOther = Boolean(
+                          r.cleanupScheduleId && r.cleanupScheduleId !== schedule.id,
+                        );
+                        const isDraftChecked = linkDraftIds.includes(r.id);
+                        return (
+                          <label
+                            key={r.id}
+                            className={`flex items-center gap-3 p-2 rounded-xl transition-colors ${
+                              isAssignedToOther
+                                ? "opacity-50 cursor-not-allowed bg-gray-50"
+                                : "hover:bg-indigo-50/50 cursor-pointer"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isDraftChecked}
+                              disabled={isAssignedToOther}
+                              onChange={() => {
+                                if (!isAssignedToOther) {
+                                  toggleLinkDraft(r.id);
+                                }
+                              }}
+                              className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 disabled:opacity-40"
                             />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-gray-900 truncate">
-                              {r.title}
-                            </p>
-                            <p className="text-[11px] text-gray-500 truncate">
-                              {r.address || schedule.barangay} • {r.status}
-                            </p>
-                          </div>
-                        </label>
-                      ))}
+                            {r.images?.[0]?.imageUrl && (
+                              <Image
+                                src={r.images[0].imageUrl}
+                                alt={r.title}
+                                width={40}
+                                height={40}
+                                unoptimized
+                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-gray-200"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs font-bold text-gray-900 truncate">
+                                  {r.title}
+                                </p>
+                                {isAssignedToOther ? (
+                                  <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                                    Already Scheduled
+                                  </span>
+                                ) : isDraftChecked ? (
+                                  <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    Selected
+                                  </span>
+                                ) : (
+                                  <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    Available
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                                {r.address || schedule.barangay} • {r.status}
+                              </p>
+                            </div>
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
                   <div className="flex gap-2 justify-end pt-1">

@@ -7,11 +7,12 @@ import {
   useMarkAllAsRead,
 } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn, timeAgo } from "@/lib/utils";
 import Link from "next/link";
 import {
   Bell,
-  ClipboardList,
+  BellRing,
   RefreshCw,
   HardHat,
   Settings,
@@ -20,87 +21,158 @@ import {
   CheckCheck,
   Eye,
   Radio,
+  Search,
+  X,
+  Filter,
+  ShieldCheck,
+  FileText,
+  Activity,
+  ArrowRight,
+  Inbox,
+  Sparkles,
+  Layers,
+  Clock,
 } from "lucide-react";
 import {
   NotificationListSkeleton,
   PageHeadingSkeleton,
 } from "@/components/skeletons/page-skeletons";
+import { format } from "date-fns";
 
-/* ── Type-based icon & colour config ── */
+/* ── Type Configuration & Visual Tokens ───────────────────────────────────────── */
 const typeConfig: Record<
   string,
-  { icon: React.ReactNode; bg: string; ring: string }
+  {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    gradientBg: string;
+    borderAccent: string;
+    pillBg: string;
+    pillText: string;
+    pillBorder: string;
+  }
 > = {
   NEW_REPORT: {
-    icon: <ClipboardList className="w-4 h-4 text-white" />,
-    bg: "bg-blue-500",
-    ring: "ring-blue-500/20",
+    icon: FileText,
+    label: "New Report",
+    gradientBg: "from-blue-600 via-indigo-600 to-blue-700 shadow-blue-500/20",
+    borderAccent: "border-l-blue-600",
+    pillBg: "bg-blue-50",
+    pillText: "text-blue-700",
+    pillBorder: "border-blue-200/80",
   },
   STATUS_CHANGE: {
-    icon: <RefreshCw className="w-4 h-4 text-white" />,
-    bg: "bg-amber-500",
-    ring: "ring-amber-500/20",
+    icon: RefreshCw,
+    label: "Status Update",
+    gradientBg: "from-amber-500 via-orange-500 to-amber-600 shadow-amber-500/20",
+    borderAccent: "border-l-amber-500",
+    pillBg: "bg-amber-50",
+    pillText: "text-amber-800",
+    pillBorder: "border-amber-200/80",
   },
   ASSIGNMENT: {
-    icon: <HardHat className="w-4 h-4 text-white" />,
-    bg: "bg-emerald-500",
-    ring: "ring-emerald-500/20",
+    icon: HardHat,
+    label: "Assignment",
+    gradientBg: "from-emerald-500 via-teal-600 to-emerald-700 shadow-emerald-500/20",
+    borderAccent: "border-l-emerald-600",
+    pillBg: "bg-emerald-50",
+    pillText: "text-emerald-800",
+    pillBorder: "border-emerald-200/80",
   },
   SYSTEM: {
-    icon: <Settings className="w-4 h-4 text-white" />,
-    bg: "bg-slate-500",
-    ring: "ring-slate-500/20",
+    icon: Settings,
+    label: "System Alert",
+    gradientBg: "from-slate-600 via-gray-700 to-slate-800 shadow-slate-500/20",
+    borderAccent: "border-l-slate-500",
+    pillBg: "bg-slate-50",
+    pillText: "text-slate-700",
+    pillBorder: "border-slate-200/80",
   },
 };
 
-const TypeBadgeLabel: Record<string, string> = {
-  NEW_REPORT: "New Report",
-  STATUS_CHANGE: "Status Update",
-  ASSIGNMENT: "Assignment",
-  SYSTEM: "System",
-};
-
-/* ── Type filter options ── */
+/* ── Type Filter Tabs Configuration ────────────────────────────────────────── */
 const FILTER_OPTIONS = [
-  { key: "ALL", label: "All" },
-  { key: "NEW_REPORT", label: "Reports" },
-  { key: "STATUS_CHANGE", label: "Updates" },
-  { key: "ASSIGNMENT", label: "Assignments" },
-  { key: "SYSTEM", label: "System" },
+  { key: "ALL", label: "All Alerts" },
+  { key: "NEW_REPORT", label: "Waste Reports" },
+  { key: "STATUS_CHANGE", label: "Status Updates" },
+  { key: "ASSIGNMENT", label: "Crew Assignments" },
+  { key: "SYSTEM", label: "System Alerts" },
 ] as const;
 
-/* ── Date grouping helper ── */
+/* ── Date Grouping Helper ─────────────────────────────────────────────────── */
 function groupDateLabel(dateStr: string): string {
   const d = new Date(dateStr);
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
   const startOfWeek = new Date(startOfToday);
   startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
 
   if (d >= startOfToday) return "Today";
+  if (d >= startOfYesterday) return "Yesterday";
   if (d >= startOfWeek) return "This Week";
-  const month = d.toLocaleDateString("en-PH", { month: "long", year: "numeric" });
-  return month;
+  return d.toLocaleDateString("en-PH", { month: "long", year: "numeric" });
 }
 
 export default function NotificationsPage() {
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState("ALL");
+  const [readFilter, setReadFilter] = useState<"ALL" | "UNREAD" | "READ">("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+
   const { data, isLoading } = useNotifications(page);
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
 
   const notifications = useMemo(() => data?.data || [], [data?.data]);
   const pagination = data?.pagination;
-  const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
 
-  /* ── Filtered notifications ── */
+  // KPI Statistics
+  const stats = useMemo(() => {
+    const total = pagination?.total || notifications.length;
+    const unread = notifications.filter((n) => !n.isRead).length;
+    const reports = notifications.filter((n) => n.type === "NEW_REPORT").length;
+    const operations = notifications.filter(
+      (n) => n.type === "STATUS_CHANGE" || n.type === "ASSIGNMENT"
+    ).length;
+    return { total, unread, reports, operations };
+  }, [notifications, pagination?.total]);
+
+  // Filtered Notifications based on Type, Read state, and Search Query
   const filtered = useMemo(() => {
-    if (typeFilter === "ALL") return notifications;
-    return notifications.filter((n) => n.type === typeFilter);
-  }, [notifications, typeFilter]);
+    return notifications.filter((n) => {
+      // Type Filter
+      if (typeFilter !== "ALL" && n.type !== typeFilter) {
+        return false;
+      }
+      // Read/Unread Filter
+      if (readFilter === "UNREAD" && n.isRead) {
+        return false;
+      }
+      if (readFilter === "READ" && !n.isRead) {
+        return false;
+      }
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesTitle = n.title?.toLowerCase().includes(q);
+        const matchesMsg = n.message?.toLowerCase().includes(q);
+        const matchesReport = n.report?.title?.toLowerCase().includes(q);
+        if (!matchesTitle && !matchesMsg && !matchesReport) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [notifications, typeFilter, readFilter, searchQuery]);
 
-  /* ── Group by date ── */
+  // Group by Date for Timeline View
   const grouped = useMemo(() => {
     const map = new Map<string, typeof filtered>();
     for (const n of filtered) {
@@ -111,10 +183,19 @@ export default function NotificationsPage() {
     return Array.from(map.entries());
   }, [filtered]);
 
-  /* ── Loading skeleton ── */
+  const hasActiveFilters =
+    typeFilter !== "ALL" || readFilter !== "ALL" || searchQuery.trim() !== "";
+
+  const handleResetFilters = () => {
+    setTypeFilter("ALL");
+    setReadFilter("ALL");
+    setSearchQuery("");
+  };
+
+  /* ── Loading Skeleton ─────────────────────────────────────────────────────── */
   if (isLoading && !data) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-[1600px] mx-auto pb-12 animate-in fade-in duration-300">
         <PageHeadingSkeleton />
         <NotificationListSkeleton rows={6} />
       </div>
@@ -122,211 +203,483 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* ─── HEADER ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-            Notifications
-          </h1>
-          <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-            {unreadCount > 0 ? (
-              <>
+    <div className="space-y-7 pb-12 max-w-[1600px] mx-auto animate-in fade-in duration-300">
+      {/* ── 1. Top Hero Command Banner ────────────────────────────────────────── */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/40 rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-sm">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100 shadow-2xs">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                Panabo City Operations & Coastal Care
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100 shadow-2xs">
                 <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span>
-                  {unreadCount} unread notification
-                  {unreadCount !== 1 ? "s" : ""}
-                </span>
-              </>
-            ) : (
-              <>
-                <Bell className="w-3.5 h-3.5 text-gray-400" />
-                <span>All caught up</span>
-              </>
-            )}
-          </p>
-        </div>
+                Live Sync Active (5s)
+              </span>
+            </div>
 
-        {unreadCount > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => markAllAsRead.mutate()}
-            disabled={markAllAsRead.isPending}
-            className="gap-1.5 border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-all"
-          >
-            <CheckCheck className="w-4 h-4" />
-            Mark All Read
-          </Button>
-        )}
-      </div>
+            <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/25 shrink-0">
+                <BellRing className="w-5 h-5 md:w-6 md:h-6" />
+              </div>
+              Notifications Center
+            </h1>
 
-      {/* ─── REAL-TIME INDICATOR ─── */}
-      <div className="flex items-center gap-2 text-xs text-gray-400">
-        <Radio className="w-3 h-3 text-green-500" />
-        <span>Live</span>
-        <span className="w-1 h-1 rounded-full bg-gray-300" />
-        <span>Updates every 5s</span>
-      </div>
+            <p className="text-sm text-gray-500 max-w-2xl leading-relaxed">
+              Stay informed on real-time waste report submissions, coastal cleanup schedules, crew assignments, and verification milestones.
+            </p>
+          </div>
 
-      {/* ─── FILTER CHIPS ─── */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {FILTER_OPTIONS.map((opt) => (
-          <button
-            key={opt.key}
-            onClick={() => {
-              setTypeFilter(opt.key);
-              setPage(1);
-            }}
-            className={cn(
-              "px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200",
-              typeFilter === opt.key
-                ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
-                : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
-            )}
-          >
-            {opt.label}
-            {opt.key !== "ALL" &&
-              notifications.filter((n) => n.type === opt.key).length > 0 && (
-                <span
-                  className={cn(
-                    "ml-1.5 tabular-nums",
-                    typeFilter === opt.key ? "text-blue-200" : "text-gray-400"
-                  )}
-                >
-                  {notifications.filter((n) => n.type === opt.key).length}
-                </span>
+          {/* Quick Mark All Read Action */}
+          <div className="flex items-center gap-3 self-stretch sm:self-auto shrink-0">
+            <Button
+              variant={stats.unread > 0 ? "default" : "outline"}
+              onClick={() => markAllAsRead.mutate()}
+              disabled={stats.unread === 0 || markAllAsRead.isPending}
+              className={cn(
+                "w-full sm:w-auto h-11 px-5 rounded-2xl font-bold text-xs gap-2 transition-all duration-200 shadow-sm",
+                stats.unread > 0
+                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20 active:scale-95"
+                  : "bg-white text-gray-400 border-gray-200 cursor-not-allowed"
               )}
-          </button>
-        ))}
+            >
+              <CheckCheck className="w-4 h-4" />
+              {markAllAsRead.isPending
+                ? "Marking as Read..."
+                : stats.unread > 0
+                ? `Mark All Read (${stats.unread})`
+                : "All Caught Up"}
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* ─── NOTIFICATIONS LIST ─── */}
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200">
-          <div className="mb-5 relative">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-50 to-indigo-50 ring-8 ring-blue-50/50">
-              <Bell className="h-9 w-9 text-blue-400" />
+      {/* ── 2. Executive Metric KPI Cards ───────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Alerts */}
+        <div
+          onClick={() => {
+            setTypeFilter("ALL");
+            setReadFilter("ALL");
+          }}
+          className={cn(
+            "p-5 rounded-3xl border transition-all duration-200 cursor-pointer relative overflow-hidden group",
+            typeFilter === "ALL" && readFilter === "ALL"
+              ? "bg-white shadow-md border-blue-300 ring-2 ring-blue-500/10"
+              : "bg-white/80 hover:bg-white shadow-2xs hover:shadow-md border-gray-100"
+          )}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Total Alerts
+            </span>
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
+              <Bell className="w-5 h-5" />
             </div>
           </div>
-          <h3 className="text-lg font-semibold text-gray-700">
-            {typeFilter === "ALL"
-              ? "No notifications yet"
-              : "No notifications of this type"}
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-gray-900 tracking-tight">
+              {stats.total}
+            </span>
+            <span className="text-xs text-gray-400 font-medium">all time</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Full operational log</p>
+        </div>
+
+        {/* Card 2: Unread / Action Required */}
+        <div
+          onClick={() =>
+            setReadFilter(readFilter === "UNREAD" ? "ALL" : "UNREAD")
+          }
+          className={cn(
+            "p-5 rounded-3xl border transition-all duration-200 cursor-pointer relative overflow-hidden group",
+            readFilter === "UNREAD"
+              ? "bg-white shadow-md border-amber-300 ring-2 ring-amber-500/15"
+              : "bg-white/80 hover:bg-white shadow-2xs hover:shadow-md border-gray-100"
+          )}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+              {stats.unread > 0 && (
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
+              )}
+              Action Required
+            </span>
+            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
+              <BellRing className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-amber-950 tracking-tight">
+              {stats.unread}
+            </span>
+            <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+              unread
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Pending review & review</p>
+        </div>
+
+        {/* Card 3: Waste Reports */}
+        <div
+          onClick={() =>
+            setTypeFilter(typeFilter === "NEW_REPORT" ? "ALL" : "NEW_REPORT")
+          }
+          className={cn(
+            "p-5 rounded-3xl border transition-all duration-200 cursor-pointer relative overflow-hidden group",
+            typeFilter === "NEW_REPORT"
+              ? "bg-white shadow-md border-indigo-300 ring-2 ring-indigo-500/15"
+              : "bg-white/80 hover:bg-white shadow-2xs hover:shadow-md border-gray-100"
+          )}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">
+              Waste Submissions
+            </span>
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
+              <FileText className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-gray-900 tracking-tight">
+              {stats.reports}
+            </span>
+            <span className="text-xs text-gray-400 font-medium">on this page</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Citizen & field submissions</p>
+        </div>
+
+        {/* Card 4: Operations & Updates */}
+        <div
+          onClick={() =>
+            setTypeFilter(
+              typeFilter === "STATUS_CHANGE" ? "ALL" : "STATUS_CHANGE"
+            )
+          }
+          className={cn(
+            "p-5 rounded-3xl border transition-all duration-200 cursor-pointer relative overflow-hidden group",
+            typeFilter === "STATUS_CHANGE"
+              ? "bg-white shadow-md border-emerald-300 ring-2 ring-emerald-500/15"
+              : "bg-white/80 hover:bg-white shadow-2xs hover:shadow-md border-gray-100"
+          )}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
+              Crew & Milestones
+            </span>
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
+              <Activity className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-gray-900 tracking-tight">
+              {stats.operations}
+            </span>
+            <span className="text-xs text-emerald-600 font-semibold">active updates</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Cleanup progress & verified sites</p>
+        </div>
+      </div>
+
+      {/* ── 3. Search & Interactive Filter Toolbar ────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-white/80 backdrop-blur-xl p-4 rounded-3xl border border-gray-100 shadow-[0_4px_20px_rgb(0,0,0,0.02)]">
+        {/* Left: Search input & Read status toggle */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+          {/* Live Search */}
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Input
+              type="text"
+              placeholder="Search notifications by title, report ID, or message..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-9 h-10 rounded-2xl border-gray-200 text-xs font-medium bg-gray-50/50 focus:bg-white transition-all shadow-none"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Read Status Segmented Control */}
+          <div className="bg-gray-100/90 p-1 rounded-2xl inline-flex gap-1 border border-gray-200/60 shadow-inner self-start sm:self-auto shrink-0">
+            <button
+              onClick={() => setReadFilter("ALL")}
+              className={cn(
+                "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200",
+                readFilter === "ALL"
+                  ? "bg-white text-indigo-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-900"
+              )}
+            >
+              All Alerts
+            </button>
+            <button
+              onClick={() => setReadFilter("UNREAD")}
+              className={cn(
+                "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1.5",
+                readFilter === "UNREAD"
+                  ? "bg-white text-indigo-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-900"
+              )}
+            >
+              <span>Unread</span>
+              {stats.unread > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-blue-600 text-white">
+                  {stats.unread}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setReadFilter("READ")}
+              className={cn(
+                "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200",
+                readFilter === "READ"
+                  ? "bg-white text-indigo-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-900"
+              )}
+            >
+              Read
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Type Category Filter Pills */}
+        <div className="flex items-center gap-1.5 flex-wrap overflow-x-auto pb-1 lg:pb-0">
+          {FILTER_OPTIONS.map((opt) => {
+            const isSelected = typeFilter === opt.key;
+            const count =
+              opt.key === "ALL"
+                ? notifications.length
+                : notifications.filter((n) => n.type === opt.key).length;
+
+            return (
+              <button
+                key={opt.key}
+                onClick={() => {
+                  setTypeFilter(opt.key);
+                  setPage(1);
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1.5 shrink-0 border",
+                  isSelected
+                    ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20"
+                    : "bg-white hover:bg-gray-50 text-gray-600 border-gray-200 shadow-2xs hover:shadow-xs"
+                )}
+              >
+                <span>{opt.label}</span>
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      "text-[10px] px-1.5 py-0.2 rounded-full font-extrabold",
+                      isSelected
+                        ? "bg-white/20 text-white"
+                        : "bg-gray-100 text-gray-600"
+                    )}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── 4. Active Filter Indicator Bar ──────────────────────────────────── */}
+      {hasActiveFilters && (
+        <div className="flex items-center justify-between px-2 text-xs text-gray-500">
+          <span>
+            Showing <strong className="text-gray-900">{filtered.length}</strong>{" "}
+            of {notifications.length} notifications matching active criteria
+          </span>
+          <button
+            onClick={handleResetFilters}
+            className="text-indigo-600 font-bold hover:underline inline-flex items-center gap-1"
+          >
+            <X className="w-3.5 h-3.5" />
+            Reset all filters
+          </button>
+        </div>
+      )}
+
+      {/* ── 5. Notifications Timeline List ──────────────────────────────────── */}
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center bg-white/80 backdrop-blur-xl rounded-3xl border border-dashed border-gray-200 shadow-xs p-8">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-blue-50 to-indigo-100/70 border border-blue-100 flex items-center justify-center text-blue-600 shadow-inner mb-4">
+            <Inbox className="w-10 h-10 text-blue-500" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 tracking-tight">
+            {hasActiveFilters
+              ? "No matching notifications found"
+              : "All Caught Up!"}
           </h3>
-          <p className="mt-2 max-w-xs text-sm text-gray-400 leading-relaxed">
-            {typeFilter === "ALL"
-              ? "You're all caught up! When new reports are submitted or waste reports get updates, you'll see them here."
-              : "Try switching to a different filter to see more notifications."}
+          <p className="mt-1.5 max-w-sm text-xs text-gray-500 leading-relaxed">
+            {hasActiveFilters
+              ? "We could not find any alerts matching your search keyword or selected filters. Try broadening your criteria."
+              : "There are no pending alerts in the operations center. New report submissions and cleanup milestones will stream in live."}
           </p>
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetFilters}
+              className="mt-5 rounded-xl text-xs font-bold gap-1.5 border-gray-200 hover:bg-gray-50"
+            >
+              Clear Search & Filters
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-8">
           {grouped.map(([groupLabel, items]) => (
-            <section key={groupLabel}>
-              {/* Group heading */}
-              <div className="flex items-center gap-3 mb-3">
-                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {groupLabel}
-                </h2>
-                <span className="h-px flex-1 bg-gray-100" />
-                <span className="text-xs text-gray-400 tabular-nums">
-                  {items.length}
+            <section key={groupLabel} className="space-y-3">
+              {/* Group Timeline Header */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-600 shadow-xs" />
+                  <h2 className="text-xs font-black text-gray-700 uppercase tracking-widest">
+                    {groupLabel}
+                  </h2>
+                </div>
+                <div className="h-px flex-1 bg-gradient-to-r from-gray-200 via-gray-100 to-transparent" />
+                <span className="text-[11px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-200/60">
+                  {items.length} {items.length === 1 ? "alert" : "alerts"}
                 </span>
               </div>
 
-              {/* Notification cards */}
-              <div className="space-y-2">
-                {items.map((n, idx) => {
+              {/* Notification Cards */}
+              <div className="space-y-3">
+                {items.map((n) => {
                   const config = typeConfig[n.type] || typeConfig.SYSTEM;
+                  const Icon = config.icon;
+                  const exactTime = format(new Date(n.createdAt), "PPpp");
+
                   return (
                     <div
                       key={n.id}
                       className={cn(
-                        "group relative flex items-start gap-4 rounded-xl border p-4 transition-all duration-200",
-                        n.isRead
-                          ? "bg-white border-gray-100 hover:border-gray-200 hover:shadow-sm"
-                          : "bg-blue-50/60 border-blue-200 hover:border-blue-300 hover:shadow-sm hover:shadow-blue-100"
+                        "group relative flex flex-col sm:flex-row sm:items-start gap-4 p-5 rounded-2xl border transition-all duration-200 overflow-hidden",
+                        !n.isRead
+                          ? `bg-gradient-to-r from-blue-50/85 via-indigo-50/25 to-white border-blue-200/90 shadow-2xs hover:shadow-md hover:border-blue-300 border-l-[4px] ${config.borderAccent}`
+                          : "bg-white/90 hover:bg-white border-gray-100 hover:border-gray-200 shadow-2xs hover:shadow-sm border-l-[4px] border-l-transparent"
                       )}
                     >
-                      {/* Unread indicator dot */}
-                      {!n.isRead && (
-                        <span className="absolute top-4 left-3.5 w-1.5 h-1.5 rounded-full bg-blue-500" />
-                      )}
-
-                      {/* Type icon */}
+                      {/* Left: Type Icon Container */}
                       <div
                         className={cn(
-                          "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-4 transition-transform group-hover:scale-105",
-                          config.bg,
-                          config.ring
+                          "w-11 h-11 rounded-2xl flex items-center justify-center text-white bg-gradient-to-br shadow-sm shrink-0 group-hover:scale-105 transition-transform duration-200",
+                          config.gradientBg
                         )}
                       >
-                        {config.icon}
+                        <Icon className="w-5 h-5 text-white" />
                       </div>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <h3
-                            className={cn(
-                              "text-sm leading-snug",
-                              n.isRead
-                                ? "text-gray-700 font-medium"
-                                : "text-gray-900 font-semibold"
+                      {/* Middle: Content Information Architecture */}
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        {/* Top Line: Badge, Title, Timestamp */}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {/* Type Pill */}
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-2xs",
+                                config.pillBg,
+                                config.pillText,
+                                config.pillBorder
+                              )}
+                            >
+                              {config.label}
+                            </span>
+
+                            {/* Unread Indicator Badge */}
+                            {!n.isRead && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100/90 text-blue-700 border border-blue-200 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+                                New
+                              </span>
                             )}
+                          </div>
+
+                          {/* Relative Timestamp with tooltip */}
+                          <div
+                            className="flex items-center gap-1 text-xs text-gray-400 font-medium whitespace-nowrap"
+                            title={exactTime}
                           >
-                            {n.title}
-                          </h3>
-                          <span className="shrink-0 text-xs text-gray-400 whitespace-nowrap mt-0.5">
-                            {timeAgo(n.createdAt)}
-                          </span>
+                            <Clock className="w-3.5 h-3.5 text-gray-400" />
+                            <span>{timeAgo(n.createdAt)}</span>
+                          </div>
                         </div>
-                        <p className="mt-1 text-sm text-gray-500 leading-relaxed line-clamp-2">
+
+                        {/* Title */}
+                        <h3
+                          className={cn(
+                            "text-sm tracking-tight leading-snug",
+                            !n.isRead
+                              ? "font-extrabold text-gray-900"
+                              : "font-semibold text-gray-800"
+                          )}
+                        >
+                          {n.title}
+                        </h3>
+
+                        {/* Message Body */}
+                        <p className="text-xs text-gray-600 leading-relaxed font-normal">
                           {n.message}
                         </p>
 
-                        {/* Badge + Actions */}
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          {/* Type badge */}
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider",
-                              n.type === "NEW_REPORT" && "text-blue-600 bg-blue-50",
-                              n.type === "STATUS_CHANGE" && "text-amber-600 bg-amber-50",
-                              n.type === "ASSIGNMENT" && "text-emerald-600 bg-emerald-50",
-                              n.type === "SYSTEM" && "text-slate-600 bg-slate-50"
+                        {/* Bottom Metadata & Action Buttons */}
+                        <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-gray-100/60 mt-2">
+                          {/* Left: Linked Entity Info */}
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            {n.reportId && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gray-50 text-gray-600 border border-gray-200 text-[11px] font-mono">
+                                <FileText className="w-3 h-3 text-indigo-500" />
+                                ID: {n.reportId.slice(0, 8)}...
+                              </span>
                             )}
-                          >
-                            {TypeBadgeLabel[n.type] || n.type}
-                          </span>
+                            {n.report?.title && (
+                              <span className="text-[11px] text-gray-500 truncate max-w-[200px]">
+                                &ldquo;{n.report.title}&rdquo;
+                              </span>
+                            )}
+                          </div>
 
-                          {/* Action buttons */}
-                          <div className="flex items-center gap-1.5 ml-auto">
+                          {/* Right: Quick Action Controls */}
+                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                             {n.reportId && (
                               <Link href={`/dashboard/reports/${n.reportId}`}>
                                 <Button
                                   size="sm"
-                                  variant="default"
-                                  className="h-7 text-xs gap-1 px-2.5"
+                                  className="h-8 rounded-xl text-xs font-bold gap-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white shadow-2xs shadow-blue-500/20 active:scale-95 transition-all"
                                 >
-                                  <Eye className="w-3 h-3" />
+                                  <Eye className="w-3.5 h-3.5" />
                                   View Report
                                 </Button>
                               </Link>
                             )}
+
                             {!n.isRead && (
                               <Button
                                 size="sm"
-                                variant="ghost"
-                                className="h-7 text-xs gap-1 px-2.5 text-gray-500 hover:text-blue-600"
+                                variant="outline"
                                 onClick={() => markAsRead.mutate(n.id)}
                                 disabled={markAsRead.isPending}
+                                className="h-8 rounded-xl text-xs font-bold gap-1.5 px-3 text-gray-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50/50 transition-all"
+                                title="Mark this notification as read"
                               >
-                                <CheckCheck className="w-3 h-3" />
+                                <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
                                 Dismiss
                               </Button>
                             )}
@@ -342,30 +695,41 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {/* ─── PAGINATION ─── */}
+      {/* ── 6. Modern Pagination Controls ───────────────────────────────────── */}
       {pagination && pagination.totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-100">
-          <p className="text-xs text-gray-400">
-            Page {pagination.page} of {pagination.totalPages} &middot;{" "}
-            {pagination.total} notification{pagination.total !== 1 ? "s" : ""}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100 bg-white/60 backdrop-blur-md p-4 rounded-3xl">
+          <p className="text-xs text-gray-500 font-medium">
+            Showing page <strong className="text-gray-900">{pagination.page}</strong> of{" "}
+            <strong className="text-gray-900">{pagination.totalPages}</strong> &middot;{" "}
+            {pagination.total} total notification{pagination.total !== 1 ? "s" : ""}
           </p>
+
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="h-8 gap-1 text-xs"
+              onClick={() => {
+                setPage((p) => p - 1);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="h-9 rounded-xl gap-1.5 text-xs font-bold border-gray-200 hover:bg-gray-50 disabled:opacity-50"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               Previous
             </Button>
+            <div className="px-3 py-1 rounded-xl bg-gray-100 text-xs font-extrabold text-gray-700">
+              {page}
+            </div>
             <Button
               variant="outline"
               size="sm"
               disabled={page >= pagination.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="h-8 gap-1 text-xs"
+              onClick={() => {
+                setPage((p) => p + 1);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="h-9 rounded-xl gap-1.5 text-xs font-bold border-gray-200 hover:bg-gray-50 disabled:opacity-50"
             >
               Next
               <ChevronRight className="w-3.5 h-3.5" />
@@ -376,3 +740,4 @@ export default function NotificationsPage() {
     </div>
   );
 }
+

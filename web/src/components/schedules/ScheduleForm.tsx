@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import {
   Dialog,
@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { CleanupScheduleStatus, User, Report } from "@/types";
-import { ADMIN_ALLOWED_BARANGAY_NAMES } from "@/lib/adminBarangays";
+import { getReverseGeocodedLocation } from "@/lib/utils";
 import {
   Users,
   FileText,
@@ -29,6 +29,7 @@ import {
   X,
   Info,
   Compass,
+  ShieldCheck,
 } from "lucide-react";
 
 interface ScheduleFormProps {
@@ -74,6 +75,7 @@ export function detectBarangayFromLocation(locationStr: string): string {
   const lower = locationStr.toLowerCase().trim();
 
   // 1. Direct or partial match with official Panabo coastal barangays
+  if (lower.includes("san francisco")) return "Barangay San Francisco";
   if (lower.includes("san pedro")) return "Barangay San Pedro";
   if (lower.includes("cagangohan")) return "Barangay Cagangohan";
   if (lower.includes("san vicente")) return "Barangay San Vicente";
@@ -87,6 +89,7 @@ export function detectBarangayFromLocation(locationStr: string): string {
   if (lower.includes("malativas")) return "Barangay Malativas";
   if (lower.includes("san nicolas")) return "Barangay San Nicolas";
   if (lower.includes("san roque")) return "Barangay San Roque";
+  if (lower.includes("salvacion")) return "Barangay Salvacion";
 
   // 2. Regex match for "Barangay [Name]" or "Brgy. [Name]"
   const match = locationStr.match(/(?:Barangay|Brgy\.?)\s+([A-Za-z\s]+)/i);
@@ -139,45 +142,82 @@ export function ScheduleForm({
   const { data: eligibleReports = [] } = useQuery({
     queryKey: ["reports", "eligible-for-schedule"],
     queryFn: async () => {
-      const [verified, scheduled] = await Promise.all([
-        api.get("/reports?status=VERIFIED&limit=100"),
-        api.get("/reports?status=CLEANUP_SCHEDULED&limit=100"),
-      ]);
-      const combined = [
-        ...(verified.data.data as Report[]),
-        ...(scheduled.data.data as Report[]),
-      ];
-      return combined.filter(
-        (r, i, arr) => arr.findIndex((x) => x.id === r.id) === i,
+      // Query verified reports with hasCleanupSchedule=false so reports already assigned to other schedules are not fetched
+      const res = await api.get(
+        "/reports?status=VERIFIED&hasCleanupSchedule=false&limit=100",
       );
+      const list = (res.data.data as Report[]) || [];
+      return list.filter((r) => !r.cleanupScheduleId);
     },
     enabled: isOpen,
   });
 
   const displayedReports = useMemo(() => {
-    return isEditing && initialData?.reports
-      ? [
-          ...initialData.reports,
-          ...eligibleReports.filter(
-            (er) => !initialData.reports.find((ir: any) => ir.id === er.id),
-          ),
-        ]
-      : eligibleReports;
+    if (isEditing && initialData?.reports) {
+      const currentReports = (initialData.reports as Report[]) || [];
+      const unassigned = eligibleReports.filter(
+        (er) =>
+          !er.cleanupScheduleId &&
+          !currentReports.some((cr: any) => cr.id === er.id),
+      );
+      return [...currentReports, ...unassigned];
+    }
+    return eligibleReports.filter((r) => !r.cleanupScheduleId);
   }, [isEditing, initialData?.reports, eligibleReports]);
 
-  // Extract unique Location Names from verified reports for quick auto-fill
-  const availableLocationNames = useMemo(() => {
-    const set = new Set<string>();
-    displayedReports.forEach((r: any) => {
-      const loc = r.address?.trim() || r.title?.trim();
-      if (loc) set.add(loc);
+  const [geocodedAddresses, setGeocodedAddresses] = useState<Record<string, string>>({});
+
+  const resolveLocationForReport = useCallback(
+    (report: any): string => {
+      if (
+        report.address &&
+        report.address.trim() &&
+        !report.address.toLowerCase().startsWith("waste report")
+      ) {
+        return report.address.trim();
+      }
+      if (geocodedAddresses[report.id]) {
+        return geocodedAddresses[report.id];
+      }
+      if (
+        report.title &&
+        report.title.trim() &&
+        !report.title.toLowerCase().startsWith("waste report")
+      ) {
+        return report.title.trim();
+      }
+      return "";
+    },
+    [geocodedAddresses],
+  );
+
+  // Reverse-geocode any reports whose address is missing or generic
+  useEffect(() => {
+    if (!isOpen || displayedReports.length === 0) return;
+
+    displayedReports.forEach(async (report: any) => {
+      const existing = report.address?.trim();
+      if (
+        (!existing || existing.toLowerCase().startsWith("waste report")) &&
+        report.latitude &&
+        report.longitude &&
+        !geocodedAddresses[report.id]
+      ) {
+        try {
+          const geocoded = await getReverseGeocodedLocation(report.latitude, report.longitude);
+          if (geocoded) {
+            setGeocodedAddresses((prev) => ({
+              ...prev,
+              [report.id]: geocoded,
+            }));
+          }
+        } catch {
+          // ignore network failure
+        }
+      }
     });
-    // Add known Panabo coastal areas
-    ADMIN_ALLOWED_BARANGAY_NAMES.forEach((name) => {
-      set.add(`Barangay ${name} Coastal Area`);
-    });
-    return Array.from(set);
-  }, [displayedReports]);
+  }, [isOpen, displayedReports, geocodedAddresses]);
+
 
   useEffect(() => {
     setErrorMessage(null);
@@ -191,10 +231,13 @@ export function ScheduleForm({
       };
 
       const initialBarangay = initialData.barangay || "";
-      const initialLocation =
+      const rawInitialLoc =
         initialData.reports?.[0]?.address ||
         initialData.barangay ||
         "";
+      const initialLocation = rawInitialLoc.toLowerCase().startsWith("waste report")
+        ? ""
+        : rawInitialLoc;
 
       setFormData({
         title: initialData.title || "",
@@ -234,12 +277,17 @@ export function ScheduleForm({
   const handleLocationNameChange = (newLocationName: string) => {
     const autoBarangay = detectBarangayFromLocation(newLocationName);
 
-    // Also check if any eligible report matches this location name
-    const matchingReports = displayedReports.filter(
-      (r: any) =>
-        (r.address && r.address.toLowerCase().includes(newLocationName.toLowerCase())) ||
-        (r.title && r.title.toLowerCase().includes(newLocationName.toLowerCase())),
-    );
+    // Also check if any eligible unassigned report matches this location name
+    const search = newLocationName.toLowerCase().trim();
+    const matchingReports = displayedReports.filter((r: any) => {
+      if (r.cleanupScheduleId && (!isEditing || r.cleanupScheduleId !== initialData?.id)) {
+        return false;
+      }
+      const addr = (r.address || "").toLowerCase();
+      const resolved = resolveLocationForReport(r).toLowerCase();
+      const title = !r.title?.toLowerCase().startsWith("waste report") ? r.title.toLowerCase() : "";
+      return (addr && addr.includes(search)) || (resolved && resolved.includes(search)) || (title && title.includes(search));
+    });
 
     setFormData((prev) => {
       const updated: any = {
@@ -250,7 +298,8 @@ export function ScheduleForm({
 
       // If user hasn't typed an operation title, generate one automatically
       if (!prev.title.trim() || prev.title.startsWith("Coastal Cleanup - ")) {
-        updated.title = `Coastal Cleanup - ${newLocationName}`;
+        const shortLoc = newLocationName.split(",").slice(0, 2).join(",").trim();
+        updated.title = `Coastal Cleanup - ${shortLoc || newLocationName}`;
       }
 
       // Auto-link matching reports if not already selected
@@ -264,9 +313,20 @@ export function ScheduleForm({
     });
   };
 
-  // When a waste report is toggled in Tab 3 (Crew & Reports):
+  // When a waste report is toggled in Tab 1 (Operation Details):
   // Automatically fill in Location Name, Target Barangay, and GPS Coordinates!
   const handleReportToggle = (reportId: string) => {
+    const targetReport = displayedReports.find((r: any) => r.id === reportId);
+    if (
+      targetReport?.cleanupScheduleId &&
+      (!isEditing || targetReport.cleanupScheduleId !== initialData?.id)
+    ) {
+      setErrorMessage(
+        `Waste report "${targetReport.title}" is already assigned to another cleanup schedule and cannot be selected.`,
+      );
+      return;
+    }
+
     setFormData((prev) => {
       const nextReportIds = prev.reportIds.includes(reportId)
         ? prev.reportIds.filter((id) => id !== reportId)
@@ -283,7 +343,13 @@ export function ScheduleForm({
 
       if (selected.length > 0) {
         const latest = selected[selected.length - 1];
-        newLocationName = latest.address || latest.title || newLocationName;
+        const resolved = resolveLocationForReport(latest);
+        if (resolved) {
+          newLocationName = resolved;
+        } else if (newLocationName.toLowerCase().startsWith("waste report")) {
+          newLocationName = "";
+        }
+
         // Automatically fill in Target Barangay based on this Location Name!
         newBarangay = detectBarangayFromLocation(newLocationName);
 
@@ -294,6 +360,18 @@ export function ScheduleForm({
         newLng = sumLng / selected.length;
       }
 
+      let updatedTitle = prev.title;
+      if (
+        !prev.title.trim() ||
+        prev.title === "Coastal Cleanup - Waste report" ||
+        prev.title.startsWith("Coastal Cleanup - ")
+      ) {
+        if (newLocationName) {
+          const shortLoc = newLocationName.split(",").slice(0, 2).join(",").trim();
+          updatedTitle = `Coastal Cleanup - ${shortLoc || newLocationName}`;
+        }
+      }
+
       return {
         ...prev,
         reportIds: nextReportIds,
@@ -301,10 +379,7 @@ export function ScheduleForm({
         barangay: newBarangay,
         latitude: newLat,
         longitude: newLng,
-        title:
-          !prev.title.trim() && newLocationName
-            ? `Coastal Cleanup - ${newLocationName}`
-            : prev.title,
+        title: updatedTitle,
       };
     });
   };
@@ -346,8 +421,8 @@ export function ScheduleForm({
       setActiveTab("details");
       return;
     }
-    if (!formData.barangay.trim()) {
-      setErrorMessage("Please specify the target Barangay / coastal location.");
+    if (!formData.locationName?.trim() && !formData.barangay?.trim()) {
+      setErrorMessage("Please specify the coastal location.");
       setActiveTab("details");
       return;
     }
@@ -365,13 +440,18 @@ export function ScheduleForm({
       setErrorMessage(
         "Please link at least one waste report to this cleanup operation.",
       );
-      setActiveTab("crew");
+      setActiveTab("details");
       return;
     }
 
     try {
       setLoading(true);
       const payload: any = { ...formData };
+      payload.barangay =
+        formData.barangay?.trim() ||
+        formData.locationName?.trim() ||
+        detectBarangayFromLocation(formData.locationName) ||
+        "Panabo Coastal Area";
       if (payload.scheduledAt) {
         payload.scheduledAt = new Date(payload.scheduledAt).toISOString();
       }
@@ -437,7 +517,7 @@ export function ScheduleForm({
                 LGU Operational Dispatch
               </span>
               <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight">
-                {isEditing ? "Edit Cleanup Schedule" : "Deploy Cleanup Schedule"}
+                {isEditing ? "Edit Cleanup Schedule" : "Create Cleanup Schedule"}
               </DialogTitle>
               <p className="text-xs text-gray-500">
                 Coordinate personnel, allocate protective equipment, and assign
@@ -451,13 +531,18 @@ export function ScheduleForm({
             <button
               type="button"
               onClick={() => setActiveTab("details")}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 activeTab === "details"
                   ? "bg-white text-indigo-700 shadow-sm"
                   : "text-gray-500 hover:text-gray-900"
               }`}
             >
               1. Operation Details
+              {formData.reportIds.length > 0 && (
+                <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded-full text-[10px]">
+                  {formData.reportIds.length}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -484,7 +569,7 @@ export function ScheduleForm({
                   : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              3. Crew & Reports
+              3. Assign
               {formData.workerIds.length > 0 && (
                 <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded-full text-[10px]">
                   {formData.workerIds.length}
@@ -541,132 +626,138 @@ export function ScheduleForm({
                     />
                   </div>
 
-                  {/* Location Name (Trigger for Auto-filling Target Barangay) */}
+                  {/* Location Name / Coastal Site */}
                   <div className="space-y-1.5 md:col-span-2">
-                    <div className="flex items-center justify-between">
-                      <Label
-                        htmlFor="locationName"
-                        className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5"
-                      >
-                        <Compass className="w-3.5 h-3.5 text-blue-600" />
-                        Location Name / Reported Coastal Site *
-                      </Label>
-                      <span className="text-[11px] font-semibold text-indigo-600">
-                        ⚡ Auto-fills Target Barangay below
-                      </span>
-                    </div>
+                    <Label
+                      htmlFor="locationName"
+                      className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5"
+                    >
+                      <Compass className="w-3.5 h-3.5 text-blue-600" />
+                      Location Name / Reported Coastal Site *
+                    </Label>
 
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <Input
-                          id="locationName"
-                          placeholder="Type or select a location name (e.g., Panabo Coastal Area, San Pedro Beach)..."
-                          value={formData.locationName}
-                          onChange={(e) => handleLocationNameChange(e.target.value)}
-                          className="rounded-xl border-gray-200 bg-blue-50/20 focus-visible:ring-indigo-500 h-11 text-sm font-medium pl-9"
-                        />
-                        <MapPin className="w-4 h-4 text-blue-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                      </div>
-
-                      {/* Dropdown / Quick Select pills of available Location Names */}
-                      {availableLocationNames.length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                          <span className="text-[11px] text-gray-400 font-medium">
-                            Reported sites:
-                          </span>
-                          {availableLocationNames.map((loc) => {
-                            const isSelected =
-                              formData.locationName.toLowerCase() ===
-                              loc.toLowerCase();
-                            return (
-                              <button
-                                key={loc}
-                                type="button"
-                                onClick={() => handleLocationNameChange(loc)}
-                                className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold transition-all flex items-center gap-1 ${
-                                  isSelected
-                                    ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                                    : "bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:bg-blue-50/40"
-                                }`}
-                              >
-                                <MapPin className="w-3 h-3 text-current" />
-                                {loc}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                    <div className="relative">
+                      <Input
+                        id="locationName"
+                        placeholder="Type a location name (e.g., Lilia Homes, San Francisco) or select a waste report below..."
+                        value={formData.locationName}
+                        onChange={(e) => handleLocationNameChange(e.target.value)}
+                        className="rounded-xl border-gray-200 bg-blue-50/20 focus-visible:ring-indigo-500 h-11 text-sm font-medium pl-9"
+                      />
+                      <MapPin className="w-4 h-4 text-blue-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     </div>
                   </div>
 
-                  {/* Target Barangay (Automatically filled in based on Location Name!) */}
-                  <div className="space-y-1.5">
+                  {/* Waste Reports Linking */}
+                  <div className="space-y-2.5 md:col-span-2 pt-1">
                     <div className="flex items-center justify-between">
-                      <Label
-                        htmlFor="barangay"
-                        className="text-xs font-bold text-gray-700 uppercase tracking-wider"
-                      >
-                        Target Barangay / Coastal Area *
+                      <Label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-indigo-500" />
+                        Waste Reports *
                       </Label>
-                      {formData.barangay && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                          <Check className="w-3 h-3" /> Auto-filled
+                      {formData.reportIds.length > 0 && (
+                        <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                          {formData.reportIds.length} selected
                         </span>
                       )}
                     </div>
 
-                    <div className="space-y-2">
-                      <Input
-                        id="barangay"
-                        required
-                        minLength={1}
-                        maxLength={300}
-                        placeholder="Automatically filled in from Location Name"
-                        value={formData.barangay}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            barangay: e.target.value,
-                          }))
-                        }
-                        className="rounded-xl border-gray-200 bg-gray-50/70 focus-visible:ring-indigo-500 h-11 text-sm font-semibold text-gray-900"
-                      />
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50/70 border border-emerald-100 text-[11px] text-emerald-800">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>
+                        Protected: Reports already assigned to another cleanup schedule cannot be re-selected.
+                      </span>
+                    </div>
 
-                      {/* Official Coastal Barangay quick buttons */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[11px] text-gray-400 font-medium">
-                          Barangay selector:
-                        </span>
-                        {ADMIN_ALLOWED_BARANGAY_NAMES.map((name) => {
-                          const isMatch = formData.barangay.includes(name);
+                    <div className="border border-gray-200 rounded-2xl divide-y max-h-60 overflow-y-auto bg-gray-50/30">
+                      {displayedReports.length === 0 ? (
+                        <div className="p-4 text-xs text-gray-500 text-center">
+                          No eligible unassigned waste reports (VERIFIED) available.
+                        </div>
+                      ) : (
+                        displayedReports.map((report: any) => {
+                          const isLinked = formData.reportIds.includes(
+                            report.id,
+                          );
+                          const isAssignedToOther = Boolean(
+                            report.cleanupScheduleId &&
+                              (!isEditing || report.cleanupScheduleId !== initialData?.id),
+                          );
+                          const reportLoc =
+                            resolveLocationForReport(report) || "Location unavailable";
                           return (
-                            <button
-                              key={name}
-                              type="button"
-                              onClick={() => {
-                                const bName = `Barangay ${name}`;
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  barangay: bName,
-                                  locationName: prev.locationName || `${bName} Coastal Area`,
-                                }));
-                              }}
-                              className={`text-[11px] px-2.5 py-0.5 rounded-lg border font-semibold transition-all ${
-                                isMatch
-                                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                            <label
+                              key={report.id}
+                              className={`flex items-center gap-3 p-3 transition-colors ${
+                                isAssignedToOther
+                                  ? "opacity-50 cursor-not-allowed bg-gray-100/60"
+                                  : isLinked
+                                    ? "bg-blue-50/40 cursor-pointer hover:bg-white"
+                                    : "hover:bg-white cursor-pointer"
                               }`}
                             >
-                              {name}
-                            </button>
+                              <input
+                                type="checkbox"
+                                checked={isLinked}
+                                disabled={isAssignedToOther}
+                                onChange={() => {
+                                  if (!isAssignedToOther) {
+                                    handleReportToggle(report.id);
+                                  }
+                                }}
+                                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 shrink-0 disabled:opacity-40"
+                              />
+                              {report.images && report.images.length > 0 ? (
+                                <Image
+                                  src={report.images[0].imageUrl}
+                                  alt="waste photo"
+                                  width={40}
+                                  height={40}
+                                  unoptimized
+                                  className="w-10 h-10 object-cover rounded-lg border border-gray-200 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+                                  <FileText className="w-4 h-4 text-gray-400" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-xs font-bold text-gray-900 truncate">
+                                    {report.title}
+                                  </p>
+                                  {isAssignedToOther ? (
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                                      Already Scheduled
+                                    </span>
+                                  ) : isLinked ? (
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                      Selected
+                                    </span>
+                                  ) : (
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      Available
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-gray-500 truncate flex items-center gap-1 mt-0.5">
+                                  <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
+                                  <span>{reportLoc}</span>
+                                  <span>•</span>
+                                  <span className="font-semibold text-indigo-600">
+                                    {report.status}
+                                  </span>
+                                </p>
+                              </div>
+                            </label>
                           );
-                        })}
-                      </div>
+                        })
+                      )}
                     </div>
                   </div>
 
                   {/* Deployment Date & Time */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 md:col-span-2">
                     <Label
                       htmlFor="scheduledAt"
                       className="text-xs font-bold text-gray-700 uppercase tracking-wider"
@@ -767,7 +858,7 @@ export function ScheduleForm({
                           Protective & Cleanup Equipment Allocation
                         </h4>
                         <p className="text-xs text-gray-500">
-                          Equip the cleanup crew with necessary safety gear and tools
+                          Equip assigned personnel with necessary safety gear and tools
                         </p>
                       </div>
                     </div>
@@ -846,46 +937,47 @@ export function ScheduleForm({
               </div>
             )}
 
-            {/* TAB 3: CREW & REPORTS */}
+            {/* TAB 3: ASSIGN FIELD WORKERS */}
             {activeTab === "crew" && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Field Workers Assignment */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                        <Users className="w-4 h-4 text-indigo-500" />
-                        Assign Field Workers *
-                      </Label>
-                      <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                        {formData.workerIds.length} assigned
-                      </span>
-                    </div>
+              <div className="space-y-5 animate-in fade-in duration-200">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-indigo-500" />
+                      Assign Field Workers *
+                    </Label>
+                    <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                      {formData.workerIds.length} assigned
+                    </span>
+                  </div>
 
-                    <div className="border border-gray-200 rounded-2xl divide-y max-h-72 overflow-y-auto bg-gray-50/30">
-                      {workers.length === 0 ? (
-                        <div className="p-4 text-xs text-gray-500 text-center">
-                          No field workers registered.
-                        </div>
-                      ) : (
-                        workers.map((worker) => {
+                  <div className="border border-gray-200 rounded-2xl max-h-96 overflow-y-auto bg-gray-50/30 p-2">
+                    {workers.length === 0 ? (
+                      <div className="p-8 text-xs text-gray-500 text-center">
+                        No field workers registered.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {workers.map((worker) => {
                           const isAssigned = formData.workerIds.includes(
                             worker.id,
                           );
                           return (
                             <label
                               key={worker.id}
-                              className={`flex items-center gap-3 p-3 hover:bg-white cursor-pointer transition-colors ${
-                                isAssigned ? "bg-indigo-50/40" : ""
+                              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                                isAssigned
+                                  ? "bg-indigo-50/60 border-indigo-300 shadow-sm ring-1 ring-indigo-500/20"
+                                  : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50/60"
                               }`}
                             >
                               <input
                                 type="checkbox"
                                 checked={isAssigned}
                                 onChange={() => handleWorkerToggle(worker.id)}
-                                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 shrink-0"
                               />
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-blue-200 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
+                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-100 to-blue-200 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
                                 {worker.firstName[0]}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -898,87 +990,17 @@ export function ScheduleForm({
                               </div>
                             </label>
                           );
-                        })
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Waste Reports Linking */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                        <FileText className="w-4 h-4 text-indigo-500" />
-                        Link Waste Reports *
-                      </Label>
-                      <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                        {formData.reportIds.length} linked
-                      </span>
-                    </div>
-
-                    <div className="border border-gray-200 rounded-2xl divide-y max-h-72 overflow-y-auto bg-gray-50/30">
-                      {displayedReports.length === 0 ? (
-                        <div className="p-4 text-xs text-gray-500 text-center">
-                          No eligible waste reports (VERIFIED) available.
-                        </div>
-                      ) : (
-                        displayedReports.map((report: any) => {
-                          const isLinked = formData.reportIds.includes(
-                            report.id,
-                          );
-                          const reportLoc =
-                            report.address || report.title || "Location unavailable";
-                          return (
-                            <label
-                              key={report.id}
-                              className={`flex items-center gap-3 p-3 hover:bg-white cursor-pointer transition-colors ${
-                                isLinked ? "bg-blue-50/40" : ""
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isLinked}
-                                onChange={() => handleReportToggle(report.id)}
-                                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 shrink-0"
-                              />
-                              {report.images && report.images.length > 0 ? (
-                                <Image
-                                  src={report.images[0].imageUrl}
-                                  alt="waste photo"
-                                  width={40}
-                                  height={40}
-                                  className="w-10 h-10 object-cover rounded-lg border border-gray-200 shrink-0"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                                  <FileText className="w-4 h-4 text-gray-400" />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-gray-900 truncate">
-                                  {report.title}
-                                </p>
-                                <p className="text-[11px] text-gray-500 truncate flex items-center gap-1">
-                                  <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
-                                  <span>{reportLoc}</span>
-                                  <span>•</span>
-                                  <span className="font-semibold text-indigo-600">
-                                    {report.status}
-                                  </span>
-                                </p>
-                              </div>
-                            </label>
-                          );
-                        })
-                      )}
-                    </div>
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100/70 text-[11px] text-blue-700 font-medium flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  Selecting any waste report automatically fills in the Location
-                  Name, detects the Target Barangay, and computes GPS coordinates
-                  for the GIS map.
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
+                  <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-gray-600">
+                    Assigned personnel will receive an operational dispatch notice on their mobile devices with location coordinates, cleanup briefings, and allocated equipment.
+                  </p>
                 </div>
               </div>
             )}
@@ -997,7 +1019,7 @@ export function ScheduleForm({
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              {formData.workerIds.length} crew
+              {formData.workerIds.length} assigned
             </span>
             <span>•</span>
             <span
@@ -1040,7 +1062,7 @@ export function ScheduleForm({
               ) : isEditing ? (
                 "Update Operation"
               ) : (
-                "Deploy Schedule"
+                "Create Cleanup Schedule"
               )}
             </Button>
           </div>
