@@ -383,14 +383,23 @@ export function ReportDetailSkeleton() {
 
 export function SchedulePageSkeleton() {
   return (
-    <div className="space-y-8 pb-8 max-w-[1600px] mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-white/40 shadow-sm">
-        <div className="space-y-2">
-          <Skeleton className="h-9 w-52" />
-          <Skeleton className="h-4 w-72" />
+    <div className="space-y-7 pb-12 max-w-[1600px] mx-auto animate-pulse">
+      {/* Header Banner Skeleton */}
+      <div className="bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/40 rounded-3xl border border-gray-200/80 p-6 md:p-8">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-6 w-52 rounded-full" />
+              <Skeleton className="h-6 w-32 rounded-full" />
+            </div>
+            <Skeleton className="h-10 w-80 rounded-xl" />
+            <Skeleton className="h-4 w-96 max-w-full" />
+          </div>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-11 w-11 rounded-2xl" />
+            <Skeleton className="h-11 w-48 rounded-2xl" />
+          </div>
         </div>
-        <Skeleton className="h-11 w-40 rounded-xl" />
       </div>
 
       {/* KPI Cards */}
@@ -398,23 +407,26 @@ export function SchedulePageSkeleton() {
         {Array.from({ length: 4 }).map((_, idx) => (
           <div
             key={idx}
-            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4"
+            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-2"
           >
-            <Skeleton className="w-12 h-12 rounded-xl shrink-0" />
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-7 w-10" />
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="w-10 h-10 rounded-xl" />
             </div>
+            <Skeleton className="h-8 w-16" />
+            <Skeleton className="h-3 w-36" />
           </div>
         ))}
       </div>
 
-      {/* View Toggle */}
-      <div className="flex justify-center sm:justify-start">
-        <div className="bg-gray-100/80 rounded-2xl p-1.5 inline-flex gap-1">
-          <Skeleton className="h-10 w-32 rounded-xl" />
-          <Skeleton className="h-10 w-24 rounded-xl" />
+      {/* Toolbar */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-white/70 p-3.5 rounded-3xl border border-gray-100">
+        <div className="flex items-center gap-2.5 flex-1">
+          <Skeleton className="h-10 flex-1 rounded-2xl" />
+          <Skeleton className="h-10 w-36 rounded-2xl" />
+          <Skeleton className="h-10 w-36 rounded-2xl" />
         </div>
+        <Skeleton className="h-10 w-72 rounded-2xl" />
       </div>
 
       {/* Calendar/List placeholder */}
@@ -437,7 +449,6 @@ export function SchedulePageSkeleton() {
         <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
           {Array.from({ length: 35 }).map((_, idx) => (
             <div key={idx} className="h-24 p-2 space-y-1.5">
-              {/* Show a skeleton event bar in a fixed deterministic pattern */}
               {(idx % 9 === 2 || idx % 11 === 3 || idx % 13 === 5) && (
                 <Skeleton className="h-6 w-full rounded-md" />
               )}
