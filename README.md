@@ -81,13 +81,6 @@ Use `--dart-define` when launching the mobile app:
 flutter run --dart-define=API_BASE_URL=http://localhost:5000/api
 ```
 
-By default, photos are analyzed on-device with TFLite. To analyze them with Gemini
-(via the backend's `/ai/analyze-report` endpoint) instead, add the `USE_GEMINI` flag:
-
-```bash
-flutter run --dart-define=USE_GEMINI=true
-```
-
 ## 3) Prepare Database
 
 Run Prisma migration and seed from the root:
