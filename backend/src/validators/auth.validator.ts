@@ -6,6 +6,7 @@ export const registerSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(50),
   lastName: z.string().min(1, "Last name is required").max(50),
   phone: z.string().optional(),
+  address: z.string().optional(),
 });
 
 export const loginSchema = z.object({

@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle2, AlertCircle, Camera, Upload, User, Mail, Phone, Shield } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Camera, Upload, User, Mail, Phone, Shield, MapPin } from "lucide-react";
 import Image from "next/image";
 
 export default function ProfilePage() {
@@ -17,6 +17,7 @@ export default function ProfilePage() {
     lastName: "",
     email: "",
     phone: "",
+    address: "",
     avatarUrl: "",
   });
   
@@ -32,6 +33,7 @@ export default function ProfilePage() {
         lastName: user.lastName || "",
         email: user.email || "",
         phone: user.phone || "",
+        address: user.address || "",
         avatarUrl: user.avatarUrl || "",
       });
     }
@@ -255,6 +257,20 @@ export default function ProfilePage() {
                     type="tel"
                     value={formData.phone}
                     onChange={handleChange}
+                    className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
+                  />
+                </div>
+
+                <div className="space-y-3 md:col-span-2">
+                  <Label htmlFor="address" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-slate-400" /> Address
+                  </Label>
+                  <Input
+                    id="address"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    placeholder="Enter your street address or barangay"
                     className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
                   />
                 </div>

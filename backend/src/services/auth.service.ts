@@ -74,6 +74,7 @@ export class AuthService {
         role: user.role,
         phone: user.phone,
         avatarUrl: user.avatarUrl,
+        address: user.address,
         createdAt: user.createdAt,
       },
       token,

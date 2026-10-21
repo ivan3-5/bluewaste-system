@@ -13,6 +13,7 @@ export const createUserSchema = z.object({
   lastName: z.string().min(1, "Last name is required").max(50),
   role: roleEnum,
   phone: z.string().max(30).optional(),
+  address: z.string().optional(),
 });
 
 export const updateUserSchema = z
@@ -22,6 +23,7 @@ export const updateUserSchema = z
     email: z.string().email().optional(),
     role: roleEnum.optional(),
     phone: z.string().max(30).optional(),
+    address: z.string().optional(),
     isActive: z.boolean().optional(),
     avatarUrl: z.string().url().optional(),
   })

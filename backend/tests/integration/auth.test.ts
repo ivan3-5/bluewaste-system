@@ -53,6 +53,7 @@ describe('Auth Integration Tests', () => {
       expect(res.body).toHaveProperty('token')
       expect(res.body.user).toHaveProperty('id', 'user-123')
       expect(res.body.user).toHaveProperty('role', 'LGU_ADMIN')
+      expect(res.body.user).toHaveProperty('address', '')
       // Note: Access token may also be sent in a cookie
       expect(res.headers['set-cookie']).toBeDefined()
     })
@@ -86,6 +87,39 @@ describe('Auth Integration Tests', () => {
       expect(res.body).toHaveProperty('error')
       expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED')
       expect(res.body.error).toHaveProperty('message', 'Invalid email or password')
+    })
+  })
+
+  describe('POST /api/v1/auth/register', () => {
+    it('should register successfully and preserve address', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null)
+      prismaMock.user.create.mockResolvedValue({
+        id: 'user-456',
+        email: 'newuser@example.com',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        role: 'CITIZEN',
+        phone: '09123456789',
+        avatarUrl: null,
+        address: '123 Green St, Barangay Clean',
+        createdAt: new Date(),
+      } as any)
+
+      const res = await request(app)
+        .post('/api/v1/auth/register')
+        .send({
+          email: 'newuser@example.com',
+          password: 'password123',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          phone: '09123456789',
+          address: '123 Green St, Barangay Clean',
+        })
+
+      expect(res.status).toBe(201)
+      expect(res.body).toHaveProperty('token')
+      expect(res.body.user).toHaveProperty('id', 'user-456')
+      expect(res.body.user).toHaveProperty('address', '123 Green St, Barangay Clean')
     })
   })
 })

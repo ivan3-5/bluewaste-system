@@ -6,6 +6,7 @@ export interface User {
   role: "CITIZEN" | "LGU_ADMIN" | "FIELD_WORKER";
   phone?: string;
   avatarUrl?: string;
+  address?: string;
   createdAt: string;
   updatedAt?: string;
 }

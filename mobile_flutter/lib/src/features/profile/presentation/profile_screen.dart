@@ -5,6 +5,7 @@ import "package:image_picker/image_picker.dart";
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
+import "../../auth/domain/app_user.dart";
 import "../../auth/presentation/auth_controller.dart";
 import "../../reports/presentation/my_reports_screen.dart";
 
@@ -29,10 +30,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void initState() {
     super.initState();
     final user = ref.read(authControllerProvider).user;
-    _firstNameController.text = user?.firstName ?? "";
-    _lastNameController.text = user?.lastName ?? "";
-    _phoneController.text = user?.phone ?? "";
-    _addressController.text = user?.address ?? "";
+    _populateControllers(user);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(authControllerProvider.notifier).refreshProfile();
+    });
+  }
+
+  void _populateControllers(AppUser? user) {
+    if (user == null) return;
+    _firstNameController.text = user.firstName;
+    _lastNameController.text = user.lastName;
+    _phoneController.text = user.phone ?? "";
+    _addressController.text = user.address ?? "";
   }
 
   @override
@@ -336,6 +345,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authControllerProvider, (previous, next) {
+      if (!_saving && next.user != null && previous?.user != next.user) {
+        _populateControllers(next.user);
+      }
+    });
+
     final user = ref.watch(authControllerProvider).user;
     final avatarUrl = (user?.avatarUrl ?? "").trim();
     final hasAvatar = avatarUrl.isNotEmpty;
@@ -443,6 +458,44 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                   textAlign: TextAlign.center,
                 ),
+                if ((user?.address ?? "").trim().isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.tint(AppColors.primary, opacity: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.location_on_rounded,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            user!.address!.trim(),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.sm),
                 AppStatusPill(
                   label: userRoleLabel,

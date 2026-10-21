@@ -52,6 +52,7 @@ export class UserService {
           role: true,
           phone: true,
           avatarUrl: true,
+          address: true,
           isActive: true,
           createdAt: true,
           _count: { select: { reports: true, assignedReports: true } },
@@ -73,8 +74,9 @@ export class UserService {
     lastName?: string;
     role?: string;
     phone?: string;
+    address?: string;
   }) {
-    const { email, password, firstName, lastName, role, phone } = data;
+    const { email, password, firstName, lastName, role, phone, address } = data;
 
     if (!email || !password || !firstName || !lastName || !role) {
       throw new Error("Missing required fields");
@@ -99,6 +101,7 @@ export class UserService {
         lastName,
         role: role as Role,
         phone: phone || null,
+        address: address || "",
       },
       select: {
         id: true,
@@ -108,6 +111,7 @@ export class UserService {
         role: true,
         phone: true,
         avatarUrl: true,
+        address: true,
         isActive: true,
         createdAt: true,
         _count: { select: { reports: true, assignedReports: true } },
@@ -123,11 +127,12 @@ export class UserService {
       email?: string;
       role?: string;
       phone?: string;
+      address?: string;
       isActive?: boolean;
       avatarUrl?: string;
     },
   ) {
-    const { firstName, lastName, email, role, phone, isActive, avatarUrl } = data;
+    const { firstName, lastName, email, role, phone, address, isActive, avatarUrl } = data;
 
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
@@ -153,6 +158,7 @@ export class UserService {
         ...(email !== undefined && { email }),
         ...(role !== undefined && { role: role as Role }),
         ...(phone !== undefined && { phone }),
+        ...(address !== undefined && { address }),
         ...(isActive !== undefined && { isActive }),
         ...(avatarUrl !== undefined && { avatarUrl }),
       },
@@ -164,6 +170,7 @@ export class UserService {
         role: true,
         phone: true,
         avatarUrl: true,
+        address: true,
         isActive: true,
         createdAt: true,
         _count: { select: { reports: true, assignedReports: true } },

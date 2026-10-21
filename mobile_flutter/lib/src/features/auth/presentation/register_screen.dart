@@ -106,7 +106,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text("Registration successful! Please log in."),
+            content:
+                const Text("Account created successfully! Welcome to BlueWaste."),
             behavior: SnackBarBehavior.floating,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
