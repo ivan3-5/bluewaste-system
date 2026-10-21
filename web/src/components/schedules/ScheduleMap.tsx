@@ -69,15 +69,10 @@ export default function ScheduleMap({
       delete container._leaflet_id;
     }
 
-    const initialCenter: [number, number] =
-      validSchedules.length > 0
-        ? [validSchedules[0].latitude, validSchedules[0].longitude]
-        : [7.3032, 125.6811];
-
     const map = L.map(container, {
       zoomControl: true,
       scrollWheelZoom: true,
-    }).setView(initialCenter, 13);
+    }).setView([7.3032, 125.6811], 13);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution:

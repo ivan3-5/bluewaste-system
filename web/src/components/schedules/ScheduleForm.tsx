@@ -154,8 +154,8 @@ export function ScheduleForm({
     enabled: isOpen,
   });
 
-  const displayedReports =
-    isEditing && initialData?.reports
+  const displayedReports = useMemo(() => {
+    return isEditing && initialData?.reports
       ? [
           ...initialData.reports,
           ...eligibleReports.filter(
@@ -163,6 +163,7 @@ export function ScheduleForm({
           ),
         ]
       : eligibleReports;
+  }, [isEditing, initialData?.reports, eligibleReports]);
 
   // Extract unique Location Names from verified reports for quick auto-fill
   const availableLocationNames = useMemo(() => {
@@ -837,7 +838,7 @@ export function ScheduleForm({
                 <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
                   <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
                   <p className="text-xs text-gray-600">
-                    Allocated equipment will appear on the field worker's mobile
+                    Allocated equipment will appear on the field worker&apos;s mobile
                     dispatch sheet, enabling them to verify and prepare supplies
                     prior to departing city hall.
                   </p>

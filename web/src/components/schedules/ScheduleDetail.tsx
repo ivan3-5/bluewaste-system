@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Dialog,
   DialogContent,
@@ -333,7 +334,7 @@ export function ScheduleDetail({
                 {schedule.workers.length === 0 ? (
                   <div className="col-span-2 p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs font-medium flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    No field workers assigned yet. Click "Edit Operation" to
+                    No field workers assigned yet. Click &quot;Edit Operation&quot; to
                     assign crew members.
                   </div>
                 ) : (
@@ -423,9 +424,12 @@ export function ScheduleDetail({
                             className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
                           />
                           {r.images?.[0]?.imageUrl && (
-                            <img
+                            <Image
                               src={r.images[0].imageUrl}
                               alt={r.title}
+                              width={40}
+                              height={40}
+                              unoptimized
                               className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-gray-200"
                             />
                           )}
@@ -475,9 +479,12 @@ export function ScheduleDetail({
                       className="flex gap-3 p-3 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow group"
                     >
                       {r.images?.[0]?.imageUrl ? (
-                        <img
+                        <Image
                           src={r.images[0].imageUrl}
                           alt={r.title}
+                          width={56}
+                          height={56}
+                          unoptimized
                           className="w-14 h-14 rounded-xl object-cover shrink-0 border border-gray-100"
                         />
                       ) : (
@@ -656,7 +663,7 @@ export function ScheduleDetail({
               <p className="text-xs text-gray-500 mt-1">
                 Are you sure you want to remove{" "}
                 <span className="font-semibold text-gray-800">
-                  "{schedule.title}"
+                  &quot;{schedule.title}&quot;
                 </span>
                 ? This action cannot be undone and will unassign workers and
                 linked reports.
