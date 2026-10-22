@@ -25,6 +25,7 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
   int _index = 0;
 
   void _setTab(int value) {
+    HapticFeedback.selectionClick();
     setState(() {
       _index = value;
     });
@@ -141,20 +142,20 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.card,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(color: AppColors.border),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             child: NavigationBar(
-              height: 66,
+              height: 64,
               elevation: 0,
               shadowColor: Colors.transparent,
               surfaceTintColor: Colors.transparent,
@@ -166,22 +167,28 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
               destinations: [
                 const NavigationDestination(
                   icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
+                  selectedIcon:
+                      Icon(Icons.home_rounded, color: AppColors.primary),
                   label: "Home",
                 ),
                 const NavigationDestination(
                   icon: Icon(Icons.assignment_outlined),
-                  selectedIcon: Icon(Icons.assignment),
+                  selectedIcon:
+                      Icon(Icons.assignment_rounded, color: AppColors.primary),
                   label: "Tasks",
                 ),
                 const NavigationDestination(
                   icon: Icon(Icons.map_outlined),
-                  selectedIcon: Icon(Icons.map),
+                  selectedIcon:
+                      Icon(Icons.map_rounded, color: AppColors.primary),
                   label: "Map",
                 ),
                 const NavigationDestination(
                   icon: Icon(Icons.calendar_month_outlined),
-                  selectedIcon: Icon(Icons.calendar_month),
+                  selectedIcon: Icon(
+                    Icons.calendar_month_rounded,
+                    color: AppColors.primary,
+                  ),
                   label: "Schedule",
                 ),
                 NavigationDestination(
@@ -190,7 +197,7 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
                     count: unreadCount,
                   ),
                   selectedIcon: AppBadgeIcon(
-                    icon: Icons.notifications,
+                    icon: Icons.notifications_rounded,
                     count: unreadCount,
                   ),
                   label: "Alerts",

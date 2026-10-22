@@ -74,6 +74,11 @@ class PremiumTextField extends StatefulWidget {
   final TextInputAction? textInputAction;
   final Widget? suffixIcon;
   final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onChanged;
+  final String? errorText;
+  final FocusNode? focusNode;
+  final TextCapitalization textCapitalization;
+  final bool enabled;
 
   const PremiumTextField({
     super.key,
@@ -86,6 +91,11 @@ class PremiumTextField extends StatefulWidget {
     this.textInputAction,
     this.suffixIcon,
     this.onSubmitted,
+    this.onChanged,
+    this.errorText,
+    this.focusNode,
+    this.textCapitalization = TextCapitalization.none,
+    this.enabled = true,
   });
 
   @override
@@ -93,97 +103,167 @@ class PremiumTextField extends StatefulWidget {
 }
 
 class _PremiumTextFieldState extends State<PremiumTextField> {
-  final FocusNode _focusNode = FocusNode();
+  FocusNode? _internalFocusNode;
+  FocusNode get _effectiveFocusNode =>
+      widget.focusNode ?? (_internalFocusNode ??= FocusNode());
   bool _isFocused = false;
 
   @override
   void initState() {
     super.initState();
-    _focusNode.addListener(() {
+    _effectiveFocusNode.addListener(_handleFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(PremiumTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusNode != oldWidget.focusNode) {
+      (oldWidget.focusNode ?? _internalFocusNode)
+          ?.removeListener(_handleFocusChange);
+      _effectiveFocusNode.addListener(_handleFocusChange);
+    }
+  }
+
+  void _handleFocusChange() {
+    if (mounted) {
       setState(() {
-        _isFocused = _focusNode.hasFocus;
+        _isFocused = _effectiveFocusNode.hasFocus;
       });
-    });
+    }
   }
 
   @override
   void dispose() {
-    _focusNode.dispose();
+    _effectiveFocusNode.removeListener(_handleFocusChange);
+    _internalFocusNode?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-      decoration: BoxDecoration(
-        color: _isFocused
-            ? AppColors.background
-            : AppColors.background.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: _isFocused
-            ? [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.15),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                )
-              ]
-            : [],
-      ),
-      child: TextField(
-        controller: widget.controller,
-        focusNode: _focusNode,
-        obscureText: widget.obscureText,
-        keyboardType: widget.keyboardType,
-        textInputAction: widget.textInputAction,
-        onSubmitted: widget.onSubmitted,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: AppColors.foreground.withValues(alpha: 0.9),
-          letterSpacing: 0.3,
-        ),
-        decoration: InputDecoration(
-          labelText: widget.labelText,
-          hintText: widget.hintText,
-          hintStyle: TextStyle(
-            color: AppColors.mutedForeground.withValues(alpha: 0.5),
-            fontWeight: FontWeight.w400,
-          ),
-          labelStyle: TextStyle(
-            color: AppColors.mutedForeground.withValues(alpha: 0.8),
-            fontWeight: FontWeight.w500,
-          ),
-          floatingLabelStyle: const TextStyle(
-            color: AppColors.primary,
-            fontWeight: FontWeight.w600,
-          ),
-          prefixIcon: Icon(
-            widget.prefixIcon,
-            color: _isFocused
-                ? AppColors.primary
-                : AppColors.mutedForeground.withValues(alpha: 0.8),
-          ),
-          suffixIcon: widget.suffixIcon,
-          enabledBorder: OutlineInputBorder(
+    final hasError =
+        widget.errorText != null && widget.errorText!.trim().isNotEmpty;
+    final primaryColor =
+        hasError ? AppColors.destructive : AppColors.primary;
+    final borderColor = hasError
+        ? AppColors.destructive
+        : (_isFocused
+            ? AppColors.primary
+            : AppColors.border.withValues(alpha: 0.6));
+    final borderWidth = hasError || _isFocused ? 1.8 : 1.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: hasError
+                ? AppColors.tint(AppColors.destructive, opacity: 0.03)
+                : (_isFocused
+                    ? AppColors.background
+                    : AppColors.background.withValues(alpha: 0.7)),
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: AppColors.border.withValues(alpha: 0.5),
-              width: 1,
+            boxShadow: _isFocused || hasError
+                ? [
+                    BoxShadow(
+                      color:
+                          primaryColor.withValues(alpha: hasError ? 0.12 : 0.15),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : [],
+          ),
+          child: TextField(
+            controller: widget.controller,
+            focusNode: _effectiveFocusNode,
+            obscureText: widget.obscureText,
+            keyboardType: widget.keyboardType,
+            textInputAction: widget.textInputAction,
+            textCapitalization: widget.textCapitalization,
+            enabled: widget.enabled,
+            onSubmitted: widget.onSubmitted,
+            onChanged: widget.onChanged,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: AppColors.foreground.withValues(alpha: 0.9),
+              letterSpacing: 0.3,
+            ),
+            decoration: InputDecoration(
+              labelText: widget.labelText,
+              hintText: widget.hintText,
+              hintStyle: TextStyle(
+                color: AppColors.mutedForeground.withValues(alpha: 0.5),
+                fontWeight: FontWeight.w400,
+              ),
+              labelStyle: TextStyle(
+                color: hasError
+                    ? AppColors.destructive
+                    : AppColors.mutedForeground.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w500,
+              ),
+              floatingLabelStyle: TextStyle(
+                color: primaryColor,
+                fontWeight: FontWeight.w700,
+              ),
+              prefixIcon: Icon(
+                widget.prefixIcon,
+                color: hasError
+                    ? AppColors.destructive
+                    : (_isFocused
+                        ? AppColors.primary
+                        : AppColors.mutedForeground.withValues(alpha: 0.8)),
+              ),
+              suffixIcon: widget.suffixIcon,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: borderColor,
+                  width: borderWidth,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: primaryColor,
+                  width: 2.0,
+                ),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
             ),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: AppColors.primary,
-              width: 2,
+        ),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(top: 5, left: 10, right: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  size: 13.5,
+                  color: AppColors.destructive,
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    widget.errorText!,
+                    style: const TextStyle(
+                      color: AppColors.destructive,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        ),
-      ),
+      ],
     );
   }
 }
