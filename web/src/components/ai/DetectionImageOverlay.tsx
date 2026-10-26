@@ -101,7 +101,7 @@ export default function DetectionImageOverlay({
   }, [detections, naturalSize]);
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+    <div className="relative overflow-hidden rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900">
       <Image
         ref={imageRef}
         src={imageSrc}

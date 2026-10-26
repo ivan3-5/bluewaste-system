@@ -21,6 +21,8 @@ type MapViewProps = {
   center?: [number, number];
   zoom?: number;
   hideControls?: boolean;
+  className?: string;
+  mapHeightClassName?: string;
 };
 
 const DEFAULT_CENTER: [number, number] = [7.3132, 125.6844];
@@ -199,6 +201,8 @@ export default function MapView({
   center = DEFAULT_CENTER,
   zoom = 12,
   hideControls = false,
+  className = "",
+  mapHeightClassName,
 }: MapViewProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<
@@ -678,27 +682,27 @@ export default function MapView({
   const activeCount = groupedMode ? filteredIncidents.length : filteredReports.length;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
       {isAdmin && !hideControls && (
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+        <div className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 px-4 py-3 sm:px-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap lg:w-auto">
               <div className="w-full sm:w-56 lg:w-64">
                 <label
                   htmlFor="coastal-zone-select"
-                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400"
                 >
                   Coastal Zone
                 </label>
                 <select
                   id="coastal-zone-select"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:focus:ring-sky-900/30"
                   value={selectedZoneId || ""}
                   onChange={(e) => setSelectedZoneId(e.target.value || null)}
                 >
-                  <option value="">Select a zone</option>
+                  <option value="" className="dark:bg-slate-900 dark:text-slate-200">Select a zone</option>
                   {zones.map((z: any) => (
-                    <option key={z.id} value={z.id}>
+                    <option key={z.id} value={z.id} className="dark:bg-slate-900 dark:text-slate-200">
                       {z.name}
                     </option>
                   ))}
@@ -708,13 +712,13 @@ export default function MapView({
               <div className="w-full sm:w-56 lg:w-64">
                 <label
                   htmlFor="status-filter-select"
-                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400"
                 >
                   All Status
                 </label>
                 <select
                   id="status-filter-select"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:focus:ring-sky-900/30"
                   value={selectedStatus}
                   onChange={(e) =>
                     setSelectedStatus(
@@ -722,10 +726,10 @@ export default function MapView({
                     )
                   }
                 >
-                  <option value="ALL">All Status</option>
+                  <option value="ALL" className="dark:bg-slate-900 dark:text-slate-200">All Status</option>
                   {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(
                     ([value, label]) => (
-                      <option key={value} value={value}>
+                      <option key={value} value={value} className="dark:bg-slate-900 dark:text-slate-200">
                         {label}
                       </option>
                     ),
@@ -741,7 +745,7 @@ export default function MapView({
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
                   groupedMode
                     ? "bg-[hsl(var(--primary))] text-white shadow-md"
-                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    : "border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
                 }`}
                 onClick={() => setGroupedMode((v) => !v)}
                 title={
@@ -764,7 +768,7 @@ export default function MapView({
                     className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
                       isDrawingZone
                         ? "bg-[hsl(var(--primary))] text-white hover:opacity-90"
-                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                        : "border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
                     }`}
                     onClick={() => {
                       setIsEditingZone(false);
@@ -777,7 +781,7 @@ export default function MapView({
                     className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
                       isEditingZone
                         ? "bg-amber-500 text-white hover:bg-amber-600"
-                        : "border border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
+                        : "border border-amber-200 dark:border-amber-900/60 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
                     }`}
                     onClick={() => {
                       setIsDrawingZone(false);
@@ -789,7 +793,7 @@ export default function MapView({
                 </>
               )}
               <button
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-700"
                 onClick={() => {
                   setSelectedZoneId(null);
                   setIsEditingZone(false);
@@ -806,7 +810,7 @@ export default function MapView({
             isEditingZone ||
             selectedStatus !== "ALL" ||
             groupedMode) && (
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
               {isDrawingZone
                 ? "Drawing mode enabled: draw a polygon on the map."
                 : isEditingZone
@@ -821,7 +825,7 @@ export default function MapView({
         </div>
       )}
 
-      <div className={`relative ${isAdmin ? "h-[62vh]" : "h-[70vh]"}`}>
+      <div className={`relative ${mapHeightClassName || (isAdmin ? "h-[62vh]" : "h-[70vh]")}`}>
         <div ref={containerRef} className="h-full w-full" />
       </div>
     </div>

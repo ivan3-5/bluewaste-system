@@ -176,22 +176,22 @@ export default function ScheduleMap({
   }, [validSchedules, onScheduleClick]);
 
   return (
-    <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/90 overflow-hidden transition-all duration-300">
+    <div className="bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-gray-100/90 dark:border-slate-800 overflow-hidden transition-all duration-300">
       {/* Map Control / Status Legend Banner */}
-      <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-gray-50/80 via-white to-blue-50/30">
+      <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-gray-50/80 via-white to-blue-50/30 dark:from-slate-900 dark:via-slate-950 dark:to-blue-950/20">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-700 flex items-center justify-center font-bold">
-            <MapPin className="w-5 h-5 text-blue-600" />
+          <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 flex items-center justify-center font-bold">
+            <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
               Coastal Operations GIS Map
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-900/60">
                 {validSchedules.length} Plotted{" "}
                 {validSchedules.length === 1 ? "Site" : "Sites"}
               </span>
             </h3>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-slate-400">
               Panabo City coastal cleanup deployments and operational perimeters
             </p>
           </div>
@@ -199,20 +199,20 @@ export default function ScheduleMap({
 
         {/* Legend */}
         <div className="flex items-center gap-3 flex-wrap text-xs font-semibold">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100/60">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-blue-200" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100/60 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-900/60">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-blue-200 dark:ring-blue-900" />
             Upcoming
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100/60">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-amber-200" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100/60 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-900/60">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-amber-200 dark:ring-amber-900" />
             Ongoing
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100/60">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100/60 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-900/60">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-900" />
             Completed
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-100/60">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-200" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-100/60 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/60">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-200 dark:ring-rose-900" />
             Cancelled
           </div>
         </div>

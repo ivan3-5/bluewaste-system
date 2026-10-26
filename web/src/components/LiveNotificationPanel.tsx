@@ -26,43 +26,43 @@ const VARIANT_CONFIG: Record<
 > = {
   success: {
     icon: <CheckCircle2 className="w-4 h-4" />,
-    bg: "bg-white",
-    border: "border-emerald-200",
+    bg: "bg-white dark:bg-slate-900/95",
+    border: "border-emerald-200 dark:border-emerald-800/60",
     bar: "bg-emerald-500",
-    title: "text-emerald-700",
-    iconBg: "bg-emerald-50 text-emerald-600",
+    title: "text-emerald-700 dark:text-emerald-300",
+    iconBg: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400",
   },
   error: {
     icon: <XCircle className="w-4 h-4" />,
-    bg: "bg-white",
-    border: "border-red-200",
+    bg: "bg-white dark:bg-slate-900/95",
+    border: "border-red-200 dark:border-red-800/60",
     bar: "bg-red-500",
-    title: "text-red-700",
-    iconBg: "bg-red-50 text-red-600",
+    title: "text-red-700 dark:text-red-300",
+    iconBg: "bg-red-50 text-red-600 dark:bg-rose-950/60 dark:text-rose-400",
   },
   warning: {
     icon: <AlertTriangle className="w-4 h-4" />,
-    bg: "bg-white",
-    border: "border-amber-200",
+    bg: "bg-white dark:bg-slate-900/95",
+    border: "border-amber-200 dark:border-amber-800/60",
     bar: "bg-amber-500",
-    title: "text-amber-700",
-    iconBg: "bg-amber-50 text-amber-600",
+    title: "text-amber-700 dark:text-amber-300",
+    iconBg: "bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400",
   },
   info: {
     icon: <Info className="w-4 h-4" />,
-    bg: "bg-white",
-    border: "border-blue-200",
+    bg: "bg-white dark:bg-slate-900/95",
+    border: "border-blue-200 dark:border-blue-800/60",
     bar: "bg-blue-500",
-    title: "text-blue-700",
-    iconBg: "bg-blue-50 text-blue-600",
+    title: "text-blue-700 dark:text-blue-300",
+    iconBg: "bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400",
   },
   system: {
     icon: <Zap className="w-4 h-4" />,
-    bg: "bg-white",
-    border: "border-violet-200",
+    bg: "bg-white dark:bg-slate-900/95",
+    border: "border-violet-200 dark:border-violet-800/60",
     bar: "bg-violet-500",
-    title: "text-violet-700",
-    iconBg: "bg-violet-50 text-violet-600",
+    title: "text-violet-700 dark:text-violet-300",
+    iconBg: "bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400",
   },
 };
 
@@ -151,16 +151,16 @@ function ToastCard({ toast }: { toast: ToastNotification }) {
             </p>
             <button
               onClick={handleDismiss}
-              className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors mt-0.5"
+              className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 transition-colors mt-0.5"
               aria-label="Dismiss notification"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
-          <p className="mt-0.5 text-xs text-gray-600 leading-snug line-clamp-2">
+          <p className="mt-0.5 text-xs text-gray-600 dark:text-slate-300 leading-snug line-clamp-2">
             {toast.message}
           </p>
-          <p className="mt-1.5 text-[10px] font-medium text-gray-400 uppercase tracking-wide">
+          <p className="mt-1.5 text-[10px] font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wide">
             {relativeTime}
           </p>
         </div>

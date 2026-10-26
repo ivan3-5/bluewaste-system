@@ -14,6 +14,7 @@ import {
   ListCardsSkeleton,
   PageHeadingSkeleton,
 } from "@/components/skeletons/page-skeletons";
+import { PaginationControls } from "@/components/ui/pagination";
 
 const WASTE_TYPE_STYLES: Record<WasteType, string> = {
   PLASTIC: "bg-blue-100 text-blue-800 border-blue-200",
@@ -41,6 +42,7 @@ export default function MyWasteReportsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -50,7 +52,7 @@ export default function MyWasteReportsPage() {
 
   const { data, isLoading: isReportsLoading } = useMyWasteReports({
     page,
-    limit: 10,
+    limit: pageSize,
   });
 
   if (!isLoading && !user) {
@@ -196,29 +198,20 @@ export default function MyWasteReportsPage() {
           )}
         </div>
 
-        {pagination && pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              Page {pagination.page} of {pagination.totalPages}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= pagination.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </Button>
-            </div>
+        {pagination && (
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <PaginationControls
+              currentPage={page}
+              totalRecords={pagination.total}
+              pageSize={pageSize}
+              totalPages={pagination.totalPages}
+              onPageChange={(newPage) => setPage(newPage)}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setPage(1);
+              }}
+              itemName="reports"
+            />
           </div>
         )}
       </div>

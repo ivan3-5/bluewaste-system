@@ -131,12 +131,17 @@ export class UserService {
       isActive?: boolean;
       avatarUrl?: string;
     },
+    requestingUserId?: string,
   ) {
     const { firstName, lastName, email, role, phone, address, isActive, avatarUrl } = data;
 
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new Error("User not found");
+    }
+
+    if (existing.role === Role.CITIZEN && requestingUserId && requestingUserId !== id) {
+      throw new Error("Citizen user accounts cannot be edited by administrators.");
     }
 
     if (role && !Object.values(Role).includes(role as Role)) {

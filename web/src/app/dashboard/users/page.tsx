@@ -16,6 +16,7 @@ import {
   PageHeadingSkeleton,
 } from "@/components/skeletons/page-skeletons";
 import { useLiveNotifications } from "@/contexts/LiveNotificationContext";
+import { PaginationControls } from "@/components/ui/pagination";
 
 const ROLE_LABELS: Record<string, string> = {
   LGU_ADMIN: "Admin",
@@ -24,9 +25,9 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_BADGE_CLASSES: Record<string, string> = {
-  LGU_ADMIN: "bg-blue-100 text-blue-800",
-  FIELD_WORKER: "bg-green-100 text-green-800",
-  CITIZEN: "bg-gray-100 text-gray-700",
+  LGU_ADMIN: "bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300",
+  FIELD_WORKER: "bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300",
+  CITIZEN: "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300",
 };
 
 const ROLES = ["LGU_ADMIN", "FIELD_WORKER", "CITIZEN"] as const;
@@ -55,6 +56,7 @@ const emptyForm: UserFormData = {
 export default function UsersPage() {
   const { pushToast } = useLiveNotifications();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [roleFilter, setRoleFilter] = useState("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -69,7 +71,7 @@ export default function UsersPage() {
 
   const { data, isLoading } = useUsers({
     page,
-    limit: 15,
+    limit: pageSize,
     role: roleFilter || undefined,
     search: search || undefined,
   });
@@ -114,6 +116,19 @@ export default function UsersPage() {
   };
 
   const openEdit = (user: UserRecord) => {
+    if (user.role === "CITIZEN") {
+      pushToast({
+        id: `user-edit-blocked-${user.id}`,
+        title: "Action Not Allowed",
+        message: "Citizen user accounts cannot be edited by administrators.",
+        type: "STATUS_CHANGE",
+        variant: "warning",
+        isRead: true,
+        createdAt: new Date().toISOString(),
+      });
+      return;
+    }
+
     setForm({
       firstName: user.firstName,
       lastName: user.lastName,
@@ -177,6 +192,10 @@ export default function UsersPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUser) return;
+    if (editUser.role === "CITIZEN") {
+      setFormError("Citizen user accounts cannot be edited by administrators.");
+      return;
+    }
     setFormError("");
 
     if (!form.firstName || !form.lastName || !form.email) {
@@ -226,7 +245,7 @@ export default function UsersPage() {
     required = false,
   ) => (
     <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">
+      <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
         {label}
         {required && <span className="ml-0.5 text-red-500">*</span>}
       </label>
@@ -247,9 +266,9 @@ export default function UsersPage() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">User Management</h1>
           {pagination && (
-            <p className="mt-0.5 text-sm text-gray-500">
+            <p className="mt-0.5 text-sm text-gray-500 dark:text-slate-400">
               {pagination.total} total user{pagination.total !== 1 ? "s" : ""}
             </p>
           )}
@@ -260,21 +279,21 @@ export default function UsersPage() {
       {/* Filters */}
       <div className="mb-6 flex flex-wrap items-end gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
+          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-slate-400">
             Role
           </label>
           <select
             title="Filter by role"
-            className="rounded-md border px-3 py-2 text-sm"
+            className="rounded-md border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
             value={roleFilter}
             onChange={(e) => {
               setRoleFilter(e.target.value);
               setPage(1);
             }}
           >
-            <option value="">All Roles</option>
+            <option value="" className="dark:bg-slate-900 dark:text-slate-200">All Roles</option>
             {ROLES.map((r) => (
-              <option key={r} value={r}>
+              <option key={r} value={r} className="dark:bg-slate-900 dark:text-slate-200">
                 {ROLE_LABELS[r]}
               </option>
             ))}
@@ -283,7 +302,7 @@ export default function UsersPage() {
 
         <div className="flex items-end gap-2">
           <div className="flex-1">
-            <label className="mb-1 block text-xs font-medium text-gray-600">
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-slate-400">
               Search
             </label>
             <Input
@@ -312,77 +331,89 @@ export default function UsersPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-800">
+          <thead className="bg-gray-50 dark:bg-slate-800/80">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
                 Name
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
                 Email
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
                 Role
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
                 Phone
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
                 Joined
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
             {users.length === 0 ? (
               <tr>
                 <td
                   colSpan={7}
-                  className="px-4 py-10 text-center text-gray-400"
+                  className="px-4 py-10 text-center text-gray-400 dark:text-slate-500"
                 >
                   No users found
                 </td>
               </tr>
             ) : (
               users.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-800">
+                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50">
+                  <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-slate-200">
                     {user.firstName} {user.lastName}
                   </td>
-                  <td className="max-w-[180px] truncate px-4 py-3 text-sm text-gray-600">
+                  <td className="max-w-[180px] truncate px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
                     {user.email}
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_BADGE_CLASSES[user.role] ?? "bg-gray-100 text-gray-700"}`}
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_BADGE_CLASSES[user.role] ?? "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300"}`}
                     >
                       {ROLE_LABELS[user.role] ?? user.role}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
                     {user.phone || "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${user.isActive ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-700"}`}
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${user.isActive ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300" : "bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300"}`}
                     >
                       {user.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-slate-400">
                     {formatDateTime(user.createdAt)}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => openEdit(user)}>
-                        Edit
-                      </Button>
+                    <div className="flex items-center gap-2">
+                      {user.role === "CITIZEN" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled
+                          className="cursor-not-allowed opacity-40 text-xs bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-400 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-400"
+                          title="Citizen accounts cannot be edited by administrators"
+                        >
+                          Edit
+                        </Button>
+                      ) : (
+                        <Button size="sm" onClick={() => openEdit(user)}>
+                          Edit
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -393,30 +424,20 @@ export default function UsersPage() {
       </div>
 
       {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-500">
-            Page {pagination.page} of {pagination.totalPages}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page <= 1}
-              onClick={() => setPage(page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page >= pagination.totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+      {pagination && (
+        <PaginationControls
+          currentPage={page}
+          totalRecords={pagination.total}
+          pageSize={pageSize}
+          totalPages={pagination.totalPages}
+          onPageChange={(newPage) => setPage(newPage)}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+          itemName="users"
+          className="mt-4 bg-white dark:bg-slate-900 p-3.5 rounded-lg border border-gray-200 dark:border-slate-800"
+        />
       )}
 
       {/* Add User Modal */}
@@ -426,10 +447,10 @@ export default function UsersPage() {
           onClick={() => setShowAddModal(false)}
         >
           <div
-            className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
+            className="w-full max-w-lg rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl border border-gray-100 dark:border-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-5 text-lg font-semibold text-gray-800">
+            <h3 className="mb-5 text-lg font-semibold text-gray-800 dark:text-slate-100">
               Add New User
             </h3>
             <form onSubmit={handleAddSubmit} className="space-y-4">
@@ -442,19 +463,19 @@ export default function UsersPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
                     Role <span className="text-red-500">*</span>
                   </label>
                   <select
                     title="Select role"
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
                     value={form.role}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, role: e.target.value as Role }))
                     }
                   >
                     {ADD_ROLES.map((r) => (
-                      <option key={r} value={r}>
+                      <option key={r} value={r} className="dark:bg-slate-900 dark:text-slate-200">
                         {ROLE_LABELS[r]}
                       </option>
                     ))}
@@ -463,13 +484,14 @@ export default function UsersPage() {
                 {field("Phone", "phone")}
               </div>
 
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
+              {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
 
               <div className="flex justify-end gap-3 pt-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowAddModal(false)}
+                  className="dark:border-slate-700 dark:text-slate-300"
                 >
                   Cancel
                 </Button>
@@ -489,58 +511,80 @@ export default function UsersPage() {
           onClick={() => setEditUser(null)}
         >
           <div
-            className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
+            className="w-full max-w-lg rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl border border-gray-100 dark:border-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-5 text-lg font-semibold text-gray-800">
+            <h3 className="mb-5 text-lg font-semibold text-gray-800 dark:text-slate-100">
               Edit User
             </h3>
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                {field("First Name", "firstName", "text", true)}
-                {field("Last Name", "lastName", "text", true)}
-              </div>
-              {field("Email", "email", "email", true)}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Role <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    title="Select role"
-                    className="w-full rounded-md border px-3 py-2 text-sm"
-                    value={form.role}
-                    disabled={isRoleLocked}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, role: e.target.value as Role }))
-                    }
-                  >
-                    {editRoles.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABELS[r]}
-                      </option>
-                    ))}
-                  </select>
+            {editUser.role === "CITIZEN" ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm text-amber-800 dark:text-amber-300">
+                  <p className="font-semibold">Citizen Account Protected</p>
+                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                    Citizen accounts are private and managed directly by the citizen. Administrators cannot modify citizen personal details.
+                  </p>
                 </div>
-                {field("Phone", "phone")}
+                <div className="flex justify-end pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditUser(null)}
+                    className="dark:border-slate-700 dark:text-slate-300"
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
+            ) : (
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {field("First Name", "firstName", "text", true)}
+                  {field("Last Name", "lastName", "text", true)}
+                </div>
+                {field("Email", "email", "email", true)}
 
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
+                      Role <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      title="Select role"
+                      className="w-full rounded-md border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
+                      value={form.role}
+                      disabled={isRoleLocked}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, role: e.target.value as Role }))
+                      }
+                    >
+                      {editRoles.map((r) => (
+                        <option key={r} value={r} className="dark:bg-slate-900 dark:text-slate-200">
+                          {ROLE_LABELS[r]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {field("Phone", "phone")}
+                </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEditUser(null)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={updateUser.isPending}>
-                  {updateUser.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </form>
+                {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditUser(null)}
+                    className="dark:border-slate-700 dark:text-slate-300"
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={updateUser.isPending}>
+                    {updateUser.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

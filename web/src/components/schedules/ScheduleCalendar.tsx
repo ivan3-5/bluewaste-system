@@ -44,50 +44,50 @@ const STATUS_CONFIG: Record<
     label: "Upcoming",
     dotBg: "bg-blue-600",
     borderLeft: "border-l-blue-600",
-    cardBg: "bg-gradient-to-r from-blue-50/95 via-indigo-50/40 to-white",
-    border: "border-blue-200/80",
+    cardBg: "bg-gradient-to-r from-blue-50/95 via-indigo-50/40 to-white dark:from-blue-950/70 dark:via-indigo-950/40 dark:to-slate-900",
+    border: "border-blue-200/80 dark:border-blue-900/60",
     hoverBorder: "hover:border-blue-400 hover:shadow-blue-500/10",
-    textColor: "text-blue-950",
-    pillBg: "bg-blue-50",
-    pillText: "text-blue-700",
-    pillBorder: "border-blue-200",
+    textColor: "text-blue-950 dark:text-blue-100",
+    pillBg: "bg-blue-50 dark:bg-blue-950/80",
+    pillText: "text-blue-700 dark:text-blue-300",
+    pillBorder: "border-blue-200 dark:border-blue-900/60",
   },
   ONGOING: {
     label: "Ongoing",
     dotBg: "bg-amber-500",
     isPulsing: true,
     borderLeft: "border-l-amber-500",
-    cardBg: "bg-gradient-to-r from-amber-50/95 via-orange-50/40 to-white",
-    border: "border-amber-300",
+    cardBg: "bg-gradient-to-r from-amber-50/95 via-orange-50/40 to-white dark:from-amber-950/70 dark:via-orange-950/40 dark:to-slate-900",
+    border: "border-amber-300 dark:border-amber-900/60",
     hoverBorder: "hover:border-amber-500 hover:shadow-amber-500/10",
-    textColor: "text-amber-950",
-    pillBg: "bg-amber-50",
-    pillText: "text-amber-800",
-    pillBorder: "border-amber-300",
+    textColor: "text-amber-950 dark:text-amber-100",
+    pillBg: "bg-amber-50 dark:bg-amber-950/80",
+    pillText: "text-amber-800 dark:text-amber-300",
+    pillBorder: "border-amber-300 dark:border-amber-900/60",
   },
   COMPLETED: {
     label: "Completed",
     dotBg: "bg-emerald-600",
     borderLeft: "border-l-emerald-600",
-    cardBg: "bg-gradient-to-r from-emerald-50/95 via-teal-50/40 to-white",
-    border: "border-emerald-200/80",
+    cardBg: "bg-gradient-to-r from-emerald-50/95 via-teal-50/40 to-white dark:from-emerald-950/70 dark:via-teal-950/40 dark:to-slate-900",
+    border: "border-emerald-200/80 dark:border-emerald-900/60",
     hoverBorder: "hover:border-emerald-400 hover:shadow-emerald-500/10",
-    textColor: "text-emerald-950",
-    pillBg: "bg-emerald-50",
-    pillText: "text-emerald-700",
-    pillBorder: "border-emerald-200",
+    textColor: "text-emerald-950 dark:text-emerald-100",
+    pillBg: "bg-emerald-50 dark:bg-emerald-950/80",
+    pillText: "text-emerald-700 dark:text-emerald-300",
+    pillBorder: "border-emerald-200 dark:border-emerald-900/60",
   },
   CANCELLED: {
     label: "Cancelled",
     dotBg: "bg-rose-500",
     borderLeft: "border-l-rose-400",
-    cardBg: "bg-rose-50/60",
-    border: "border-rose-200/70",
+    cardBg: "bg-rose-50/60 dark:bg-rose-950/40",
+    border: "border-rose-200/70 dark:border-rose-900/60",
     hoverBorder: "hover:border-rose-300 hover:shadow-rose-500/10",
-    textColor: "text-rose-900 line-through opacity-75",
-    pillBg: "bg-rose-50",
-    pillText: "text-rose-700",
-    pillBorder: "border-rose-200",
+    textColor: "text-rose-900 dark:text-rose-200 line-through opacity-75",
+    pillBg: "bg-rose-50 dark:bg-rose-950/80",
+    pillText: "text-rose-700 dark:text-rose-300",
+    pillBorder: "border-rose-200 dark:border-rose-900/60",
   },
 };
 
@@ -112,9 +112,9 @@ export function ScheduleCalendar({
   }, [schedules]);
 
   return (
-    <div className="bg-white/85 backdrop-blur-2xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8 transition-all hover:shadow-[0_16px_40px_rgb(0,0,0,0.06)]">
+    <div className="bg-white/85 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-gray-100 dark:border-slate-800 p-6 md:p-8 transition-all hover:shadow-[0_16px_40px_rgb(0,0,0,0.06)]">
       {/* ── Calendar Operational Top Banner ─────── */}
-      <div className="mb-6 pb-6 border-b border-gray-100 flex items-center justify-between gap-4">
+      <div className="mb-6 pb-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4">
         {/* Left: Branding & Context */}
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 via-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold shadow-md shadow-blue-500/20 shrink-0">
@@ -122,14 +122,14 @@ export function ScheduleCalendar({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-black text-gray-900 tracking-tight">
+              <h3 className="text-base font-black text-gray-900 dark:text-slate-100 tracking-tight">
                 Monthly Operational Timeline
               </h3>
-              <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold">
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/60 text-xs font-bold">
                 {schedules.length} Scheduled
               </span>
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
               {onDateClick
                 ? "Click any future date to create a cleanup operation, or select an event for full briefing"
                 : "Select any scheduled cleanup operation to view full briefing"}
@@ -300,7 +300,7 @@ export function ScheduleCalendar({
                         </span>
                         {config.label}
                       </span>
-                      <span className="text-[10px] font-bold text-gray-500">
+                      <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400">
                         {timeStr}
                       </span>
                     </div>
@@ -312,21 +312,21 @@ export function ScheduleCalendar({
                     </h4>
 
                     {schedule?.barangay && (
-                      <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-500 font-medium truncate">
-                        <MapPin className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                      <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-500 dark:text-slate-400 font-medium truncate">
+                        <MapPin className="w-2.5 h-2.5 text-gray-400 dark:text-slate-500 shrink-0" />
                         <span className="truncate">{schedule.barangay}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 mt-2 pt-1 border-t border-gray-100/60 text-[10px] text-gray-500">
+                  <div className="flex items-center gap-2 mt-2 pt-1 border-t border-gray-100/60 dark:border-slate-800 text-[10px] text-gray-500 dark:text-slate-400">
                     <span className="flex items-center gap-1">
-                      <Users className="w-3 h-3 text-blue-600" />
+                      <Users className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                       <span className="font-semibold">{workerCount} Crew</span>
                     </span>
                     {reportCount > 0 && (
                       <span className="flex items-center gap-1">
-                        <FileText className="w-3 h-3 text-indigo-600" />
+                        <FileText className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
                         <span className="font-semibold">
                           {reportCount} Reports
                         </span>
@@ -354,7 +354,7 @@ export function ScheduleCalendar({
                         className={`relative inline-flex rounded-full h-2 w-2 ${config.dotBg}`}
                       />
                     </span>
-                    <span className="text-[10px] font-bold text-gray-700 tracking-tight shrink-0">
+                    <span className="text-[10px] font-bold text-gray-700 dark:text-slate-300 tracking-tight shrink-0">
                       {timeStr}
                     </span>
                   </div>
@@ -362,19 +362,19 @@ export function ScheduleCalendar({
                   <div className="flex items-center gap-1 shrink-0">
                     {workerCount > 0 && (
                       <span
-                        className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/90 border border-gray-200/80 text-[9px] font-bold text-gray-700 shadow-2xs"
+                        className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/90 dark:bg-slate-800/90 border border-gray-200/80 dark:border-slate-700 text-[9px] font-bold text-gray-700 dark:text-slate-300 shadow-2xs"
                         title={`${workerCount} assigned worker${workerCount > 1 ? "s" : ""}`}
                       >
-                        <Users className="w-2.5 h-2.5 text-blue-600" />
+                        <Users className="w-2.5 h-2.5 text-blue-600 dark:text-blue-400" />
                         <span>{workerCount}</span>
                       </span>
                     )}
                     {reportCount > 0 && (
                       <span
-                        className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/90 border border-gray-200/80 text-[9px] font-bold text-gray-700 shadow-2xs"
+                        className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/90 dark:bg-slate-800/90 border border-gray-200/80 dark:border-slate-700 text-[9px] font-bold text-gray-700 dark:text-slate-300 shadow-2xs"
                         title={`${reportCount} linked waste report${reportCount > 1 ? "s" : ""}`}
                       >
-                        <FileText className="w-2.5 h-2.5 text-indigo-600" />
+                        <FileText className="w-2.5 h-2.5 text-indigo-600 dark:text-indigo-400" />
                         <span>{reportCount}</span>
                       </span>
                     )}
@@ -390,8 +390,8 @@ export function ScheduleCalendar({
 
                 {/* Coastal Barangay Location */}
                 {schedule?.barangay && (
-                  <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 font-medium truncate">
-                    <MapPin className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                  <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 dark:text-slate-400 font-medium truncate">
+                    <MapPin className="w-2.5 h-2.5 text-gray-400 dark:text-slate-500 shrink-0" />
                     <span className="truncate">{schedule.barangay}</span>
                   </div>
                 )}

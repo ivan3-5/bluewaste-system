@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link
           rel="stylesheet"
@@ -39,8 +39,32 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var p = window.location.pathname;
+                  var isDash = p.indexOf('/dashboard') === 0 || p.indexOf('/field-worker') === 0;
+                  if (isDash) {
+                    var s = localStorage.getItem('bluewaste_dashboard_theme');
+                    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    var dark = s === 'dark' || (!s && prefersDark);
+                    if (dark) {
+                      document.documentElement.classList.add('dark');
+                    } else {
+                      document.documentElement.classList.remove('dark');
+                    }
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
       </head>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </QueryProvider>

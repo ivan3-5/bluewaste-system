@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Image from "next/image";
 import { Search, Loader2 } from "lucide-react";
 import {
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLiveNotifications } from "@/contexts/LiveNotificationContext";
+import { PaginationControls, useClientPagination } from "@/components/ui/pagination";
 
 
 type ReportsTableProps = {
@@ -41,12 +42,12 @@ const STATUS_FLOW: Record<AdminReportStatus, AdminReportStatus[]> = {
 };
 
 const STATUS_TRIGGER_STYLES: Record<AdminReportStatus, string> = {
-  PENDING: "border-amber-200/90 bg-amber-50/80 text-amber-700 hover:bg-amber-100/70 focus:ring-amber-400",
-  VERIFIED: "border-blue-200/90 bg-blue-50/80 text-blue-700 hover:bg-blue-100/70 focus:ring-blue-400",
-  CLEANUP_SCHEDULED: "border-violet-200/90 bg-violet-50/80 text-violet-700 hover:bg-violet-100/70 focus:ring-violet-400",
-  IN_PROGRESS: "border-orange-200/90 bg-orange-50/80 text-orange-700 hover:bg-orange-100/70 focus:ring-orange-400",
-  CLEANED: "border-emerald-200/90 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100/70 focus:ring-emerald-400",
-  REJECTED: "border-rose-200/90 bg-rose-50/80 text-rose-700 hover:bg-rose-100/70 focus:ring-rose-400",
+  PENDING: "border-amber-200/90 bg-amber-50/80 text-amber-700 hover:bg-amber-100/70 focus:ring-amber-400 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-950/60",
+  VERIFIED: "border-blue-200/90 bg-blue-50/80 text-blue-700 hover:bg-blue-100/70 focus:ring-blue-400 dark:border-blue-500/30 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60",
+  CLEANUP_SCHEDULED: "border-violet-200/90 bg-violet-50/80 text-violet-700 hover:bg-violet-100/70 focus:ring-violet-400 dark:border-violet-500/30 dark:bg-violet-950/40 dark:text-violet-300 dark:hover:bg-violet-950/60",
+  IN_PROGRESS: "border-orange-200/90 bg-orange-50/80 text-orange-700 hover:bg-orange-100/70 focus:ring-orange-400 dark:border-orange-500/30 dark:bg-orange-950/40 dark:text-orange-300 dark:hover:bg-orange-950/60",
+  CLEANED: "border-emerald-200/90 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100/70 focus:ring-emerald-400 dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60",
+  REJECTED: "border-rose-200/90 bg-rose-50/80 text-rose-700 hover:bg-rose-100/70 focus:ring-rose-400 dark:border-rose-500/30 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/60",
 };
 
 const STATUS_DOT_COLORS: Record<AdminReportStatus, string> = {
@@ -105,6 +106,14 @@ export function ReportsTable({
     });
   }, [reports, searchQuery, statusFilter]);
 
+  const pagination = useClientPagination(visibleReports, 10);
+  const { resetPage } = pagination;
+
+  // Auto-reset pagination to page 1 whenever search query or status filter changes
+  useEffect(() => {
+    resetPage();
+  }, [searchQuery, statusFilter, resetPage]);
+
   const handleSaveStatus = async (
     report: AdminReport,
     nextStatus: AdminReportStatus,
@@ -159,9 +168,9 @@ export function ReportsTable({
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
       {showControls && (
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200/80 p-4 bg-slate-50/40">
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200/80 dark:border-slate-800 p-4 bg-slate-50/40 dark:bg-slate-950/40">
 
           <Select
             value={statusFilter || "all"}
@@ -174,7 +183,7 @@ export function ReportsTable({
                 "w-[180px] rounded-xl font-semibold transition-all shadow-xs",
                 statusFilter
                   ? STATUS_TRIGGER_STYLES[statusFilter]
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50/80"
+                  : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50/80 dark:hover:bg-slate-800"
               )}
             >
               <div className="flex items-center gap-2 truncate">
@@ -190,7 +199,7 @@ export function ReportsTable({
             <SelectContent className="w-[210px]">
               <SelectItem value="all">
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-slate-300" />
+                  <span className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600" />
                   <span>All Statuses</span>
                 </div>
               </SelectItem>
@@ -220,60 +229,60 @@ export function ReportsTable({
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search reports..."
               aria-label="Search reports"
-              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-9 pr-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
           </div>
         </div>
       )}
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+        <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+          <thead className="bg-slate-50 dark:bg-slate-800/60">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Image
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Category
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Severity
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Reporter
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Assigned
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Reported
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {visibleReports.length === 0 ? (
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {pagination.totalRecords === 0 ? (
               <tr>
                 <td
                   colSpan={8}
-                  className="px-4 py-10 text-center text-sm text-slate-500"
+                  className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                 >
                   No reports match the current filters.
                 </td>
               </tr>
             ) : (
-              visibleReports.map((report) => {
+              pagination.paginatedItems.map((report) => {
                 const currentStatus = statusDrafts[report.id] ?? report.status;
                 const isSaving = savingStatusReportId === report.id;
                 const allowedStatuses = STATUS_FLOW[report.status] || [];
 
                 return (
-                  <tr key={report.id} className="hover:bg-slate-50/60 transition-colors">
+                  <tr key={report.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="px-4 py-3">
                       <Image
                         src={report.imageUrl}
@@ -291,21 +300,21 @@ export function ReportsTable({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <p className="max-w-[240px] truncate text-sm font-semibold text-slate-900">
+                        <p className="max-w-[240px] truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                           {report.reporterName || "Anonymous Citizen"}
                         </p>
                       </div>
                       {report.reporterEmail ? (
-                        <p className="max-w-[240px] truncate text-xs text-slate-500">
+                        <p className="max-w-[240px] truncate text-xs text-slate-500 dark:text-slate-400">
                           {report.reporterEmail}
                         </p>
                       ) : (
-                        <p className="max-w-[240px] truncate text-xs text-slate-400 italic">
+                        <p className="max-w-[240px] truncate text-xs text-slate-400 dark:text-slate-500 italic">
                           Identity hidden
                         </p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-900">
+                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">
                       <ReportAssignmentCell report={report} />
                     </td>
                     <td className="px-4 py-3">
@@ -360,7 +369,7 @@ export function ReportsTable({
                                     disabled={disabled}
                                     className={cn(
                                       "py-2 text-xs",
-                                      isCurrent && "font-semibold text-blue-600 bg-blue-50/70"
+                                      isCurrent && "font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/70 dark:bg-blue-950/40"
                                     )}
                                   >
                                     <div className="flex items-center justify-between w-full gap-2">
@@ -376,7 +385,7 @@ export function ReportsTable({
                                         <span>{label}</span>
                                       </div>
                                       {isCurrent && (
-                                        <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-100/80 px-1.5 py-0.5 rounded-full">
+                                        <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-900/60 px-1.5 py-0.5 rounded-full">
                                           Current
                                         </span>
                                       )}
@@ -391,8 +400,12 @@ export function ReportsTable({
                         <StatusBadge status={report.status} />
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {new Date(report.reportedAt).toLocaleString()}
+                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                      {new Date(report.reportedAt).toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
                     </td>
                     <td className="px-4 py-3">
                       <Link
@@ -408,6 +421,20 @@ export function ReportsTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* ── Table Pagination Bar ── */}
+      <div className="px-4 pb-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <PaginationControls
+          currentPage={pagination.currentPage}
+          totalRecords={pagination.totalRecords}
+          pageSize={pagination.pageSize}
+          totalPages={pagination.totalPages}
+          onPageChange={pagination.setCurrentPage}
+          onPageSizeChange={pagination.setPageSize}
+          itemName="reports"
+          compact={compact}
+        />
       </div>
     </div>
   );
@@ -434,7 +461,7 @@ function ReportAssignmentCell({ report }: { report: AdminReport }) {
   }, [report.assignedWorkers, report.assignedWorkerNames, report.assignedToId, report.assignedToName]);
 
   if (currentWorkers.length === 0) {
-    return <span className="text-sm text-slate-400 italic">Unassigned</span>;
+    return <span className="text-sm text-slate-400 dark:text-slate-500 italic">Unassigned</span>;
   }
 
   return (
@@ -449,10 +476,10 @@ function ReportAssignmentCell({ report }: { report: AdminReport }) {
           </span>
           {/* Tooltip on hover */}
           <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 opacity-0 transition-all duration-150 group-hover:opacity-100 z-30">
-            <div className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white shadow-md">
+            <div className="whitespace-nowrap rounded-lg bg-slate-900 dark:bg-slate-800 dark:border dark:border-slate-700 px-2.5 py-1 text-xs font-medium text-white shadow-md">
               {w.name}
             </div>
-            <div className="mx-auto -mt-1 h-1.5 w-1.5 rotate-45 bg-slate-900" />
+            <div className="mx-auto -mt-1 h-1.5 w-1.5 rotate-45 bg-slate-900 dark:bg-slate-800" />
           </div>
         </div>
       ))}

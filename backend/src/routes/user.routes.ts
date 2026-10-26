@@ -1,6 +1,6 @@
-import { Router } from "express";
+import { Router, Response, NextFunction } from "express";
 import { UserController } from "../controllers/user.controller";
-import { authenticate } from "../middleware/auth";
+import { authenticate, AuthRequest } from "../middleware/auth";
 import { authorize } from "../middleware/authorize";
 import { validate } from "../middleware/validate";
 import {
@@ -33,7 +33,16 @@ router.post(
 router.put(
   "/:id",
   authenticate,
-  authorize("LGU_ADMIN"),
+  (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.user?.role === "LGU_ADMIN" || req.user?.id === req.params.id) {
+      if (req.user?.role !== "LGU_ADMIN") {
+        delete req.body.role;
+        delete req.body.isActive;
+      }
+      return next();
+    }
+    return res.status(403).json({ error: "Insufficient permissions." });
+  },
   validate(userIdParamSchema, "params"),
   validate(updateUserSchema),
   UserController.updateUser,

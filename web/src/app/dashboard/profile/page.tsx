@@ -100,24 +100,24 @@ export default function ProfilePage() {
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-600 tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-600 dark:from-blue-400 dark:to-indigo-300 tracking-tight">
               Account Settings
             </h1>
-            <p className="text-slate-500 mt-2 text-base md:text-lg">
+            <p className="text-slate-500 dark:text-slate-400 mt-2 text-base md:text-lg">
               Manage your personal information and preferences
             </p>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-full border border-blue-100 font-medium text-sm shadow-sm">
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 rounded-full border border-blue-100 dark:border-blue-900/60 font-medium text-sm shadow-sm">
             <Shield className="w-4 h-4" />
             <span>{user.role === "LGU_ADMIN" ? "Administrator" : user.role === "FIELD_WORKER" ? "Field Worker" : "Citizen"}</span>
           </div>
         </div>
 
         {/* Main Card */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] overflow-hidden relative">
+        <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] border border-white dark:border-slate-800 dark:bg-slate-900/90 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] dark:shadow-none overflow-hidden relative">
           
           {/* Decorative background element */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-100/40 to-indigo-100/40 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-100/40 to-indigo-100/40 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
           
           <div className="p-8 md:p-12 relative z-10">
             <form onSubmit={handleSubmit} className="space-y-10">
@@ -127,15 +127,15 @@ export default function ProfilePage() {
                 <div
                   className={`p-5 rounded-2xl flex items-center gap-4 transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${
                     message.type === "success"
-                      ? "bg-green-50/80 backdrop-blur-sm text-green-800 border border-green-200/50 shadow-sm"
-                      : "bg-red-50/80 backdrop-blur-sm text-red-800 border border-red-200/50 shadow-sm"
+                      ? "bg-green-50/80 backdrop-blur-sm text-green-800 border border-green-200/50 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60 shadow-sm"
+                      : "bg-red-50/80 backdrop-blur-sm text-red-800 border border-red-200/50 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60 shadow-sm"
                   }`}
                 >
-                  <div className={`p-2 rounded-full ${message.type === "success" ? "bg-green-100" : "bg-red-100"}`}>
+                  <div className={`p-2 rounded-full ${message.type === "success" ? "bg-green-100 dark:bg-emerald-900/50" : "bg-red-100 dark:bg-rose-900/50"}`}>
                     {message.type === "success" ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-emerald-400" />
                     ) : (
-                      <AlertCircle className="w-5 h-5 text-red-600" />
+                      <AlertCircle className="w-5 h-5 text-red-600 dark:text-rose-400" />
                     )}
                   </div>
                   <p className="text-sm font-semibold">{message.text}</p>
@@ -143,9 +143,9 @@ export default function ProfilePage() {
               )}
 
               {/* Avatar Section */}
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 p-6 bg-slate-50/50 rounded-3xl border border-slate-100">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 p-6 bg-slate-50/50 dark:bg-slate-800/40 rounded-3xl border border-slate-100 dark:border-slate-800">
                 <div className="relative group cursor-pointer" onClick={() => !isUploadingImage && fileInputRef.current?.click()}>
-                  <div className={`w-32 h-32 rounded-full overflow-hidden bg-white flex items-center justify-center border-4 border-white shadow-xl ring-4 ring-slate-100 transition-all duration-300 ${isUploadingImage ? 'opacity-50' : 'group-hover:ring-blue-100 group-hover:shadow-2xl group-hover:scale-105'}`}>
+                  <div className={`w-32 h-32 rounded-full overflow-hidden bg-white dark:bg-slate-800 flex items-center justify-center border-4 border-white dark:border-slate-800 shadow-xl ring-4 ring-slate-100 dark:ring-slate-700 transition-all duration-300 ${isUploadingImage ? 'opacity-50' : 'group-hover:ring-blue-100 dark:group-hover:ring-blue-900/50 group-hover:shadow-2xl group-hover:scale-105'}`}>
                     {formData.avatarUrl ? (
                       <Image
                         src={formData.avatarUrl}
@@ -155,7 +155,7 @@ export default function ProfilePage() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="text-4xl font-black text-slate-300 tracking-tighter">
+                      <span className="text-4xl font-black text-slate-300 dark:text-slate-600 tracking-tighter">
                         {formData.firstName?.[0]}
                         {formData.lastName?.[0]}
                       </span>
@@ -169,8 +169,8 @@ export default function ProfilePage() {
                   
                   {isUploadingImage && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="bg-white/90 p-2 rounded-full shadow-lg">
-                        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                      <div className="bg-white/90 dark:bg-slate-800/90 p-2 rounded-full shadow-lg">
+                        <Loader2 className="w-6 h-6 animate-spin text-blue-600 dark:text-blue-400" />
                       </div>
                     </div>
                   )}
@@ -185,8 +185,8 @@ export default function ProfilePage() {
                 </div>
                 
                 <div className="flex flex-col items-center sm:items-start text-center sm:text-left pt-2">
-                  <h3 className="text-lg font-bold text-slate-800">Profile Photo</h3>
-                  <p className="text-sm text-slate-500 mt-1 max-w-xs">
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Profile Photo</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xs">
                     Upload a new photo to personalize your account. Max size: 5MB (JPG, PNG).
                   </p>
                   <Button
@@ -194,9 +194,9 @@ export default function ProfilePage() {
                     variant="outline"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingImage}
-                    className="mt-4 rounded-xl border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold shadow-sm transition-all"
+                    className="mt-4 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold shadow-sm transition-all"
                   >
-                    <Upload className="w-4 h-4 mr-2 text-slate-500" />
+                    <Upload className="w-4 h-4 mr-2 text-slate-500 dark:text-slate-400" />
                     Choose Image
                   </Button>
                 </div>
@@ -205,8 +205,8 @@ export default function ProfilePage() {
               {/* Form Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                 <div className="space-y-3">
-                  <Label htmlFor="firstName" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <User className="w-4 h-4 text-slate-400" /> First Name
+                  <Label htmlFor="firstName" className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                    <User className="w-4 h-4 text-slate-400 dark:text-slate-500" /> First Name
                   </Label>
                   <Input
                     id="firstName"
@@ -214,13 +214,13 @@ export default function ProfilePage() {
                     value={formData.firstName}
                     onChange={handleChange}
                     required
-                    className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
+                    className="h-12 rounded-xl bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
                   />
                 </div>
                 
                 <div className="space-y-3">
-                  <Label htmlFor="lastName" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <User className="w-4 h-4 text-slate-400" /> Last Name
+                  <Label htmlFor="lastName" className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                    <User className="w-4 h-4 text-slate-400 dark:text-slate-500" /> Last Name
                   </Label>
                   <Input
                     id="lastName"
@@ -228,13 +228,13 @@ export default function ProfilePage() {
                     value={formData.lastName}
                     onChange={handleChange}
                     required
-                    className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
+                    className="h-12 rounded-xl bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
                   />
                 </div>
 
                 <div className="space-y-3">
-                  <Label htmlFor="email" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-slate-400" /> Email Address
+                  <Label htmlFor="email" className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500" /> Email Address
                   </Label>
                   <Input
                     id="email"
@@ -243,13 +243,13 @@ export default function ProfilePage() {
                     value={formData.email}
                     onChange={handleChange}
                     required
-                    className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
+                    className="h-12 rounded-xl bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
                   />
                 </div>
                 
                 <div className="space-y-3">
-                  <Label htmlFor="phone" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-slate-400" /> Phone Number <span className="text-slate-400 font-normal">(Optional)</span>
+                  <Label htmlFor="phone" className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500" /> Phone Number <span className="text-slate-400 dark:text-slate-500 font-normal">(Optional)</span>
                   </Label>
                   <Input
                     id="phone"
@@ -257,13 +257,13 @@ export default function ProfilePage() {
                     type="tel"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
+                    className="h-12 rounded-xl bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
                   />
                 </div>
 
                 <div className="space-y-3 md:col-span-2">
-                  <Label htmlFor="address" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-slate-400" /> Address
+                  <Label htmlFor="address" className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-slate-400 dark:text-slate-500" /> Address
                   </Label>
                   <Input
                     id="address"
@@ -271,13 +271,13 @@ export default function ProfilePage() {
                     value={formData.address}
                     onChange={handleChange}
                     placeholder="Enter your street address or barangay"
-                    className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
+                    className="h-12 rounded-xl bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-base shadow-sm"
                   />
                 </div>
               </div>
               
               {/* Action Area */}
-              <div className="pt-8 mt-8 border-t border-slate-100 flex items-center justify-end">
+              <div className="pt-8 mt-8 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
                 <Button 
                   type="submit" 
                   disabled={isLoading} 

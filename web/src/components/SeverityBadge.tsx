@@ -9,22 +9,22 @@ const SEVERITY_CONFIG: Record<
   CRITICAL: {
     label: "Critical",
     emoji: "🔴",
-    className: "border-red-200 bg-red-50 text-red-700",
+    className: "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-300",
   },
   HIGH: {
     label: "High",
     emoji: "🟠",
-    className: "border-orange-200 bg-orange-50 text-orange-700",
+    className: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/40 dark:text-orange-300",
   },
   MODERATE: {
     label: "Moderate",
     emoji: "🟡",
-    className: "border-yellow-200 bg-yellow-50 text-yellow-800",
+    className: "border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-950/40 dark:text-yellow-300",
   },
   SPAM: {
     label: "Spam",
     emoji: "⚪",
-    className: "border-slate-200 bg-slate-100 text-slate-500",
+    className: "border-slate-200 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400",
   },
 };
 
@@ -44,7 +44,7 @@ export function SeverityBadge({
   if (!severity) {
     if (!showFallback) return null;
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-400">
+      <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1 text-xs font-medium text-slate-400 dark:text-slate-400">
         {showEmoji && <span>⏳</span>}
         Not Analyzed
       </span>

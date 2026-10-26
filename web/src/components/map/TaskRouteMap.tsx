@@ -348,37 +348,37 @@ export default function TaskRouteMap({ lat, lng, reportTitle }: Props) {
     <div className="flex h-full w-full flex-col">
       {/* Info bar */}
       {phase === "ready" && (
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100/60 bg-gradient-to-r from-blue-50/60 to-slate-50/50 px-5 py-3">
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100/60 dark:border-slate-800 bg-gradient-to-r from-blue-50/60 to-slate-50/50 dark:from-slate-900/90 dark:to-slate-950/90 px-5 py-3">
           {routeInfo ? (
             <>
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400">
                   <Milestone className="h-3.5 w-3.5" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Distance</p>
-                  <p className="text-xs font-bold text-slate-800">{fmtDistance(routeInfo.distanceKm)}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Distance</p>
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{fmtDistance(routeInfo.distanceKm)}</p>
                 </div>
               </div>
-              <div className="h-7 w-px bg-slate-200" />
+              <div className="h-7 w-px bg-slate-200 dark:bg-slate-700" />
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-teal-100 text-teal-600">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-950/80 text-teal-600 dark:text-teal-400">
                   <Clock className="h-3.5 w-3.5" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Drive Time</p>
-                  <p className="text-xs font-bold text-slate-800">{fmtDuration(routeInfo.durationSec)}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Drive Time</p>
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{fmtDuration(routeInfo.durationSec)}</p>
                 </div>
               </div>
             </>
           ) : straightKm !== null ? (
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-orange-600">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 dark:bg-amber-950/80 text-orange-600 dark:text-amber-400">
                 <MapPin className="h-3.5 w-3.5" />
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Straight-line</p>
-                <p className="text-xs font-bold text-slate-800">{fmtDistance(straightKm)}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Straight-line</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{fmtDistance(straightKm)}</p>
               </div>
             </div>
           ) : null}
@@ -387,10 +387,10 @@ export default function TaskRouteMap({ lat, lng, reportTitle }: Props) {
             <span
               className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold ${
                 gpsAccuracy <= 20
-                  ? "bg-green-100 text-green-700"
+                  ? "bg-green-100 text-green-700 dark:bg-emerald-950/80 dark:text-emerald-300"
                   : gpsAccuracy <= 100
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-orange-100 text-orange-700"
+                  ? "bg-yellow-100 text-yellow-700 dark:bg-amber-950/80 dark:text-amber-300"
+                  : "bg-orange-100 text-orange-700 dark:bg-orange-950/80 dark:text-orange-300"
               }`}
             >
               ±{gpsAccuracy}m GPS
@@ -399,7 +399,7 @@ export default function TaskRouteMap({ lat, lng, reportTitle }: Props) {
 
           <button
             onClick={loadRoute}
-            className="ml-auto flex h-7 w-7 items-center justify-center rounded-lg bg-white/70 text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:bg-white hover:text-blue-600"
+            className="ml-auto flex h-7 w-7 items-center justify-center rounded-lg bg-white/70 dark:bg-slate-800 text-slate-500 dark:text-slate-300 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 transition hover:bg-white dark:hover:bg-slate-700 hover:text-blue-600 dark:hover:text-blue-400"
             title="Refresh route"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -413,13 +413,13 @@ export default function TaskRouteMap({ lat, lng, reportTitle }: Props) {
 
         {/* Legend */}
         {phase === "ready" && (
-          <div className="absolute bottom-4 left-3 z-[1000] space-y-1.5 rounded-xl border border-slate-200/60 bg-white/90 px-3 py-2.5 text-xs text-slate-600 shadow-md backdrop-blur-sm">
+          <div className="absolute bottom-4 left-3 z-[1000] space-y-1.5 rounded-xl border border-slate-200/60 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 shadow-md backdrop-blur-sm">
             <div className="flex items-center gap-2">
-              <span className="h-3 w-3 flex-shrink-0 rounded-full bg-[#0066cc] ring-2 ring-white shadow" />
+              <span className="h-3 w-3 flex-shrink-0 rounded-full bg-[#0066cc] ring-2 ring-white dark:ring-slate-800 shadow" />
               Your location
             </div>
             <div className="flex items-center gap-2">
-              <span className="h-3 w-3 flex-shrink-0 rounded-full bg-[#ef4444] ring-2 ring-white shadow" />
+              <span className="h-3 w-3 flex-shrink-0 rounded-full bg-[#ef4444] ring-2 ring-white dark:ring-slate-800 shadow" />
               Report site
             </div>
             <div className="flex items-center gap-2">
@@ -438,38 +438,36 @@ export default function TaskRouteMap({ lat, lng, reportTitle }: Props) {
                 mapRef.current.setView([p.lat, p.lng], 16, { animate: true });
               }
             }}
-            className="absolute bottom-4 right-4 z-[1000] flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-md transition hover:border-blue-300 hover:bg-blue-50"
+            className="absolute bottom-4 right-4 z-[1000] flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md transition hover:border-blue-300 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-slate-800"
             title="Centre on my location"
           >
-            <Navigation className="h-4 w-4 text-blue-600" />
+            <Navigation className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           </button>
         )}
 
-
-
         {/* Loading overlay */}
         {isLoading && (
-          <div className="absolute inset-0 z-[1001] flex flex-col items-center justify-center gap-4 bg-white/90 backdrop-blur-sm">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50">
-              <Navigation className="h-7 w-7 animate-pulse text-blue-600" />
+          <div className="absolute inset-0 z-[1001] flex flex-col items-center justify-center gap-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950/60">
+              <Navigation className="h-7 w-7 animate-pulse text-blue-600 dark:text-blue-400" />
             </div>
             <div className="flex flex-col items-center gap-2">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-              <p className="text-sm font-medium text-slate-700">{phaseLabel[phase]}</p>
-              <p className="text-xs text-slate-400">Getting your GPS & building route</p>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{phaseLabel[phase]}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Getting your GPS & building route</p>
             </div>
           </div>
         )}
 
         {/* Error overlay */}
         {phase === "error" && (
-          <div className="absolute inset-0 z-[1001] flex flex-col items-center justify-center gap-4 px-8 text-center bg-white/95 backdrop-blur-sm">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50">
-              <AlertTriangle className="h-7 w-7 text-red-500" />
+          <div className="absolute inset-0 z-[1001] flex flex-col items-center justify-center gap-4 px-8 text-center bg-white/95 dark:bg-slate-950/95 backdrop-blur-sm">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 dark:bg-rose-950/60">
+              <AlertTriangle className="h-7 w-7 text-red-500 dark:text-rose-400" />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-900">Could not get your location</p>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">{errorMsg}</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Could not get your location</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{errorMsg}</p>
             </div>
             <button
               onClick={loadRoute}

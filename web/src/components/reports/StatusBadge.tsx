@@ -8,12 +8,12 @@ type StatusBadgeProps = {
 };
 
 const STATUS_STYLES: Record<ReportStatus, string> = {
-  PENDING: "bg-amber-50 text-amber-700 border-amber-200",
-  VERIFIED: "bg-blue-50 text-blue-700 border-blue-200",
-  CLEANUP_SCHEDULED: "bg-violet-50 text-violet-700 border-violet-200",
-  IN_PROGRESS: "bg-orange-50 text-orange-700 border-orange-200",
-  CLEANED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  REJECTED: "bg-rose-50 text-rose-700 border-rose-200",
+  PENDING: "bg-amber-50 text-amber-700 border-amber-200 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300",
+  VERIFIED: "bg-blue-50 text-blue-700 border-blue-200 dark:border-blue-500/30 dark:bg-blue-950/40 dark:text-blue-300",
+  CLEANUP_SCHEDULED: "bg-violet-50 text-violet-700 border-violet-200 dark:border-violet-500/30 dark:bg-violet-950/40 dark:text-violet-300",
+  IN_PROGRESS: "bg-orange-50 text-orange-700 border-orange-200 dark:border-orange-500/30 dark:bg-orange-950/40 dark:text-orange-300",
+  CLEANED: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300",
+  REJECTED: "bg-rose-50 text-rose-700 border-rose-200 dark:border-rose-500/30 dark:bg-rose-950/40 dark:text-rose-300",
 };
 
 const STATUS_DOT: Record<ReportStatus, string> = {

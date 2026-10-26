@@ -23,10 +23,10 @@ export interface AiAnalysisPanelProps {
 }
 
 const SEVERITY_CONFIG: Record<string, { label: string; classes: string }> = {
-  CRITICAL: { label: "Critical", classes: "bg-red-100 text-red-800 border-red-300" },
-  HIGH: { label: "High", classes: "bg-orange-100 text-orange-800 border-orange-300" },
-  MODERATE: { label: "Moderate", classes: "bg-yellow-100 text-yellow-800 border-yellow-300" },
-  SPAM: { label: "None / Spam", classes: "bg-slate-100 text-slate-600 border-slate-300" },
+  CRITICAL: { label: "Critical", classes: "bg-red-100 dark:bg-red-950/40 text-red-800 dark:text-red-300 border-red-300 dark:border-red-500/30" },
+  HIGH: { label: "High", classes: "bg-orange-100 dark:bg-orange-950/40 text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-500/30" },
+  MODERATE: { label: "Moderate", classes: "bg-yellow-100 dark:bg-yellow-950/40 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-500/30" },
+  SPAM: { label: "None / Spam", classes: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700" },
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -43,16 +43,16 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  plastic_bottle: "bg-blue-100 text-blue-800 border-blue-200",
-  plastic_bag: "bg-cyan-100 text-cyan-800 border-cyan-200",
-  fishing_net: "bg-teal-100 text-teal-800 border-teal-200",
-  rope: "bg-amber-100 text-amber-800 border-amber-200",
-  styrofoam: "bg-purple-100 text-purple-800 border-purple-200",
-  can: "bg-gray-100 text-gray-800 border-gray-200",
-  glass: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  battery: "bg-red-100 text-red-800 border-red-200",
-  diaper: "bg-pink-100 text-pink-800 border-pink-200",
-  cigarette_butt: "bg-orange-100 text-orange-800 border-orange-200",
+  plastic_bottle: "bg-blue-100 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-500/30",
+  plastic_bag: "bg-cyan-100 dark:bg-cyan-950/40 text-cyan-800 dark:text-cyan-300 border-cyan-200 dark:border-cyan-500/30",
+  fishing_net: "bg-teal-100 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border-teal-200 dark:border-teal-500/30",
+  rope: "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30",
+  styrofoam: "bg-purple-100 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-500/30",
+  can: "bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-300 border-gray-200 dark:border-slate-700",
+  glass: "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30",
+  battery: "bg-red-100 dark:bg-red-950/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-500/30",
+  diaper: "bg-pink-100 dark:bg-pink-950/40 text-pink-800 dark:text-pink-300 border-pink-200 dark:border-pink-500/30",
+  cigarette_butt: "bg-orange-100 dark:bg-orange-950/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-500/30",
 };
 
 function ConfidenceBar({ value }: { value: number }) {
@@ -61,10 +61,10 @@ function ConfidenceBar({ value }: { value: number }) {
 
   return (
     <div className="mt-1 flex items-center gap-3">
-      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-200">
+      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
         <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="w-10 text-right text-sm font-semibold text-slate-800">{pct}%</span>
+      <span className="w-10 text-right text-sm font-semibold text-slate-800 dark:text-slate-200">{pct}%</span>
     </div>
   );
 }
@@ -90,12 +90,12 @@ export function AiAnalysisPanel({
 
   if (!isAnalyzed) {
     return (
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex items-center gap-2">
-          <Brain className="h-5 w-5 text-slate-400" />
-          <h2 className="text-xl font-bold text-slate-900">Waste Analysis</h2>
+      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
+        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+          <Brain className="h-4 w-4 text-slate-400" />
+          <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Waste Analysis</h2>
         </div>
-        <p className="mt-3 text-sm text-slate-500">
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
           This report was not auto-analyzed (submitted manually).
         </p>
       </section>
@@ -107,57 +107,105 @@ export function AiAnalysisPanel({
   const conf = typeof confidence === "number" ? confidence : null;
 
   return (
-    <section className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm sm:p-6">
+    <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
       {/* Header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100">
-            <Brain className="h-5 w-5 text-violet-600" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40 text-primary">
+            <Brain className="h-4 w-4" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900">Waste Analysis</h2>
-          <span className="rounded-full border border-violet-200 bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">
-            ✦ Auto-analyzed
-          </span>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Waste Analysis</h2>
         </div>
 
         {/* Waste detected indicator */}
         {hasWaste !== null && hasWaste !== undefined && (
           <div
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
               hasWaste
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-red-200 bg-red-50 text-red-700"
+                ? "border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+                : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
             }`}
           >
             {hasWaste ? (
               <>
-                <AlertTriangle className="h-4 w-4" />
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 Waste Detected
               </>
             ) : (
               <>
-                <CheckCircle2 className="h-4 w-4" />
-                No Waste / Spam
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                No Waste / Clean
               </>
             )}
           </div>
         )}
       </div>
 
-      <dl className="space-y-4">
+      <div className="mt-3 space-y-3">
+        {/* Severity + Confidence + Latency Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {/* Severity */}
+          <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Severity Level
+            </span>
+            <div className="mt-1">
+              {severityConfig ? (
+                <span
+                  className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${severityConfig.classes}`}
+                >
+                  {severityConfig.label}
+                </span>
+              ) : (
+                <span className="text-xs text-slate-400">—</span>
+              )}
+            </div>
+          </div>
+
+          {/* Confidence */}
+          <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Confidence
+            </span>
+            <div className="mt-1">
+              {conf !== null ? (
+                <ConfidenceBar value={conf} />
+              ) : (
+                <span className="text-xs text-slate-400">—</span>
+              )}
+            </div>
+          </div>
+
+          {/* Latency */}
+          <div className="col-span-2 sm:col-span-1 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Processing Speed
+            </span>
+            <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
+              <Clock className="h-3.5 w-3.5 text-slate-400" />
+              <span>{aiGeminiMs ? `${aiGeminiMs}ms` : aiProcessingMs ? `${aiProcessingMs}ms` : "Fast"}</span>
+            </div>
+          </div>
+        </div>
+
         {/* Categories */}
-        <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <dt className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Detected Categories
-          </dt>
-          <dd>
+        <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-2.5">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Detected Waste Types
+            </span>
+            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
+              {categories.length} item{categories.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div>
             {categories.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {categories.map((cat) => (
                   <span
                     key={cat}
-                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                      CATEGORY_COLORS[cat] ?? "bg-slate-100 text-slate-700 border-slate-200"
+                    className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+                      CATEGORY_COLORS[cat] ?? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
                     }`}
                   >
                     {CATEGORY_LABELS[cat] ?? cat.replace(/_/g, " ")}
@@ -165,74 +213,19 @@ export function AiAnalysisPanel({
                 ))}
               </div>
             ) : (
-              <span className="text-sm text-slate-400">No categories detected</span>
+              <span className="text-xs text-slate-400">No specific categories flagged</span>
             )}
-          </dd>
-        </div>
-
-        {/* Severity + Confidence */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          {/* Severity */}
-          <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-            <dt className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Severity
-            </dt>
-            <dd>
-              {severityConfig ? (
-                <span
-                  className={`inline-block rounded-full border px-3 py-1 text-sm font-semibold ${severityConfig.classes}`}
-                >
-                  {severityConfig.label}
-                </span>
-              ) : (
-                <span className="text-sm text-slate-400">—</span>
-              )}
-            </dd>
-          </div>
-
-          {/* Confidence */}
-          <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-            <dt className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Confidence Score
-            </dt>
-            <dd>
-              {conf !== null ? (
-                <ConfidenceBar value={conf} />
-              ) : (
-                <span className="text-sm text-slate-400">—</span>
-              )}
-            </dd>
           </div>
         </div>
 
-        {/* AI Reason */}
-        <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <dt className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Analysis Details
-          </dt>
-          <dd className="text-sm leading-relaxed text-slate-700">
-            {formatAnalysisDetails(categories, aiReason)}
-          </dd>
+        {/* Analysis Details */}
+        <div className="rounded-lg border-l-2 border-violet-400 dark:border-violet-500 bg-violet-50/40 dark:bg-violet-950/30 p-2.5 text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+          <span className="block text-[10px] font-bold uppercase tracking-wider text-violet-900 dark:text-violet-300 mb-0.5">
+            Analysis Summary
+          </span>
+          {formatAnalysisDetails(categories, aiReason)}
         </div>
-
-        {/* Meta: timing */}
-        {((aiGeminiMs !== null && aiGeminiMs !== undefined) || (aiProcessingMs !== null && aiProcessingMs !== undefined)) && (
-          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-            {aiGeminiMs !== null && aiGeminiMs !== undefined && (
-              <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                Inference {aiGeminiMs}ms
-              </span>
-            )}
-            {aiProcessingMs !== null && aiProcessingMs !== undefined && (
-              <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                Total {aiProcessingMs}ms
-              </span>
-            )}
-          </div>
-        )}
-      </dl>
+      </div>
     </section>
   );
 }

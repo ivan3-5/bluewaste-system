@@ -53,8 +53,23 @@ export function StatsCards(props: StatsCardsProps) {
         return (
           <div
             key={card.key}
-            className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.gradient} p-5 text-white shadow-lg transition-all duration-300 ease-out hover:shadow-2xl hover:scale-105 hover:-translate-y-1 cursor-pointer`}
+            className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.gradient} p-5 text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] dark:shadow-[0_12px_30px_rgba(0,0,0,0.4)] dark:border dark:border-white/10 transition-all duration-300 ease-out hover:shadow-[0_22px_45px_rgba(15,23,42,0.28)] dark:hover:shadow-[0_22px_45px_rgba(0,0,0,0.6)] hover:scale-[1.03] hover:-translate-y-1 cursor-pointer`}
           >
+            {/* Subtle horizontal & vertical grid background (clean, non-distracting) */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 opacity-[0.14]"
+              style={{
+                backgroundImage: `
+                  linear-gradient(to right, rgba(255, 255, 255, 0.45) 1px, transparent 1px),
+                  linear-gradient(to bottom, rgba(255, 255, 255, 0.45) 1px, transparent 1px)
+                `,
+                backgroundSize: "22px 22px",
+                maskImage: "linear-gradient(to bottom right, black 35%, transparent 85%)",
+                WebkitMaskImage: "linear-gradient(to bottom right, black 35%, transparent 85%)",
+              }}
+            />
+
             <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/20" />
             <div className="pointer-events-none absolute -bottom-16 -right-6 h-36 w-36 rounded-full bg-white/12" />
             <div className="flex items-center justify-between">
