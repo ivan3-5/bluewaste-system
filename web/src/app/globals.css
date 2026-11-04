@@ -502,3 +502,174 @@
 .marker-pulse {
   /* animation removed */
 }
+
+/* ── Dark Mode Leaflet Map Overrides ── */
+.dark .leaflet-tile-pane {
+  filter: brightness(0.65) invert(1) contrast(3) hue-rotate(200deg) saturate(0.35) brightness(0.72);
+}
+
+.dark .leaflet-container {
+  background: #090d16 !important;
+}
+
+.dark .leaflet-bar a {
+  background-color: #1e293b !important;
+  border-bottom-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+.dark .leaflet-bar a:hover {
+  background-color: #334155 !important;
+  color: #38bdf8 !important;
+}
+
+.dark .leaflet-recenter-btn {
+  background: #1e293b;
+  color: #e2e8f0;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+}
+
+.dark .leaflet-recenter-btn:hover {
+  background: #334155;
+  color: #38bdf8;
+}
+
+.dark .waste-popup-wrapper .leaflet-popup-content-wrapper {
+  background: #0f172a;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid #334155;
+}
+
+.dark .waste-popup-body {
+  background: #0f172a;
+}
+
+.dark .waste-popup-title {
+  color: #f8fafc;
+}
+
+.dark .waste-popup-loc {
+  color: #cbd5e1;
+}
+
+.dark .waste-popup-addr {
+  color: #94a3b8;
+}
+
+.dark .waste-marker-tooltip.leaflet-tooltip {
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  color: #f1f5f9;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.dark .waste-marker-tooltip.leaflet-tooltip::before {
+  border-top-color: rgba(15, 23, 42, 0.96);
+}
+
+.dark .leaflet-control-attribution {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+  color: #94a3b8 !important;
+}
+
+.dark .leaflet-control-attribution a {
+  color: #38bdf8 !important;
+}
+
+/* ── FullCalendar Dark Mode ── */
+.dark .fc-theme-standard td,
+.dark .fc-theme-standard th {
+  border-color: #1e293b !important;
+}
+
+.dark .fc-col-header-cell {
+  background-color: #0f172a !important;
+}
+
+.dark .fc-col-header-cell-cushion {
+  color: #94a3b8 !important;
+}
+
+.dark .fc-day-sun,
+.dark .fc-day-sat {
+  background-color: rgba(15, 23, 42, 0.35) !important;
+}
+
+.dark .fc-daygrid-day-number {
+  color: #cbd5e1 !important;
+}
+
+.dark .fc-daygrid-day-number:hover {
+  background-color: rgba(59, 130, 246, 0.25) !important;
+  color: #38bdf8 !important;
+}
+
+.dark .fc-day-today {
+  background-color: rgba(30, 58, 138, 0.2) !important;
+}
+
+.dark .fc-toolbar-title {
+  color: #f8fafc !important;
+}
+
+.dark .fc-button-group {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+.dark .fc-button-primary {
+  color: #94a3b8 !important;
+}
+
+.dark .fc-button-primary:hover {
+  color: #f8fafc !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .fc-button-active {
+  background-color: #334155 !important;
+  color: #38bdf8 !important;
+}
+
+.dark .fc-prev-button,
+.dark .fc-next-button,
+.dark .fc-today-button {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+.dark .fc-prev-button:hover,
+.dark .fc-next-button:hover,
+.dark .fc-today-button:hover {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.dark .fc-daygrid-day-frame:hover {
+  background-color: rgba(59, 130, 246, 0.06) !important;
+}
+
+.dark .fc-popover {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6) !important;
+}
+
+.dark .fc-popover-header {
+  background-color: #1e293b !important;
+  border-bottom-color: #334155 !important;
+}
+
+.dark .fc-popover-title {
+  color: #f8fafc !important;
+}
+
+.dark .fc-popover-close {
+  color: #94a3b8 !important;
+}
+
+.dark .fc-popover-close:hover {
+  color: #f8fafc !important;
+}
+

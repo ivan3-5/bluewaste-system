@@ -50,14 +50,14 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 border-r border-white/70 bg-white/65 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:30px_30px] shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all duration-300 ease-in-out z-40",
+        "hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 border-r border-white/70 bg-white/65 dark:border-slate-800 dark:bg-slate-900/85 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] dark:[background-image:linear-gradient(rgba(51,65,85,0.22)_1px,transparent_1px),linear-gradient(90deg,rgba(51,65,85,0.22)_1px,transparent_1px)] [background-size:30px_30px] shadow-[0_16px_40px_rgba(15,23,42,0.12)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-300 ease-in-out z-40",
         isCollapsed ? "md:w-20" : "md:w-64",
       )}
     >
       {/* Logo & Toggle */}
       <div
         className={cn(
-          "flex items-center border-b border-white/70",
+          "flex items-center border-b border-white/70 dark:border-slate-800",
           isCollapsed
             ? "h-24 justify-center px-2 flex-col gap-2"
             : "h-16 justify-between px-4",
@@ -79,7 +79,7 @@ export function Sidebar() {
             />
             <span className="text-xl font-bold">
               <span className="text-primary">Blue</span>
-              <span className="text-black">Waste</span>
+              <span className="text-black dark:text-white">Waste</span>
             </span>
           </Link>
         )}
@@ -105,9 +105,9 @@ export function Sidebar() {
           onClick={toggleSidebar}
           aria-label="Toggle sidebar"
           title="Toggle sidebar"
-          className="p-1.5 rounded-lg text-gray-600 transition-colors hover:bg-gray-100/80"
+          className="p-1.5 rounded-lg text-gray-600 dark:text-slate-400 transition-colors hover:bg-gray-100/80 dark:hover:bg-slate-800 dark:hover:text-slate-200"
         >
-          <Menu className="w-5 h-5 text-gray-600" />
+          <Menu className="w-5 h-5 text-gray-600 dark:text-slate-400" />
         </button>
       </div>
 
@@ -124,8 +124,8 @@ export function Sidebar() {
               className={cn(
                 "flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
                 isActive
-                  ? "border border-white/60 bg-primary text-white shadow-[0_6px_18px_rgba(37,99,235,0.35)] backdrop-blur-md"
-                  : "text-gray-700 hover:bg-white/50 hover:text-gray-900",
+                  ? "border border-white/60 dark:border-primary/50 bg-primary text-white shadow-[0_6px_18px_rgba(37,99,235,0.35)] backdrop-blur-md"
+                  : "text-gray-700 dark:text-slate-300 hover:bg-white/50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white",
                 isCollapsed && "justify-center",
               )}
               title={isCollapsed ? link.label : undefined}
@@ -145,7 +145,7 @@ export function Sidebar() {
       </nav>
 
       {/* User info */}
-      <div className="p-4 border-t border-white/70">
+      <div className="p-4 border-t border-white/70 dark:border-slate-800">
         <div
           className={cn(
             "flex items-center",
@@ -154,7 +154,7 @@ export function Sidebar() {
         >
           <div
             className={cn(
-              "rounded-full border border-white/80 bg-white/75 shadow-sm backdrop-blur-md flex items-center justify-center flex-shrink-0 overflow-hidden",
+              "rounded-full border border-white/80 bg-white/75 dark:border-slate-700 dark:bg-slate-800 shadow-sm backdrop-blur-md flex items-center justify-center flex-shrink-0 overflow-hidden",
               isCollapsed ? "w-10 h-10" : "w-9 h-9",
             )}
           >
@@ -175,10 +175,10 @@ export function Sidebar() {
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-gray-500 truncate">
+              <p className="text-xs text-gray-500 dark:text-slate-400 truncate">
                 {user?.role === "LGU_ADMIN"
                   ? "Administrator"
                   : user?.role === "FIELD_WORKER"
@@ -193,7 +193,7 @@ export function Sidebar() {
               router.push("/");
             }}
             className={cn(
-              "text-gray-400 transition-colors hover:text-red-500",
+              "text-gray-400 dark:text-slate-400 transition-colors hover:text-red-500 dark:hover:text-red-400",
               isCollapsed && "mx-auto",
             )}
             title="Logout"

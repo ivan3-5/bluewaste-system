@@ -27,12 +27,12 @@ const STATUS_FLOW: Record<AdminReportStatus, AdminReportStatus[]> = {
 };
 
 const STATUS_TRIGGER_STYLES: Record<AdminReportStatus, string> = {
-  PENDING: "border-amber-200/90 bg-amber-50/80 text-amber-700 hover:bg-amber-100/70 focus:ring-amber-400",
-  VERIFIED: "border-blue-200/90 bg-blue-50/80 text-blue-700 hover:bg-blue-100/70 focus:ring-blue-400",
-  CLEANUP_SCHEDULED: "border-violet-200/90 bg-violet-50/80 text-violet-700 hover:bg-violet-100/70 focus:ring-violet-400",
-  IN_PROGRESS: "border-orange-200/90 bg-orange-50/80 text-orange-700 hover:bg-orange-100/70 focus:ring-orange-400",
-  CLEANED: "border-emerald-200/90 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100/70 focus:ring-emerald-400",
-  REJECTED: "border-rose-200/90 bg-rose-50/80 text-rose-700 hover:bg-rose-100/70 focus:ring-rose-400",
+  PENDING: "border-amber-200/90 bg-amber-50/80 text-amber-700 hover:bg-amber-100/70 focus:ring-amber-400 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-950/60",
+  VERIFIED: "border-blue-200/90 bg-blue-50/80 text-blue-700 hover:bg-blue-100/70 focus:ring-blue-400 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60",
+  CLEANUP_SCHEDULED: "border-violet-200/90 bg-violet-50/80 text-violet-700 hover:bg-violet-100/70 focus:ring-violet-400 dark:border-violet-900/60 dark:bg-violet-950/40 dark:text-violet-300 dark:hover:bg-violet-950/60",
+  IN_PROGRESS: "border-orange-200/90 bg-orange-50/80 text-orange-700 hover:bg-orange-100/70 focus:ring-orange-400 dark:border-orange-900/60 dark:bg-orange-950/40 dark:text-orange-300 dark:hover:bg-orange-950/60",
+  CLEANED: "border-emerald-200/90 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100/70 focus:ring-emerald-400 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60",
+  REJECTED: "border-rose-200/90 bg-rose-50/80 text-rose-700 hover:bg-rose-100/70 focus:ring-rose-400 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/60",
 };
 
 const STATUS_DOT_COLORS: Record<AdminReportStatus, string> = {
@@ -47,9 +47,13 @@ const STATUS_DOT_COLORS: Record<AdminReportStatus, string> = {
 export function ReportStatusUpdater({
   reportId,
   initialStatus,
+  compact = false,
+  className = "",
 }: {
   reportId: string;
   initialStatus: AdminReportStatus;
+  compact?: boolean;
+  className?: string;
 }) {
   const router = useRouter();
   const { pushToast } = useLiveNotifications();
@@ -118,85 +122,104 @@ export function ReportStatusUpdater({
     }
   };
 
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <label className="mb-2 block text-sm font-semibold text-slate-800">
-        Update Status
-      </label>
-      <div className="flex flex-wrap items-center gap-3">
-        <Select
-          value={status}
-          disabled={isFinalStatus || isSaving}
-          onValueChange={(nextVal) => {
-            const nextStatus = nextVal as AdminReportStatus;
-            setStatus(nextStatus);
-            void saveStatus(nextStatus);
-          }}
+  const selectElement = (
+    <div className="flex items-center gap-2">
+      <Select
+        value={status}
+        disabled={isFinalStatus || isSaving}
+        onValueChange={(nextVal) => {
+          const nextStatus = nextVal as AdminReportStatus;
+          setStatus(nextStatus);
+          void saveStatus(nextStatus);
+        }}
+      >
+        <SelectTrigger
+          className={cn(
+            "h-9 w-[190px] rounded-lg px-2.5 text-xs font-semibold shadow-2xs transition-all duration-150 border",
+            STATUS_TRIGGER_STYLES[status]
+          )}
         >
-          <SelectTrigger
-            className={cn(
-              "h-10 w-[200px] rounded-xl px-3 text-sm font-semibold shadow-xs transition-all duration-150 border",
-              STATUS_TRIGGER_STYLES[status]
+          <div className="flex items-center gap-2 truncate">
+            {isSaving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500 shrink-0" />
+            ) : (
+              <span
+                className={cn(
+                  "h-2 w-2 rounded-full shrink-0",
+                  STATUS_DOT_COLORS[status]
+                )}
+              />
             )}
-          >
-            <div className="flex items-center gap-2 truncate">
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-500 shrink-0" />
-              ) : (
-                <span
-                  className={cn(
-                    "h-2.5 w-2.5 rounded-full shrink-0",
-                    STATUS_DOT_COLORS[status]
-                  )}
-                />
-              )}
-              <span className="truncate">{ADMIN_REPORT_STATUS_LABELS[status]}</span>
-            </div>
-          </SelectTrigger>
-          <SelectContent className="w-[220px]">
-            {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(([value, label]) => {
-              const isCurrent = value === initialStatus;
-              const isAllowed = allowedStatuses.includes(value as AdminReportStatus);
-              const disabled = !isCurrent && !isAllowed;
+            <span className="truncate">{ADMIN_REPORT_STATUS_LABELS[status]}</span>
+          </div>
+        </SelectTrigger>
+        <SelectContent className="w-[210px]">
+          {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(([value, label]) => {
+            const isCurrent = value === initialStatus;
+            const isAllowed = allowedStatuses.includes(value as AdminReportStatus);
+            const disabled = !isCurrent && !isAllowed;
 
-              return (
-                <SelectItem
-                  key={value}
-                  value={value}
-                  disabled={disabled}
-                  className={cn(
-                    "py-2.5 text-xs font-medium",
-                    isCurrent && "font-semibold text-blue-600 bg-blue-50/70"
-                  )}
-                >
-                  <div className="flex items-center justify-between w-full gap-2">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "h-2 w-2 rounded-full shrink-0",
-                          STATUS_DOT_COLORS[value as AdminReportStatus]
-                        )}
-                      />
-                      <span>{label}</span>
-                    </div>
-                    {isCurrent && (
-                      <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-100/80 px-1.5 py-0.5 rounded-full">
-                        Current
-                      </span>
-                    )}
+            return (
+              <SelectItem
+                key={value}
+                value={value}
+                disabled={disabled}
+                className={cn(
+                  "py-2 text-xs font-medium",
+                  isCurrent && "font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/70 dark:bg-blue-950/40"
+                )}
+              >
+                <div className="flex items-center justify-between w-full gap-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full shrink-0",
+                        STATUS_DOT_COLORS[value as AdminReportStatus]
+                      )}
+                    />
+                    <span>{label}</span>
                   </div>
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-        {isSaving && (
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-            Saving...
+                  {isCurrent && (
+                    <span className="text-[9px] uppercase font-bold text-blue-600 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-950/80 px-1 py-0.5 rounded-full">
+                      Current
+                    </span>
+                  )}
+                </div>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+      {isSaving && (
+        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+          Updating...
+        </span>
+      )}
+    </div>
+  );
+
+  if (compact) {
+    return (
+      <div className={cn("inline-flex items-center", className)}>
+        {selectElement}
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-xs", className)}>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+          Update Report Status
+        </label>
+        {isFinalStatus && (
+          <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
+            Final status reached
           </span>
         )}
       </div>
-      {message && <p className="mt-3 text-xs font-medium text-slate-600">{message}</p>}
+      {selectElement}
+      {message && <p className="mt-2 text-xs font-medium text-slate-600 dark:text-slate-300">{message}</p>}
     </div>
   );
 }

@@ -113,10 +113,10 @@ export default function CoastalZoneManager() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
             Coastal Zones
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Create and manage coastal zone boundaries for report management.
           </p>
         </div>
@@ -127,8 +127,8 @@ export default function CoastalZoneManager() {
 
       {/* Zones Grid */}
       {zones.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 py-12 text-center">
-          <p className="text-sm text-slate-600">
+        <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 py-12 text-center">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             No coastal zones created yet. Click &quot;Create Zone&quot; to add
             one.
           </p>
@@ -138,13 +138,13 @@ export default function CoastalZoneManager() {
           {zones.map((zone) => (
             <div
               key={zone.id}
-              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm transition-shadow hover:shadow-md"
             >
               {/* Zone Header */}
               <div className="mb-3 flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-slate-900">{zone.name}</h3>
-                  <p className="text-xs text-slate-500">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100">{zone.name}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {zone.coordinates.length} coordinate
                     {zone.coordinates.length !== 1 ? "s" : ""}
                   </p>
@@ -152,8 +152,8 @@ export default function CoastalZoneManager() {
                 <div
                   className={`rounded px-2 py-1 text-xs font-medium ${
                     zone.isActive
-                      ? "bg-green-100 text-green-800"
-                      : "bg-gray-100 text-gray-800"
+                      ? "bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300"
+                      : "bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-300"
                   }`}
                 >
                   {zone.isActive ? "Active" : "Inactive"}
@@ -162,17 +162,17 @@ export default function CoastalZoneManager() {
 
               {/* Coordinates Preview */}
               {zone.coordinates.length > 0 && (
-                <div className="mb-3 rounded bg-slate-50 p-2 text-xs text-slate-600">
-                  <p className="font-medium text-slate-700 mb-1">
+                <div className="mb-3 rounded bg-slate-50 dark:bg-slate-800/60 p-2 text-xs text-slate-600 dark:text-slate-400">
+                  <p className="font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Coordinates:
                   </p>
                   {zone.coordinates.slice(0, 3).map((coord, i) => (
-                    <div key={i} className="text-slate-600">
+                    <div key={i} className="text-slate-600 dark:text-slate-400">
                       {i + 1}. ({coord.lat.toFixed(4)}, {coord.lng.toFixed(4)})
                     </div>
                   ))}
                   {zone.coordinates.length > 3 && (
-                    <div className="text-slate-500">
+                    <div className="text-slate-500 dark:text-slate-500">
                       +{zone.coordinates.length - 3} more...
                     </div>
                   )}
@@ -180,7 +180,7 @@ export default function CoastalZoneManager() {
               )}
 
               {/* Metadata */}
-              <div className="mb-4 space-y-1 text-xs text-slate-600">
+              <div className="mb-4 space-y-1 text-xs text-slate-600 dark:text-slate-400">
                 {zone.createdAt && (
                   <p>
                     Created:{" "}
@@ -203,14 +203,14 @@ export default function CoastalZoneManager() {
                 <button
                   onClick={() => handleEditZone(zone)}
                   disabled={isLoading}
-                  className="flex-1 rounded bg-blue-100 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-200 disabled:opacity-50"
+                  className="flex-1 rounded bg-blue-100 dark:bg-blue-950/50 px-3 py-2 text-sm font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 disabled:opacity-50"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => setDeleteConfirm(zone.id)}
                   disabled={isLoading}
-                  className="flex-1 rounded bg-red-100 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-200 disabled:opacity-50"
+                  className="flex-1 rounded bg-red-100 dark:bg-red-950/50 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -231,13 +231,13 @@ export default function CoastalZoneManager() {
 
           <div className="space-y-4 py-4">
             {error && (
-              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+              <div className="rounded-md bg-red-50 dark:bg-red-950/50 p-3 text-sm text-red-700 dark:text-red-300">
                 {error}
               </div>
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-900">
+              <label className="text-sm font-medium text-slate-900 dark:text-slate-200">
                 Zone Name *
               </label>
               <Input
@@ -250,7 +250,7 @@ export default function CoastalZoneManager() {
             </div>
 
             {!editingZone && (
-              <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700">
+              <div className="rounded-md bg-blue-50 dark:bg-blue-950/50 p-3 text-sm text-blue-700 dark:text-blue-300">
                 <p className="font-medium">Note:</p>
                 <p>
                   A zone will be created with default coordinates. You can edit
@@ -260,7 +260,7 @@ export default function CoastalZoneManager() {
             )}
 
             {editingZone && (
-              <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-700">
+              <div className="rounded-md bg-amber-50 dark:bg-amber-950/50 p-3 text-sm text-amber-700 dark:text-amber-300">
                 <p className="font-medium">Note:</p>
                 <p>
                   To modify the zone boundary, use the map editor on the
@@ -274,14 +274,14 @@ export default function CoastalZoneManager() {
             <button
               onClick={handleCloseModal}
               disabled={isLoading}
-              className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="rounded border border-slate-300 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={isLoading}
-              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {isLoading
                 ? "Saving..."
@@ -304,7 +304,7 @@ export default function CoastalZoneManager() {
           </DialogHeader>
 
           <div className="py-4">
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-slate-700 dark:text-slate-300">
               Are you sure you want to delete this zone? This action cannot be
               undone.
             </p>
@@ -314,14 +314,14 @@ export default function CoastalZoneManager() {
             <button
               onClick={() => setDeleteConfirm(null)}
               disabled={isLoading}
-              className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="rounded border border-slate-300 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={() => deleteConfirm && handleDeleteZone(deleteConfirm)}
               disabled={isLoading}
-              className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              className="rounded bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {isLoading ? "Deleting..." : "Delete"}
             </button>

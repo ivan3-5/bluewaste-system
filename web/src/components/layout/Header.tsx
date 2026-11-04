@@ -3,6 +3,7 @@
 import { useAuth } from "@/providers/AuthProvider";
 import { Bell, Menu, LogOut, Settings } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,12 +19,12 @@ export function Header() {
   const isFieldWorker = user?.role === "FIELD_WORKER";
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b">
+    <header className="sticky top-0 z-40 bg-white border-b dark:bg-slate-900/90 dark:border-slate-800 dark:text-slate-100 backdrop-blur-md">
       <div className="flex items-center justify-between h-16 px-4 md:px-6">
         {/* Mobile menu toggle */}
         <button
           title="Toggle mobile menu"
-          className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+          className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 dark:text-slate-200 transition-colors"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
           <Menu className="w-5 h-5" />
@@ -42,12 +43,12 @@ export function Header() {
           />
           <span className="font-bold">
             <span className="text-primary">Blue</span>
-            <span className="text-black">Waste</span>
+            <span className="text-black dark:text-white">Waste</span>
           </span>
         </div>
 
         <div className="hidden md:block">
-          <h2 className="text-lg font-semibold text-gray-800">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-slate-100">
             {isLGUAdmin
               ? "Admin Dashboard"
               : isFieldWorker
@@ -57,13 +58,14 @@ export function Header() {
         </div>
 
         {/* Right side */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3">
+          <ThemeToggle />
           <NotificationBell />
 
           <div className="hidden md:flex items-center space-x-2 relative">
             <button
               onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-              className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
             >
               <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
                 {user?.avatarUrl ? (
@@ -81,17 +83,16 @@ export function Header() {
                   </span>
                 )}
               </div>
-
             </button>
 
             {/* Profile Dropdown */}
             {profileMenuOpen && (
-              <div className="absolute top-full right-0 mt-2 w-48 bg-white border rounded-lg shadow-lg z-50">
-                <div className="px-4 py-3 border-b">
-                  <p className="text-sm font-semibold text-gray-900">
+              <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-xl shadow-lg dark:shadow-slate-950/60 z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b dark:border-slate-800">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 truncate">
                     {isLGUAdmin
                       ? "Administrator"
                       : isFieldWorker
@@ -102,7 +103,7 @@ export function Header() {
                 <Link
                   href="/dashboard/profile"
                   onClick={() => setProfileMenuOpen(false)}
-                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
                 >
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
@@ -113,7 +114,7 @@ export function Header() {
                     logout();
                     router.push("/");
                   }}
-                  className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
@@ -126,7 +127,7 @@ export function Header() {
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t bg-white py-2 px-4 space-y-1">
+        <div className="md:hidden border-t bg-white dark:bg-slate-900 dark:border-slate-800 py-2 px-4 space-y-1">
           {isAdmin ? (
             <>
               {isLGUAdmin && (
@@ -189,7 +190,7 @@ export function Header() {
               logout();
               router.push("/");
             }}
-            className="flex items-center w-full px-3 py-2 text-sm text-red-600 rounded-lg hover:bg-red-50"
+            className="flex items-center w-full px-3 py-2 text-sm text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40"
           >
             <LogOut className="w-4 h-4 mr-2" /> Logout
           </button>
@@ -212,7 +213,7 @@ function MobileLink({
     <Link
       href={href}
       onClick={onClick}
-      className="block px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-100"
+      className="block px-3 py-2 text-sm text-gray-700 dark:text-slate-200 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
     >
       {label}
     </Link>

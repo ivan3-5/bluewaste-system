@@ -35,7 +35,7 @@ export class UserController {
   static async updateUser(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;
-      const user = await UserService.updateUser(id, req.body);
+      const user = await UserService.updateUser(id, req.body, req.user?.id);
       res.json(user);
     } catch (error) {
       handleControllerError(res, error, "Failed to update user", "USER_UPDATE_FAILED");

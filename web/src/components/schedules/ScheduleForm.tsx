@@ -42,10 +42,10 @@ interface ScheduleFormProps {
 }
 
 const SCHEDULE_STATUS_SELECT_STYLES: Record<CleanupScheduleStatus, string> = {
-  UPCOMING: "border-blue-200 bg-blue-50 text-blue-700 focus:ring-blue-500",
-  ONGOING: "border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-500",
-  COMPLETED: "border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-500",
-  CANCELLED: "border-rose-200 bg-rose-50 text-rose-700 focus:ring-rose-500",
+  UPCOMING: "border-blue-200 dark:border-blue-900/60 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 focus:ring-blue-500",
+  ONGOING: "border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 focus:ring-amber-500",
+  COMPLETED: "border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 focus:ring-emerald-500",
+  CANCELLED: "border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 focus:ring-rose-500",
 };
 
 const EQUIPMENT_OPTIONS = [
@@ -431,6 +431,11 @@ export function ScheduleForm({
       setActiveTab("details");
       return;
     }
+    if (formData.equipment.length === 0) {
+      setErrorMessage("Please select at least one equipment item.");
+      setActiveTab("equipment");
+      return;
+    }
     if (formData.workerIds.length === 0) {
       setErrorMessage("Please assign at least one field worker.");
       setActiveTab("crew");
@@ -507,19 +512,19 @@ export function ScheduleForm({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         overlayClassName="bg-black/40 backdrop-blur-sm"
-        className="max-w-3xl max-h-[92vh] flex flex-col p-0 bg-white rounded-3xl border border-gray-100 shadow-2xl overflow-hidden"
+        className="max-w-3xl max-h-[92vh] flex flex-col p-0 bg-white dark:bg-slate-900 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-2xl overflow-hidden"
       >
         {/* Header */}
-        <div className="px-8 pt-7 pb-5 border-b border-gray-100 bg-gradient-to-r from-blue-50/50 via-white to-indigo-50/30">
+        <div className="px-8 pt-7 pb-5 border-b border-gray-100 dark:border-slate-800 bg-gradient-to-r from-blue-50/50 via-white to-indigo-50/30 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/20">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100/60">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-0.5 rounded-full border border-indigo-100/60 dark:border-indigo-900/50">
                 LGU Operational Dispatch
               </span>
-              <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight">
+              <DialogTitle className="text-2xl font-black text-gray-900 dark:text-slate-100 tracking-tight">
                 {isEditing ? "Edit Cleanup Schedule" : "Create Cleanup Schedule"}
               </DialogTitle>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-slate-400">
                 Coordinate personnel, allocate protective equipment, and assign
                 verified coastal waste sites.
               </p>
@@ -527,19 +532,19 @@ export function ScheduleForm({
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 mt-5 bg-gray-100/80 p-1 rounded-2xl w-fit">
+          <div className="flex items-center gap-2 mt-5 bg-gray-100/80 dark:bg-slate-800/80 p-1 rounded-2xl w-fit">
             <button
               type="button"
               onClick={() => setActiveTab("details")}
               className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 activeTab === "details"
-                  ? "bg-white text-indigo-700 shadow-sm"
-                  : "text-gray-500 hover:text-gray-900"
+                  ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
+                  : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
               }`}
             >
               1. Operation Details
               {formData.reportIds.length > 0 && (
-                <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded-full text-[10px]">
+                <span className="px-1.5 py-0.2 bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-full text-[10px]">
                   {formData.reportIds.length}
                 </span>
               )}
@@ -549,13 +554,13 @@ export function ScheduleForm({
               onClick={() => setActiveTab("equipment")}
               className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 activeTab === "equipment"
-                  ? "bg-white text-indigo-700 shadow-sm"
-                  : "text-gray-500 hover:text-gray-900"
+                  ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
+                  : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
               }`}
             >
               2. Equipment
               {formData.equipment.length > 0 && (
-                <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded-full text-[10px]">
+                <span className="px-1.5 py-0.2 bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-full text-[10px]">
                   {formData.equipment.length}
                 </span>
               )}
@@ -565,13 +570,13 @@ export function ScheduleForm({
               onClick={() => setActiveTab("crew")}
               className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 activeTab === "crew"
-                  ? "bg-white text-indigo-700 shadow-sm"
-                  : "text-gray-500 hover:text-gray-900"
+                  ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
+                  : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
               }`}
             >
               3. Assign
               {formData.workerIds.length > 0 && (
-                <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded-full text-[10px]">
+                <span className="px-1.5 py-0.2 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-full text-[10px]">
                   {formData.workerIds.length}
                 </span>
               )}
@@ -583,13 +588,13 @@ export function ScheduleForm({
         <div className="flex-1 overflow-y-auto px-8 py-6">
           {/* Error Banner */}
           {errorMessage && (
-            <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 shrink-0 text-rose-500" />
+            <div className="mb-6 p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0 text-rose-500 dark:text-rose-400" />
               <div className="flex-1">{errorMessage}</div>
               <button
                 type="button"
                 onClick={() => setErrorMessage(null)}
-                className="text-rose-400 hover:text-rose-700"
+                className="text-rose-400 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-200"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -605,7 +610,7 @@ export function ScheduleForm({
                   <div className="space-y-1.5 md:col-span-2">
                     <Label
                       htmlFor="title"
-                      className="text-xs font-bold text-gray-700 uppercase tracking-wider"
+                      className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
                     >
                       Operation Title *
                     </Label>
@@ -622,7 +627,7 @@ export function ScheduleForm({
                           title: e.target.value,
                         }))
                       }
-                      className="rounded-xl border-gray-200 bg-gray-50/50 focus-visible:ring-indigo-500 h-11 text-sm font-medium"
+                      className="rounded-xl border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500 h-11 text-sm font-medium"
                     />
                   </div>
 
@@ -630,9 +635,9 @@ export function ScheduleForm({
                   <div className="space-y-1.5 md:col-span-2">
                     <Label
                       htmlFor="locationName"
-                      className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5"
+                      className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5"
                     >
-                      <Compass className="w-3.5 h-3.5 text-blue-600" />
+                      <Compass className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                       Location Name / Reported Coastal Site *
                     </Label>
 
@@ -642,7 +647,7 @@ export function ScheduleForm({
                         placeholder="Type a location name (e.g., Lilia Homes, San Francisco) or select a waste report below..."
                         value={formData.locationName}
                         onChange={(e) => handleLocationNameChange(e.target.value)}
-                        className="rounded-xl border-gray-200 bg-blue-50/20 focus-visible:ring-indigo-500 h-11 text-sm font-medium pl-9"
+                        className="rounded-xl border-gray-200 dark:border-slate-700 bg-blue-50/20 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500 h-11 text-sm font-medium pl-9"
                       />
                       <MapPin className="w-4 h-4 text-blue-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     </div>
@@ -651,27 +656,27 @@ export function ScheduleForm({
                   {/* Waste Reports Linking */}
                   <div className="space-y-2.5 md:col-span-2 pt-1">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                        <FileText className="w-4 h-4 text-indigo-500" />
+                      <Label className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                         Waste Reports *
                       </Label>
                       {formData.reportIds.length > 0 && (
-                        <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                        <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900/50">
                           {formData.reportIds.length} selected
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50/70 border border-emerald-100 text-[11px] text-emerald-800">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/40 text-[11px] text-emerald-800 dark:text-emerald-300">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <span>
                         Protected: Reports already assigned to another cleanup schedule cannot be re-selected.
                       </span>
                     </div>
 
-                    <div className="border border-gray-200 rounded-2xl divide-y max-h-60 overflow-y-auto bg-gray-50/30">
+                    <div className="border border-gray-200 dark:border-slate-800 rounded-2xl divide-y dark:divide-slate-800 max-h-60 overflow-y-auto bg-gray-50/30 dark:bg-slate-900/50">
                       {displayedReports.length === 0 ? (
-                        <div className="p-4 text-xs text-gray-500 text-center">
+                        <div className="p-4 text-xs text-gray-500 dark:text-slate-400 text-center">
                           No eligible unassigned waste reports (VERIFIED) available.
                         </div>
                       ) : (
@@ -690,10 +695,10 @@ export function ScheduleForm({
                               key={report.id}
                               className={`flex items-center gap-3 p-3 transition-colors ${
                                 isAssignedToOther
-                                  ? "opacity-50 cursor-not-allowed bg-gray-100/60"
+                                  ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
                                   : isLinked
-                                    ? "bg-blue-50/40 cursor-pointer hover:bg-white"
-                                    : "hover:bg-white cursor-pointer"
+                                    ? "bg-blue-50/40 dark:bg-slate-800/70 cursor-pointer hover:bg-white dark:hover:bg-slate-800/50"
+                                    : "hover:bg-white dark:hover:bg-slate-800/50 cursor-pointer"
                               }`}
                             >
                               <input
@@ -705,7 +710,7 @@ export function ScheduleForm({
                                     handleReportToggle(report.id);
                                   }
                                 }}
-                                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 shrink-0 disabled:opacity-40"
+                                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-slate-600 dark:bg-slate-800 shrink-0 disabled:opacity-40"
                               />
                               {report.images && report.images.length > 0 ? (
                                 <Image
@@ -714,37 +719,37 @@ export function ScheduleForm({
                                   width={40}
                                   height={40}
                                   unoptimized
-                                  className="w-10 h-10 object-cover rounded-lg border border-gray-200 shrink-0"
+                                  className="w-10 h-10 object-cover rounded-lg border border-gray-200 dark:border-slate-700 shrink-0"
                                 />
                               ) : (
-                                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                                  <FileText className="w-4 h-4 text-gray-400" />
+                                <div className="w-10 h-10 bg-gray-100 dark:bg-slate-800 rounded-lg flex items-center justify-center shrink-0">
+                                  <FileText className="w-4 h-4 text-gray-400 dark:text-slate-500" />
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-2">
-                                  <p className="text-xs font-bold text-gray-900 truncate">
+                                  <p className="text-xs font-bold text-gray-900 dark:text-slate-100 truncate">
                                     {report.title}
                                   </p>
                                   {isAssignedToOther ? (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
                                       Already Scheduled
                                     </span>
                                   ) : isLinked ? (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50">
                                       Selected
                                     </span>
                                   ) : (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
                                       Available
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[11px] text-gray-500 truncate flex items-center gap-1 mt-0.5">
+                                <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5">
                                   <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
                                   <span>{reportLoc}</span>
                                   <span>•</span>
-                                  <span className="font-semibold text-indigo-600">
+                                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">
                                     {report.status}
                                   </span>
                                 </p>
@@ -760,7 +765,7 @@ export function ScheduleForm({
                   <div className="space-y-1.5 md:col-span-2">
                     <Label
                       htmlFor="scheduledAt"
-                      className="text-xs font-bold text-gray-700 uppercase tracking-wider"
+                      className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
                     >
                       Deployment Date & Time *
                     </Label>
@@ -770,7 +775,7 @@ export function ScheduleForm({
                       required
                       min={new Date(
                         new Date().getTime() -
-                          new Date().getTimezoneOffset() * 60000,
+                           new Date().getTimezoneOffset() * 60000,
                       )
                         .toISOString()
                         .slice(0, 16)}
@@ -781,7 +786,7 @@ export function ScheduleForm({
                           scheduledAt: e.target.value,
                         }))
                       }
-                      className="rounded-xl border-gray-200 bg-gray-50/50 focus-visible:ring-indigo-500 h-11 text-sm font-medium"
+                      className="rounded-xl border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500 h-11 text-sm font-medium"
                     />
                   </div>
                 </div>
@@ -790,7 +795,7 @@ export function ScheduleForm({
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="description"
-                    className="text-xs font-bold text-gray-700 uppercase tracking-wider"
+                    className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
                   >
                     Operational Directives & Briefing *
                   </Label>
@@ -808,7 +813,7 @@ export function ScheduleForm({
                         description: e.target.value,
                       }))
                     }
-                    className="rounded-xl border-gray-200 bg-gray-50/50 focus-visible:ring-indigo-500 resize-none text-sm leading-relaxed"
+                    className="rounded-xl border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500 resize-none text-sm leading-relaxed"
                   />
                 </div>
 
@@ -817,7 +822,7 @@ export function ScheduleForm({
                   <div className="space-y-1.5 pt-2">
                     <Label
                       htmlFor="status"
-                      className="text-xs font-bold text-gray-700 uppercase tracking-wider"
+                      className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
                     >
                       Operation Status
                     </Label>
@@ -834,10 +839,10 @@ export function ScheduleForm({
                         SCHEDULE_STATUS_SELECT_STYLES[formData.status]
                       }`}
                     >
-                      <option value="UPCOMING">Upcoming (Scheduled)</option>
-                      <option value="ONGOING">Ongoing (In Progress)</option>
-                      <option value="COMPLETED">Completed (Verified)</option>
-                      <option value="CANCELLED">Cancelled (Deferred)</option>
+                      <option value="UPCOMING" className="dark:bg-slate-900 dark:text-slate-100">Upcoming (Scheduled)</option>
+                      <option value="ONGOING" className="dark:bg-slate-900 dark:text-slate-100">Ongoing (In Progress)</option>
+                      <option value="COMPLETED" className="dark:bg-slate-900 dark:text-slate-100">Completed (Verified)</option>
+                      <option value="CANCELLED" className="dark:bg-slate-900 dark:text-slate-100">Cancelled (Deferred)</option>
                     </select>
                   </div>
                 )}
@@ -847,17 +852,17 @@ export function ScheduleForm({
             {/* TAB 2: EQUIPMENT */}
             {activeTab === "equipment" && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50/60 to-blue-50/30 border border-indigo-100">
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50/60 to-blue-50/30 dark:from-slate-800/60 dark:to-indigo-950/20 border border-indigo-100 dark:border-slate-700">
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600 dark:bg-indigo-500 text-white flex items-center justify-center">
                         <Wrench className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900 text-sm">
+                        <h4 className="font-bold text-gray-900 dark:text-slate-100 text-sm">
                           Protective & Cleanup Equipment Allocation
                         </h4>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 dark:text-slate-400">
                           Equip assigned personnel with necessary safety gear and tools
                         </p>
                       </div>
@@ -868,21 +873,21 @@ export function ScheduleForm({
                       <button
                         type="button"
                         onClick={() => applyPreset("standard")}
-                        className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 font-semibold text-indigo-700 hover:bg-indigo-50 shadow-sm"
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 shadow-sm"
                       >
                         Standard Coastal Kit
                       </button>
                       <button
                         type="button"
                         onClick={() => applyPreset("all")}
-                        className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 font-semibold text-gray-700 hover:bg-gray-50"
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700"
                       >
                         Select All
                       </button>
                       <button
                         type="button"
                         onClick={() => applyPreset("clear")}
-                        className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700"
                       >
                         Clear
                       </button>
@@ -900,22 +905,22 @@ export function ScheduleForm({
                           onClick={() => handleEquipmentToggle(item)}
                           className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
                             isSelected
-                              ? "border-indigo-500 bg-white shadow-sm ring-1 ring-indigo-500/20"
-                              : "border-gray-200 bg-white/70 hover:bg-white hover:border-gray-300"
+                              ? "border-indigo-500 dark:border-indigo-500 bg-white dark:bg-slate-800 shadow-sm ring-1 ring-indigo-500/20"
+                              : "border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"
                           }`}
                         >
                           <div
                             className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${
                               isSelected
                                 ? "bg-indigo-600 border-indigo-600 text-white"
-                                : "border-gray-300 bg-gray-50"
+                                : "border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800"
                             }`}
                           >
                             {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                           </div>
                           <span
                             className={`text-xs font-semibold ${
-                              isSelected ? "text-indigo-900" : "text-gray-700"
+                              isSelected ? "text-indigo-900 dark:text-indigo-200" : "text-gray-700 dark:text-slate-300"
                             }`}
                           >
                             {item}
@@ -926,9 +931,9 @@ export function ScheduleForm({
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                  <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-gray-600">
+                <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-800 flex items-start gap-3">
+                  <Info className="w-4 h-4 text-gray-500 dark:text-slate-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-gray-600 dark:text-slate-400">
                     Allocated equipment will appear on the field worker&apos;s mobile
                     dispatch sheet, enabling them to verify and prepare supplies
                     prior to departing city hall.
@@ -942,18 +947,18 @@ export function ScheduleForm({
               <div className="space-y-5 animate-in fade-in duration-200">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                      <Users className="w-4 h-4 text-indigo-500" />
+                    <Label className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                       Assign Field Workers *
                     </Label>
-                    <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                    <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900/50">
                       {formData.workerIds.length} assigned
                     </span>
                   </div>
 
-                  <div className="border border-gray-200 rounded-2xl max-h-96 overflow-y-auto bg-gray-50/30 p-2">
+                  <div className="border border-gray-200 dark:border-slate-800 rounded-2xl max-h-96 overflow-y-auto bg-gray-50/30 dark:bg-slate-900/50 p-2">
                     {workers.length === 0 ? (
-                      <div className="p-8 text-xs text-gray-500 text-center">
+                      <div className="p-8 text-xs text-gray-500 dark:text-slate-400 text-center">
                         No field workers registered.
                       </div>
                     ) : (
@@ -967,24 +972,24 @@ export function ScheduleForm({
                               key={worker.id}
                               className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
                                 isAssigned
-                                  ? "bg-indigo-50/60 border-indigo-300 shadow-sm ring-1 ring-indigo-500/20"
-                                  : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50/60"
+                                  ? "bg-indigo-50/60 dark:bg-slate-800 border-indigo-300 dark:border-indigo-600 shadow-sm ring-1 ring-indigo-500/20"
+                                  : "bg-white dark:bg-slate-800/40 border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 hover:bg-gray-50/60 dark:hover:bg-slate-800"
                               }`}
                             >
                               <input
                                 type="checkbox"
                                 checked={isAssigned}
                                 onChange={() => handleWorkerToggle(worker.id)}
-                                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 shrink-0"
+                                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-slate-600 dark:bg-slate-800 shrink-0"
                               />
-                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-100 to-blue-200 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
+                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-100 to-blue-200 dark:from-indigo-950 dark:to-blue-900 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0">
                                 {worker.firstName[0]}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-gray-900 truncate">
+                                <p className="text-xs font-bold text-gray-900 dark:text-slate-100 truncate">
                                   {worker.firstName} {worker.lastName}
                                 </p>
-                                <p className="text-[11px] text-gray-500 truncate">
+                                <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate">
                                   {worker.email}
                                 </p>
                               </div>
@@ -996,9 +1001,9 @@ export function ScheduleForm({
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                  <Info className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-gray-600">
+                <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-800 flex items-start gap-3">
+                  <Info className="w-4 h-4 text-gray-500 dark:text-slate-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-gray-600 dark:text-slate-400">
                     Assigned personnel will receive an operational dispatch notice on their mobile devices with location coordinates, cleanup briefings, and allocated equipment.
                   </p>
                 </div>
@@ -1008,14 +1013,14 @@ export function ScheduleForm({
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-4 border-t border-gray-100 bg-gray-50/80 flex flex-wrap items-center justify-between gap-3">
+        <div className="px-8 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-3">
           {/* Readiness Indicators */}
-          <div className="flex items-center gap-2 text-xs font-semibold text-gray-600">
+          <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-slate-400">
             <span
               className={`inline-flex items-center gap-1 ${
                 formData.workerIds.length > 0
-                  ? "text-emerald-600"
-                  : "text-gray-400"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-amber-600 dark:text-amber-400"
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1025,34 +1030,64 @@ export function ScheduleForm({
             <span
               className={`inline-flex items-center gap-1 ${
                 formData.reportIds.length > 0
-                  ? "text-emerald-600"
-                  : "text-gray-400"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-gray-400 dark:text-slate-500"
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               {formData.reportIds.length} reports
             </span>
             <span>•</span>
-            <span className="text-indigo-600">
+            <span
+              className={`inline-flex items-center gap-1 ${
+                formData.equipment.length > 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-amber-600 dark:text-amber-400"
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
               {formData.equipment.length} gear items
             </span>
           </div>
 
           <div className="flex items-center gap-2">
+            {(formData.equipment.length === 0 || formData.workerIds.length === 0) && !loading && (
+              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 hidden sm:inline-flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
+                {formData.equipment.length === 0 && formData.workerIds.length === 0
+                  ? "Equipment & worker required"
+                  : formData.equipment.length === 0
+                  ? "Equipment required"
+                  : "Worker required"}
+              </span>
+            )}
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={loading}
-              className="rounded-xl h-10 px-5 border-gray-200 text-xs font-bold"
+              className="rounded-xl h-10 px-5 border-gray-200 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 text-xs font-bold"
             >
               Cancel
             </Button>
             <Button
               form="schedule-form"
               type="submit"
-              disabled={loading}
-              className="rounded-xl h-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-indigo-500/20 text-white font-bold text-xs transition-all flex items-center gap-2"
+              disabled={
+                loading ||
+                formData.equipment.length === 0 ||
+                formData.workerIds.length === 0
+              }
+              title={
+                formData.equipment.length === 0 && formData.workerIds.length === 0
+                  ? "Please select equipment and assign workers before creating schedule"
+                  : formData.equipment.length === 0
+                  ? "Please select at least one equipment item"
+                  : formData.workerIds.length === 0
+                  ? "Please assign at least one worker"
+                  : undefined
+              }
+              className="rounded-xl h-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-indigo-500/20 text-white font-bold text-xs transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none disabled:hover:from-blue-600 disabled:hover:to-indigo-600"
             >
               {loading ? (
                 <>

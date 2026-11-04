@@ -169,7 +169,7 @@ export default function LocationPicker({
   return (
     <div className="space-y-2">
       {/* ── Map container ── */}
-      <div className="location-picker relative overflow-hidden rounded-xl border border-gray-200 shadow-sm location-picker-map-wrap">
+      <div className="location-picker relative overflow-hidden rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm location-picker-map-wrap">
         <div ref={containerRef} className="h-full w-full" />
 
         {/* GPS button */}
@@ -177,7 +177,7 @@ export default function LocationPicker({
           type="button"
           onClick={handleGps}
           disabled={gpsLoading}
-          className="absolute left-3 top-3 z-[1000] flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-md transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-60"
+          className="absolute left-3 top-3 z-[1000] flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm font-semibold text-gray-700 dark:text-slate-200 shadow-md transition-colors hover:border-blue-300 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-60"
         >
           {gpsLoading ? (
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
@@ -209,7 +209,7 @@ export default function LocationPicker({
 
       {/* GPS error */}
       {gpsError && (
-        <p className="flex items-center gap-1.5 text-xs text-amber-600">
+        <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
           <svg
             width="13"
             height="13"
@@ -230,14 +230,14 @@ export default function LocationPicker({
 
       {/* Coordinate readout */}
       {value && (
-        <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+        <div className="flex items-center gap-2 rounded-lg border border-blue-100 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/40 px-3 py-2">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
           </svg>
-          <span className="text-xs font-semibold text-blue-700">
+          <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
             Location pinned
           </span>
-          <span className="ml-auto font-mono text-xs text-blue-500">
+          <span className="ml-auto font-mono text-xs text-blue-500 dark:text-blue-400">
             {value.lat.toFixed(5)},&nbsp;{value.lng.toFixed(5)}
           </span>
         </div>

@@ -24,6 +24,7 @@ import {
   PageHeadingSkeleton,
 } from "@/components/skeletons/page-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PaginationControls } from "@/components/ui/pagination";
 
 const STATUS_FILTERS: { value: ReportStatus | ""; label: string }[] = [
   { value: "", label: "All Tasks" },
@@ -35,10 +36,12 @@ const STATUS_FILTERS: { value: ReportStatus | ""; label: string }[] = [
 
 export default function TasksPage() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState<ReportStatus | "">("");
 
   const { data, isLoading } = useAssignedReports({
     page,
+    limit: pageSize,
     status: statusFilter || undefined,
   });
 
@@ -65,29 +68,29 @@ export default function TasksPage() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+            <div className="p-2 bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-lg">
               <ClipboardList className="w-5 h-5" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 tracking-tight">
               My Tasks
             </h1>
           </div>
-          <p className="text-sm text-gray-500 ml-11">
+          <p className="text-sm text-gray-500 dark:text-slate-400 ml-11">
             Manage and track your assigned cleanup tasks
           </p>
         </div>
 
         {/* Task Counter summary optionally */}
         <div className="flex items-center gap-3 ml-11 md:ml-0">
-          <div className="bg-gray-50 px-4 py-2 rounded-lg border border-gray-100 flex items-center gap-3">
+          <div className="bg-gray-50 dark:bg-slate-800/50 px-4 py-2 rounded-lg border border-gray-100 dark:border-slate-700 flex items-center gap-3">
             <div className="flex flex-col">
-              <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">
+              <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-slate-400">
                 Total Found
               </span>
-              <span className="text-lg font-bold text-gray-900 leading-none mt-0.5">
+              <span className="text-lg font-bold text-gray-900 dark:text-slate-100 leading-none mt-0.5">
                 {pagination?.total || 0}
               </span>
             </div>
@@ -98,8 +101,8 @@ export default function TasksPage() {
       {/* Status Filter Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
         <div className="flex items-center gap-2 px-1">
-          <Filter className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">Filter:</span>
+          <Filter className="w-4 h-4 text-gray-500 dark:text-slate-400" />
+          <span className="text-sm font-medium text-gray-700 dark:text-slate-300">Filter:</span>
         </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide -mx-4 sm:mx-0 px-4 sm:px-0">
           {STATUS_FILTERS.map((filter) => {
@@ -113,8 +116,8 @@ export default function TasksPage() {
                 }}
                 className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 border ${
                   isActive
-                    ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200 dark:shadow-none"
+                    : "bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-slate-800"
                 }`}
               >
                 {filter.label}
@@ -126,14 +129,14 @@ export default function TasksPage() {
 
       {/* Tasks List */}
       {reports.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center py-24 bg-white rounded-2xl border shadow-sm">
-          <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-5 border border-gray-100">
-            <Inbox className="w-10 h-10 text-gray-400" />
+        <div className="flex flex-col items-center justify-center text-center py-24 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm">
+          <div className="w-20 h-20 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-5 border border-gray-100 dark:border-slate-700">
+            <Inbox className="w-10 h-10 text-gray-400 dark:text-slate-500" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-1">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100 mb-1">
             No tasks found
           </h3>
-          <p className="text-gray-500 text-sm max-w-sm mx-auto">
+          <p className="text-gray-500 dark:text-slate-400 text-sm max-w-sm mx-auto">
             {statusFilter
               ? "Try a different filter to see your assigned tasks."
               : "You have no tasks assigned to you right now. Grab a coffee!"}
@@ -141,7 +144,7 @@ export default function TasksPage() {
           {statusFilter && (
             <Button
               variant="outline"
-              className="mt-6 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"
+              className="mt-6 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               onClick={() => setStatusFilter("")}
             >
               Clear Filters
@@ -154,14 +157,14 @@ export default function TasksPage() {
             <Link
               key={report.id}
               href={`/field-worker/tasks/${report.id}`}
-              className="group flex flex-col bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all duration-300 transform hover:-translate-y-1"
+              className="group flex flex-col bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-500 transition-all duration-300 transform hover:-translate-y-1"
             >
               <div className="p-5 flex flex-col h-full gap-4">
                 {/* Top header: status and time */}
                 <div className="flex flex-wrap items-center justify-between gap-3 relative z-10">
                   <StatusBadge status={report.status} />
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100">
-                    <Clock className="w-3.5 h-3.5 text-gray-400" />
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400 font-medium bg-gray-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-slate-700">
+                    <Clock className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
                     {timeAgo(report.createdAt)}
                   </div>
                 </div>
@@ -169,7 +172,7 @@ export default function TasksPage() {
                 {/* Content */}
                 <div className="flex gap-4 sm:gap-5 mt-1">
                   {/* Image Thumbnail */}
-                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 bg-gray-50 rounded-xl overflow-hidden shrink-0 border border-gray-100 shadow-inner">
+                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 bg-gray-50 dark:bg-slate-800 rounded-xl overflow-hidden shrink-0 border border-gray-100 dark:border-slate-700 shadow-inner">
                     {report.images && report.images.length > 0 ? (
                       <Image
                         src={report.images[0].imageUrl}
@@ -179,7 +182,7 @@ export default function TasksPage() {
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 gap-1.5">
+                      <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 gap-1.5">
                         <ImageIcon className="w-7 h-7 opacity-50" />
                         <span className="text-[10px] font-medium uppercase tracking-wider">
                           No Photo
@@ -190,34 +193,34 @@ export default function TasksPage() {
 
                   {/* Details */}
                   <div className="flex-1 min-w-0 flex flex-col py-1">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight mb-1.5 truncate group-hover:text-blue-600 transition-colors">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-slate-100 leading-tight mb-1.5 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {report.title}
                     </h3>
 
                     <div className="flex flex-col gap-1.5 mb-2">
-                      <div className="flex items-start gap-1.5 text-sm text-gray-600">
-                        <MapPin className="w-4 h-4 shrink-0 text-gray-400 mt-0.5" />
+                      <div className="flex items-start gap-1.5 text-sm text-gray-600 dark:text-slate-300">
+                        <MapPin className="w-4 h-4 shrink-0 text-gray-400 dark:text-slate-500 mt-0.5" />
                         <span className="line-clamp-2 leading-tight">
                           {report.address || "Location not provided"}
                         </span>
                       </div>
                     </div>
 
-                    <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed mt-auto hidden sm:block">
+                    <p className="text-sm text-gray-500 dark:text-slate-400 line-clamp-2 leading-relaxed mt-auto hidden sm:block">
                       {report.description || "No description provided."}
                     </p>
                   </div>
                 </div>
 
                 {/* Footer */}
-                <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
+                <div className="mt-auto pt-4 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
                   <div className="flex items-center gap-2 overflow-hidden mr-2">
-                    <span className="inline-flex items-center whitespace-nowrap justify-center bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-md">
+                    <span className="inline-flex items-center whitespace-nowrap justify-center bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-800/80 text-blue-700 dark:text-blue-300 text-xs font-semibold px-2.5 py-1 rounded-md">
                       {WASTE_CATEGORY_LABELS[report.category] ||
                         report.category}
                     </span>
                     {report.images?.length > 1 && (
-                      <span className="text-xs text-gray-500 font-medium whitespace-nowrap bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
+                      <span className="text-xs text-gray-500 dark:text-slate-400 font-medium whitespace-nowrap bg-gray-50 dark:bg-slate-800 px-2 py-1 rounded-md border border-gray-100 dark:border-slate-700">
                         +{report.images.length - 1} photo
                         {report.images.length - 1 !== 1 && "s"}
                       </span>
@@ -236,36 +239,20 @@ export default function TasksPage() {
       )}
 
       {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border shadow-sm">
-          <p className="text-sm text-gray-600 font-medium font-sans">
-            Showing page{" "}
-            <span className="font-bold text-gray-900">{pagination.page}</span>{" "}
-            of{" "}
-            <span className="font-bold text-gray-900">
-              {pagination.totalPages}
-            </span>
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="hover:bg-gray-50"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              className="hover:bg-gray-50"
-              disabled={page >= pagination.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          </div>
+      {pagination && (
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
+          <PaginationControls
+            currentPage={page}
+            totalRecords={pagination.total}
+            pageSize={pageSize}
+            totalPages={pagination.totalPages}
+            onPageChange={(newPage) => setPage(newPage)}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+            itemName="tasks"
+          />
         </div>
       )}
     </div>

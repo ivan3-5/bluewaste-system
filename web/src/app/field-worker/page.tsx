@@ -162,12 +162,12 @@ export default function FieldWorkerDashboard() {
         <PageHeadingSkeleton />
         <StatsCardsSkeleton count={4} />
         <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <div className="rounded-2xl border bg-white p-6 space-y-4">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4">
             <Skeleton className="h-5 w-44" />
             <Skeleton className="h-3 w-32" />
             <Skeleton className="h-44 w-full" />
           </div>
-          <div className="rounded-2xl border bg-white p-6 space-y-4">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4">
             <Skeleton className="h-5 w-48" />
             <Skeleton className="h-3 w-36" />
             <div className="flex items-center justify-center">
@@ -183,7 +183,7 @@ export default function FieldWorkerDashboard() {
             </div>
           </div>
         </div>
-        <div className="rounded-2xl border bg-white p-6">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
           <ListCardsSkeleton rows={5} />
         </div>
       </div>
@@ -193,22 +193,22 @@ export default function FieldWorkerDashboard() {
   return (
     <div className="relative">
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -left-24 top-6 h-56 w-56 rounded-full bg-blue-100/70 blur-3xl" />
-        <div className="absolute right-8 top-16 h-40 w-40 rounded-full bg-emerald-100/70 blur-3xl" />
-        <div className="absolute left-1/3 top-72 h-56 w-56 rounded-full bg-orange-100/50 blur-3xl" />
+        <div className="absolute -left-24 top-6 h-56 w-56 rounded-full bg-blue-100/70 dark:bg-blue-950/20 blur-3xl" />
+        <div className="absolute right-8 top-16 h-40 w-40 rounded-full bg-emerald-100/70 dark:bg-emerald-950/20 blur-3xl" />
+        <div className="absolute left-1/3 top-72 h-56 w-56 rounded-full bg-orange-100/50 dark:bg-amber-950/20 blur-3xl" />
       </div>
 
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900">
+            <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
               Field Worker Dashboard
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Assigned tasks and cleanup progress overview
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-slate-500 shadow-sm">
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400 shadow-sm">
             <span
               className={`h-2 w-2 rounded-full ${
                 unreadCount > 0 ? "bg-orange-500" : "bg-emerald-500"
@@ -224,12 +224,27 @@ export default function FieldWorkerDashboard() {
             return (
               <div
                 key={card.label}
-                className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.gradient} p-5 text-white shadow-[0_16px_30px_rgba(15,23,42,0.18)] transition-all duration-300 hover:-translate-y-1 ${
+                className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.gradient} p-5 text-white shadow-[0_16px_30px_rgba(15,23,42,0.18)] dark:shadow-[0_16px_30px_rgba(0,0,0,0.4)] dark:border dark:border-white/10 transition-all duration-300 hover:-translate-y-1 ${
                   index < 2
                     ? "animate-in fade-in slide-in-from-bottom-4"
                     : "animate-in fade-in slide-in-from-bottom-6"
                 }`}
               >
+                {/* Subtle horizontal & vertical grid background (clean, non-distracting) */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 opacity-[0.14]"
+                  style={{
+                    backgroundImage: `
+                      linear-gradient(to right, rgba(255, 255, 255, 0.45) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(255, 255, 255, 0.45) 1px, transparent 1px)
+                    `,
+                    backgroundSize: "22px 22px",
+                    maskImage: "linear-gradient(to bottom right, black 35%, transparent 85%)",
+                    WebkitMaskImage: "linear-gradient(to bottom right, black 35%, transparent 85%)",
+                  }}
+                />
+
                 <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/20" />
                 <div className="pointer-events-none absolute -right-4 -bottom-12 h-32 w-32 rounded-full bg-white/10" />
                 <div className="flex items-start justify-between">
@@ -250,23 +265,23 @@ export default function FieldWorkerDashboard() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:shadow-none">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                   Task Activity (Last 12 Days)
                 </h2>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Assignments received over time
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                <TrendingUp className="h-4 w-4 text-blue-500" />
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <TrendingUp className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                 {totalAssigned > 0 ? "Active flow" : "No recent activity"}
               </div>
             </div>
 
-            <div className="relative mt-6 h-56 overflow-hidden rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 via-white to-slate-50">
+            <div className="relative mt-6 h-56 overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.16)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.16)_1px,transparent_1px)] bg-[size:36px_36px]" />
               <div className="absolute inset-x-6 bottom-6 flex h-40 items-end gap-3">
                 {trendBuckets.map((value, idx) => (
@@ -280,22 +295,22 @@ export default function FieldWorkerDashboard() {
                 ))}
               </div>
               {!hasTrendData && (
-                <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-slate-400">
+                <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-slate-400 dark:text-slate-500">
                   No activity yet
                 </div>
               )}
-              <div className="absolute left-6 top-4 text-xs font-medium text-slate-400">
+              <div className="absolute left-6 top-4 text-xs font-medium text-slate-400 dark:text-slate-500">
                 12 days
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:shadow-none">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Status Breakdown
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Current task distribution
               </p>
             </div>
@@ -306,8 +321,8 @@ export default function FieldWorkerDashboard() {
                   className="absolute inset-0 rounded-full"
                   style={{ background: statusGradient }}
                 />
-                <div className="absolute inset-6 rounded-full bg-white shadow-[inset_0_0_0_10px_rgba(241,245,249,0.8)]" />
-                <div className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-500">
+                <div className="absolute inset-6 rounded-full bg-white dark:bg-slate-900 shadow-[inset_0_0_0_10px_rgba(241,245,249,0.8)] dark:shadow-[inset_0_0_0_10px_rgba(30,41,59,0.8)]" />
+                <div className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-500 dark:text-slate-300">
                   {statusTotal === 0 ? "0 tasks" : `${statusTotal} tasks`}
                 </div>
               </div>
@@ -316,7 +331,7 @@ export default function FieldWorkerDashboard() {
                 {statusSegments.map((item) => (
                   <div
                     key={item.label}
-                    className="flex items-center justify-between text-sm text-slate-600"
+                    className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-300"
                   >
                     <div className="flex items-center gap-2">
                       <span
@@ -324,7 +339,7 @@ export default function FieldWorkerDashboard() {
                       />
                       {item.label}
                     </div>
-                    <span className="font-semibold text-slate-700">
+                    <span className="font-semibold text-slate-700 dark:text-slate-100">
                       {item.value}
                     </span>
                   </div>

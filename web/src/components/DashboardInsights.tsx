@@ -59,24 +59,24 @@ export function DashboardInsights({
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
               Report Trends (Last 30 Days)
             </h2>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Daily submissions across the city
             </p>
           </div>
-          <span className="inline-flex items-center gap-1 text-sm font-semibold text-blue-500">
+          <span className="inline-flex items-center gap-1 text-sm font-semibold text-blue-500 dark:text-blue-400">
             <span aria-hidden="true">↗</span>+{trendDeltaPct}% from last period
           </span>
         </div>
 
-        <div className="relative h-56 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/70 px-3 pb-4 pt-3">
+        <div className="relative h-56 overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 px-3 pb-4 pt-3">
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.12)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.12)_1px,transparent_1px)] bg-[size:28px_28px]" />
-          <span className="pointer-events-none absolute left-5 top-3 text-xs text-slate-400">
+          <span className="pointer-events-none absolute left-5 top-3 text-xs text-slate-400 dark:text-slate-500">
             30 days
           </span>
           <div
@@ -115,12 +115,12 @@ export function DashboardInsights({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
         <div className="mb-4">
-          <h2 className="text-2xl font-bold text-slate-900">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             Waste Category Distribution
           </h2>
-          <p className="text-sm text-slate-500">Breakdown by classification</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Breakdown by classification</p>
         </div>
 
         <div className="space-y-5">
@@ -130,7 +130,7 @@ export function DashboardInsights({
               style={{ backgroundImage: donutGradient }}
               aria-label="Waste category distribution donut chart"
             >
-              <div className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-center text-sm font-semibold text-slate-700 shadow-inner">
+              <div className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white dark:bg-slate-900 text-center text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-inner">
                 {totalReports} reports
               </div>
             </div>
@@ -143,7 +143,7 @@ export function DashboardInsights({
                   key={item.key}
                   className="flex items-center justify-between py-1"
                 >
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
                     <span
                       className="inline-block h-2.5 w-2.5 rounded-full"
                       style={{
@@ -153,14 +153,14 @@ export function DashboardInsights({
                     />
                     {item.label}
                   </div>
-                  <span className="text-sm font-bold text-slate-900">
+                  <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
                     {item.count}
                   </span>
                 </div>
               );
             })}
             {categories.length === 0 && (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 No reports yet for distribution.
               </p>
             )}

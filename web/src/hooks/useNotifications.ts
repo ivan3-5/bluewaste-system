@@ -3,23 +3,27 @@ import { useEffect } from "react";
 import api from "@/lib/api";
 import { PaginatedResponse, Notification } from "@/types";
 
-export function useNotifications(page: number = 1) {
+export function useNotifications(page: number = 1, limit: number = 10) {
   const queryClient = useQueryClient();
 
   // Refetch on window focus
   useEffect(() => {
     const handleFocus = () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", page] });
+      queryClient.invalidateQueries({
+        queryKey: ["notifications", page, limit],
+      });
     };
 
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [page, queryClient]);
+  }, [page, limit, queryClient]);
 
   return useQuery<PaginatedResponse<Notification>>({
-    queryKey: ["notifications", page],
+    queryKey: ["notifications", page, limit],
     queryFn: async () => {
-      const { data } = await api.get(`/notifications?page=${page}&limit=10`);
+      const { data } = await api.get(
+        `/notifications?page=${page}&limit=${limit}`,
+      );
       return data;
     },
     refetchInterval: 5000, // Poll every 5 seconds for real-time feel

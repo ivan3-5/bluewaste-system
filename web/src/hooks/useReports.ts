@@ -48,7 +48,7 @@ export function useReport(id: string) {
 }
 
 export function useMyReports(
-  filters: { page?: number; status?: ReportStatus } = {},
+  filters: { page?: number; limit?: number; status?: ReportStatus } = {},
 ) {
   return useQuery<PaginatedResponse<Report>>({
     queryKey: ["my-reports", filters],
@@ -220,7 +220,7 @@ export function useUploadReportImages() {
 }
 
 export function useAssignedReports(
-  filters: { page?: number; status?: ReportStatus } = {},
+  filters: { page?: number; limit?: number; status?: ReportStatus } = {},
 ) {
   return useQuery<PaginatedResponse<Report>>({
     queryKey: ["assigned-reports", filters],

@@ -8,8 +8,9 @@ import {
   useMarkAllAsRead,
 } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
+import { PaginationControls } from "@/components/ui/pagination";
 import { timeAgo } from "@/lib/utils";
-import { Bell, ChevronLeft, ChevronRight } from "lucide-react";
+import { Bell } from "lucide-react";
 import {
   NotificationListSkeleton,
   PageHeadingSkeleton,
@@ -24,7 +25,8 @@ const typeIcons: Record<string, string> = {
 
 export default function CitizenNotificationsPage() {
   const [page, setPage] = useState(1);
-  const { data, isLoading } = useNotifications(page);
+  const [pageSize, setPageSize] = useState(10);
+  const { data, isLoading } = useNotifications(page, pageSize);
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
 
@@ -142,30 +144,23 @@ export default function CitizenNotificationsPage() {
         </div>
       )}
 
-      {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-500">
-            Page {pagination.page} of {pagination.totalPages}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= pagination.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
+      {pagination && pagination.total > 0 && (
+        <PaginationControls
+          currentPage={pagination.page}
+          totalRecords={pagination.total}
+          pageSize={pagination.limit || pageSize}
+          totalPages={pagination.totalPages}
+          onPageChange={(newPage) => {
+            setPage(newPage);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+          itemName="notifications"
+          className="mt-6 border-t border-gray-100 pt-4"
+        />
       )}
     </div>
   );

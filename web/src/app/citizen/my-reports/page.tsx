@@ -14,6 +14,7 @@ import { timeAgo } from "@/lib/utils";
 import Link from "next/link";
 import { X, ChevronLeft, ChevronRight, ImageIcon, EyeOff } from "lucide-react";
 import { ListCardsSkeleton } from "@/components/skeletons/page-skeletons";
+import { PaginationControls } from "@/components/ui/pagination";
 
 interface LightboxState {
   images: string[];
@@ -23,9 +24,14 @@ interface LightboxState {
 
 export default function MyReportsPage() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState<ReportStatus | undefined>();
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
-  const { data, isLoading } = useMyReports({ page, status: statusFilter });
+  const { data, isLoading } = useMyReports({
+    page,
+    limit: pageSize,
+    status: statusFilter,
+  });
 
   const reports = data?.data || [];
   const pagination = data?.pagination;
@@ -367,29 +373,20 @@ export default function MyReportsPage() {
       </div>
 
       {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-500">
-            Page {pagination.page} of {pagination.totalPages}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= pagination.totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </Button>
-          </div>
+      {pagination && (
+        <div className="mt-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <PaginationControls
+            currentPage={page}
+            totalRecords={pagination.total}
+            pageSize={pageSize}
+            totalPages={pagination.totalPages}
+            onPageChange={(newPage) => setPage(newPage)}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+            itemName="reports"
+          />
         </div>
       )}
     </div>
