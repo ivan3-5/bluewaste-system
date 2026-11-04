@@ -49,36 +49,9 @@ function formatAnalysisDetails(categories: string[] = [], defaultReason?: string
     .map((cat) => cat.toLowerCase().replace(/_/g, " "));
 
   if (cleanCategories.length === 0) {
-    return "A significant accumulation of plastic bottles and containers is scattered across the sandy beach.";
+    return "No additional analysis details are available.";
   }
-
-  const formatted = cleanCategories.map((c) => {
-    if (c === "plastic bottle") return "plastic bottles";
-    if (c === "plastic bag") return "plastic bags";
-    if (c === "fishing net") return "fishing nets";
-    if (c === "cigarette butt") return "cigarette butts";
-    if (c === "can") return "cans";
-    if (c === "rope") return "ropes";
-    if (c === "glass") return "glass containers";
-    if (c === "battery") return "hazardous batteries";
-    if (c === "styrofoam") return "styrofoam debris";
-    if (c === "diaper") return "sanitary waste";
-    return c.endsWith("s") ? c : `${c}s`;
-  });
-
-  if (formatted.length === 1) {
-    if (formatted[0] === "plastic bottles") {
-      return "A significant accumulation of plastic bottles and containers is scattered across the sandy beach.";
-    }
-    return `A significant accumulation of ${formatted[0]} and scattered debris is present across the area.`;
-  }
-
-  if (formatted.length === 2) {
-    return `A significant accumulation of ${formatted[0]} and ${formatted[1]} is scattered across the coastal area.`;
-  }
-
-  const last = formatted.pop();
-  return `A significant accumulation of ${formatted.join(", ")}, and ${last} is scattered across the coastal area.`;
+  return `Detected categories: ${cleanCategories.join(", ")}.`;
 }
 
 function toFiniteNumberOrNull(value: unknown): number | null {
@@ -112,16 +85,43 @@ function normalizeImageContentType(value: string | null) {
 }
 
 export class ReportAnalysisService {
-  /**
-   * Call the Gradio ZeroGPU Space's /call/analyze endpoint.
-   *
-   * Gradio named-call API (4.x / 5.x):
-   *   1. POST /call/analyze  { data: ["data:<mime>;base64,<b64>"] }
-   *      → { event_id: "<id>" }
-   *   2. GET  /call/analyze/<id>  (SSE stream)
-   *      → lines: "event: ...\ndata: ..." until "event: complete"
-   *      → complete data line contains the result array JSON
-   */
+  private static async requestGeminiAnalysis(imageUrl: string, latitude: number, longitude: number) {
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) throw new Error("Failed to fetch report image for analysis");
+    const contentType = normalizeImageContentType(imageResponse.headers.get("content-type"));
+    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    const form = new FormData();
+    form.append("image", new Blob([new Uint8Array(imageBuffer)], { type: contentType }), "image");
+    form.append("latitude", String(latitude));
+    form.append("longitude", String(longitude));
+    const endpoint = new URL("/api/ai/analyze-report", env.WEB_URL);
+    const response = await fetch(endpoint, { method: "POST", body: form, signal: AbortSignal.timeout(120_000) });
+    if (!response.ok) throw new Error(`Web analysis service failed (${response.status})`);
+    const result: unknown = await response.json();
+    if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error("Web analysis returned an invalid response");
+    const data = result as Record<string, unknown>;
+    if (data.provider !== "gemini") throw new Error("Web analysis is not configured to use Gemini");
+    if (typeof data.hasWaste !== "boolean" ||
+        typeof data.confidence !== "number" || !Number.isFinite(data.confidence) ||
+        data.confidence < 0 || data.confidence > 1 ||
+        typeof data.severity !== "string" ||
+        !["LOW", "MEDIUM", "HIGH", "CRITICAL", "NONE"].includes(data.severity.toUpperCase()) ||
+        !Array.isArray(data.categories) || !data.categories.every((category) => typeof category === "string") ||
+        typeof data.reason !== "string" || typeof data.model !== "string" || !data.model.trim()) {
+      throw new Error("Web analysis returned invalid Gemini fields");
+    }
+    return {
+      status: data.hasWaste ? "DIRTY" as const : "CLEAN" as const,
+      wasteCount: data.hasWaste ? 1 : 0,
+      confidence: data.confidence,
+      labels: data.hasWaste ? ["with_waste", ...data.categories] : ["no_waste"],
+      severity: data.severity,
+      spamReason: data.hasWaste ? null : data.reason,
+      reason: data.reason,
+      model: data.model,
+    };
+  }
+
   private static async requestYoloAnalysis(imageUrl: string) {
     // ── 1. Fetch the image ──────────────────────────────────────────────────
     const imageResponse = await fetch(imageUrl);
@@ -132,75 +132,44 @@ export class ReportAnalysisService {
       imageResponse.headers.get("content-type"),
     );
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    const b64 = imageBuffer.toString("base64");
-    const dataUrl = `data:${contentType};base64,${b64}`;
-
-    // ── 2. Resolve the Gradio Space base URL ────────────────────────────────
-    const baseUrl = env.YOLO_API_URL
-      .replace(/\/(call|api)\/.+$/, "")   // strip any path suffix
-      .replace(/\/+$/, "");               // strip trailing slash
-
-    // ── 3. POST to /call/analyze to get event_id ────────────────────────────
-    let eventId: string;
-    try {
-      const submitRes = await fetch(`${baseUrl}/call/analyze`, {
+    const url = new URL(env.YOLO_API_URL);
+    const signal = AbortSignal.timeout(120_000);
+    let raw: unknown;
+    if (url.hostname.endsWith(".hf.space")) {
+      const base = `${url.origin}${url.pathname.replace(/\/(?:gradio_api\/)?(?:call\/)?analyze\/?$/, "").replace(/\/+$/, "")}`;
+      const endpoint = `${base}/gradio_api/call/analyze`;
+      const dataUrl = `data:${contentType};base64,${imageBuffer.toString("base64")}`;
+      const submitRes = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: [dataUrl] }),
+        body: JSON.stringify({ data: [{ url: dataUrl, mime_type: contentType, meta: { _type: "gradio.FileData" } }] }),
+        signal,
       });
       if (!submitRes.ok) {
-        const errText = await submitRes.text();
-        throw new Error(`Gradio submit error ${submitRes.status}: ${errText}`);
+        throw new Error(`Gradio submit error ${submitRes.status}`);
       }
-      const submitJson = await submitRes.json() as { event_id: string };
-      eventId = submitJson.event_id;
-      if (!eventId) throw new Error("Gradio returned no event_id");
-    } catch (err) {
-      if (err instanceof Error) throw err;
-      throw new Error(
-        "YOLO Gradio Space is unavailable. Check YOLO_API_URL and Space status.",
-      );
+      const submitJson = await submitRes.json() as { event_id?: unknown };
+      if (typeof submitJson.event_id !== "string" || !submitJson.event_id) throw new Error("Gradio returned no event_id");
+      const sseRes = await fetch(`${endpoint}/${encodeURIComponent(submitJson.event_id)}`, { signal });
+      if (!sseRes.ok) throw new Error(`Gradio SSE stream error ${sseRes.status}`);
+      const completed = (await sseRes.text()).split(/\r?\n\r?\n/)
+        .find((event) => /^event:\s*complete\s*$/m.test(event));
+      const data = completed?.match(/^data:\s*(.+)$/m)?.[1];
+      const parsed = data ? toSafeJson(data) : null;
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("Gradio inference did not complete successfully");
+      raw = parsed[0];
+    } else {
+      const form = new FormData();
+      form.append("image", new Blob([new Uint8Array(imageBuffer)], { type: contentType }), "image");
+      const response = await fetch(url, { method: "POST", body: form, signal });
+      if (!response.ok) throw new Error(`YOLO inference failed (${response.status})`);
+      raw = await response.json();
     }
-
-    // ── 4. Poll SSE stream until 'complete' event ────────────────────────────
-    const sseRes = await fetch(`${baseUrl}/call/analyze/${eventId}`);
-    if (!sseRes.ok || !sseRes.body) {
-      throw new Error(`Gradio SSE stream error ${sseRes.status}`);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw) ||
+        typeof (raw as YoloApiResponse).has_waste !== "boolean") {
+      throw new Error("YOLO returned an invalid response");
     }
-
-    // Read SSE stream line-by-line (Node.js ReadableStream)
-    const reader = sseRes.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let yoloJson: YoloApiResponse = {};
-
-    outer: while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";   // keep incomplete last line
-
-      let eventType = "";
-      for (const line of lines) {
-        if (line.startsWith("event:")) {
-          eventType = line.slice(6).trim();
-        } else if (line.startsWith("data:")) {
-          const rawData = line.slice(5).trim();
-          if (eventType === "error") {
-            throw new Error(`Gradio inference error: ${rawData}`);
-          }
-          if (eventType === "complete") {
-            // data is a JSON array; first element is our result dict
-            const parsed = toSafeJson(rawData) as unknown[];
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              yoloJson = parsed[0] as YoloApiResponse;
-            }
-            break outer;
-          }
-        }
-      }
-    }
+    const yoloJson = raw as YoloApiResponse;
 
     // ── 5. Parse response (same shape as original /analyze) ─────────────────
     const severity: string | null =
@@ -239,6 +208,8 @@ export class ReportAnalysisService {
       severity,
       layer1Passed,
       spamReason,
+      reason: typeof yoloJson.message === "string" ? yoloJson.message : null,
+      model: "yolo",
     };
   }
 
@@ -262,7 +233,9 @@ export class ReportAnalysisService {
 
     let analysis;
     try {
-      analysis = await this.requestYoloAnalysis(firstImage.imageUrl);
+      analysis = env.USE_GEMINI
+        ? await this.requestGeminiAnalysis(firstImage.imageUrl, report.latitude, report.longitude)
+        : await this.requestYoloAnalysis(firstImage.imageUrl);
     } catch (error) {
       console.warn("Analysis failed for report", reportId, error);
       return report;
@@ -327,8 +300,8 @@ export class ReportAnalysisService {
             analyzedAt: now,
             severity: resolvedSeverity,
             aiCategories: labels.filter((l: string) => l !== "with_waste" && l !== "no_waste"),
-            aiReason: spamReason ?? (hasWaste ? formatAnalysisDetails(labels.filter((l: string) => l !== "with_waste" && l !== "no_waste"), analysis.spamReason) : "No visible waste detected."),
-            aiModel: report.aiModel ?? "gemini-3.5-flash",
+            aiReason: spamReason ?? (hasWaste ? formatAnalysisDetails(labels.filter((l: string) => l !== "with_waste" && l !== "no_waste"), analysis.reason) : "No visible waste detected."),
+            aiModel: analysis.model,
           },
         }),
         ...(report.reporterId

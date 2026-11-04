@@ -61,6 +61,7 @@ const envSchema = z.object({
   MOBILE_URL: z.string().default("http://localhost:8081"),
   ALLOWED_ORIGINS: z.string().optional(),
   YOLO_API_URL: z.string().url().default("https://bluewaste-system.onrender.com/analyze"),
+  USE_GEMINI: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   SPAM_RETENTION_DAYS: z.coerce.number().int().min(1).default(3),
   // Same-waste-incident deduplication distance threshold (meters).
   // Default: 30m. Max enforced at 50m. Tune without code change.

@@ -41,6 +41,7 @@ const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
 
 type AnalyzeWasteResult = {
+  model: string;
   detectedObject: string;
   dominantWaste: WasteType | null;
   totalItems: number;
@@ -98,7 +99,7 @@ function resolveSeverityLevel(val: unknown, confidence: number): SeverityLevel {
     if (upper === "HIGH") return "HIGH";
     if (upper === "MEDIUM" || upper === "MODERATE") return "MODERATE";
     if (upper === "LOW") return "MODERATE";
-    if (upper === "SPAM") return "SPAM";
+    if (upper === "SPAM" || upper === "NONE") return "SPAM";
   }
   if (confidence >= 0.9) return "CRITICAL";
   if (confidence >= 0.7) return "HIGH";
@@ -538,6 +539,7 @@ export default function SubmitReportPage() {
     const severityVal = payload?.severity || (hasWaste ? "MODERATE" : "SPAM");
 
     return {
+      model: typeof payload?.model === "string" ? payload.model : "demo",
       detectedObject: hasWaste ? "waste" : "none",
       dominantWaste: null,
       totalItems: categoriesList.length || (hasWaste ? 1 : 0),
@@ -659,8 +661,10 @@ export default function SubmitReportPage() {
       // Use the selectedCategory (set from analysis or user) to satisfy the API.
       // Also forward the pre-computed YOLO analysis data so severity is stored
       // immediately without requiring a second YOLO call from the backend.
-      const severityToSave = analysisResult?.has_waste
-        ? resolveSeverityLevel(analysisResult.severity, analysisResult.confidence)
+      const severityToSave = analysisResult
+        ? analysisResult.has_waste
+          ? resolveSeverityLevel(analysisResult.severity, analysisResult.confidence)
+          : "SPAM"
         : null;
 
       const report = await createReport.mutateAsync({
@@ -675,7 +679,7 @@ export default function SubmitReportPage() {
         analysisStatus: analysisResult?.status ?? null,
         analysisConfidence: analysisResult?.confidence ?? null,
         analysisWasteCount: analysisResult?.wasteCount ?? null,
-        aiModel: analysisResult ? "gemini-3.5-flash" : null,
+        aiModel: analysisResult?.model ?? null,
         aiCategories: analysisResult?.labels?.filter((l: unknown): l is string => typeof l === "string" && l !== "with_waste" && l !== "no_waste") ?? [],
         aiReason: formatAnalysisDetails(
           analysisResult?.labels?.filter((l: unknown): l is string => typeof l === "string" && l !== "with_waste" && l !== "no_waste"),
@@ -945,6 +949,7 @@ export default function SubmitReportPage() {
 
                   {!isAnalyzing && analysisResult && (
                     <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3.5">
+                      <h3 className="text-xs font-bold text-gray-900">Analysis Summary</h3>
                       <div className="flex items-center justify-between gap-2 border-b border-gray-200/80 pb-2.5">
                         <div className="flex items-center gap-1.5">
                           <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${analysisResult.has_waste !== false ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
@@ -978,10 +983,11 @@ export default function SubmitReportPage() {
                         </p>
                       )}
 
-                      {analysisResult.labels && analysisResult.labels.length > 0 && (
+                      {analysisResult.labels && (
                         <div className="pt-1 border-t border-gray-200/80">
                           <span className="text-[11px] font-semibold text-gray-700 block mb-1.5">Detected Labels:</span>
                           <div className="flex flex-wrap gap-1.5">
+                            {analysisResult.labels.length === 0 && <span className="text-xs text-gray-500">None identified</span>}
                             {analysisResult.labels.map((lbl: any, idx: number) => {
                               const labelText = typeof lbl === "string" ? lbl : (lbl?.label || lbl?.class_name || "item");
                               const confText = typeof lbl === "object" && typeof lbl?.confidence === "number" ? ` (${(lbl.confidence * 100).toFixed(0)}%)` : "";
@@ -992,6 +998,12 @@ export default function SubmitReportPage() {
                               );
                             })}
                           </div>
+                        </div>
+                      )}
+                      {analysisResult.decision.message && (
+                        <div className="border-t border-gray-200/80 pt-2">
+                          <span className="block text-[11px] font-semibold text-gray-700">Analysis Details</span>
+                          <p className="mt-1 text-xs text-gray-600">{analysisResult.decision.message}</p>
                         </div>
                       )}
                     </div>

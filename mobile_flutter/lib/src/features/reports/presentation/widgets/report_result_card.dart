@@ -52,6 +52,13 @@ class ReportResultCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              "Analysis Summary",
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: AppSpacing.sm),
             // ─ Header row ──────────────────────────────────────────────────
             Row(
               children: [
@@ -69,14 +76,16 @@ class ReportResultCard extends StatelessWidget {
                   child: Text(
                     result.hasWaste ? "Waste Detected" : "No Waste Detected",
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 // Severity badge
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
@@ -85,9 +94,9 @@ class ReportResultCard extends StatelessWidget {
                   child: Text(
                     result.severity.label,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: color,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -99,18 +108,17 @@ class ReportResultCard extends StatelessWidget {
               children: [
                 Text(
                   "Confidence",
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelMedium
-                      ?.copyWith(color: Colors.grey[600]),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelMedium?.copyWith(color: Colors.grey[600]),
                 ),
                 const Spacer(),
                 Text(
                   "${confidencePct.toStringAsFixed(1)}%",
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: color,
-                      ),
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
                 ),
               ],
             ),
@@ -129,20 +137,19 @@ class ReportResultCard extends StatelessWidget {
             // ─ Severity description ────────────────────────────────────────
             Text(
               result.severity.description,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.grey[600]),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
             ),
 
             // ─ Detected labels ─────────────────────────────────────────────
-            if (result.labels.isNotEmpty) ...[
+            ...[
               const SizedBox(height: AppSpacing.sm),
               Text(
                 "Detected Labels",
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -152,18 +159,31 @@ class ReportResultCard extends StatelessWidget {
                   final pct = (lbl.confidence * 100);
                   return Chip(
                     label: Text(
-                      "${lbl.label}  ${pct.toStringAsFixed(0)}%",
+                      result.model == "yolo-tflite"
+                          ? "${lbl.label}  ${pct.toStringAsFixed(0)}%"
+                          : lbl.label,
                       style: const TextStyle(fontSize: 11),
                     ),
-                    backgroundColor:
-                        AppColors.primary.withValues(alpha: 0.1),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                     side: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.3)),
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                    ),
                     labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                     visualDensity: VisualDensity.compact,
                   );
                 }).toList(),
               ),
+              if (result.labels.isEmpty) const Text("None identified"),
+            ],
+            if ((result.reason ?? result.message).trim().isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                "Analysis Details",
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              Text(result.reason ?? result.message),
             ],
 
             const SizedBox(height: AppSpacing.md),
@@ -173,8 +193,7 @@ class ReportResultCard extends StatelessWidget {
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: onDismiss,
-                icon: const Icon(Icons.add_photo_alternate_outlined,
-                    size: 18),
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
                 label: const Text("Submit Another Report"),
               ),
             ),

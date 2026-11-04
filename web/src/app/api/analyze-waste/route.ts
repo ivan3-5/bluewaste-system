@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { classifyYoloPayload } from "@/lib/waste-classification";
+import { classifyYoloPayload, inferWasteCategory } from "@/lib/waste-classification";
+import { requestYoloPayload } from "@/lib/ai/yolo";
+import { analyzeImageWithGemini } from "@/lib/ai/gemini";
+import { validateGeminiResult } from "@/lib/ai/validator";
 
 export const runtime = "nodejs";
 
@@ -88,18 +91,6 @@ function toJsonError(status: number, message: string, details?: string) {
   );
 }
 
-function safeParseJson(text: string): YoloApiResponse | null {
-  if (!text) return null;
-  try {
-    const parsed = JSON.parse(text);
-    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as YoloApiResponse)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 function toNonNegativeInt(value: unknown): number | null {
   return parseNumeric(value, { min: 0, integer: true }) as number | null;
 }
@@ -157,14 +148,10 @@ function normalizeDecision(payload: unknown): AnalyzeDecision {
 
 export async function POST(request: NextRequest) {
   try {
-    const rawYoloUrl =
-      process.env.YOLO_API_URL || "https://bluewaste-system.onrender.com/analyze";
-    const yoloApiUrl =
-      rawYoloUrl.endsWith("/analyze") ||
-      rawYoloUrl.endsWith("/detect") ||
-      rawYoloUrl.endsWith("/predict")
-        ? rawYoloUrl
-        : `${rawYoloUrl.replace(/\/+$/, "")}/analyze`;
+    const providerSetting = process.env.USE_GEMINI?.trim().toLowerCase() || "false";
+    if (providerSetting !== "true" && providerSetting !== "false") {
+      return toJsonError(500, "Server misconfiguration: USE_GEMINI must be true or false");
+    }
     const rawApiBase =
       process.env.BACKEND_API_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
@@ -193,44 +180,35 @@ export async function POST(request: NextRequest) {
 
     const imageBuffer = Buffer.from(await image.arrayBuffer());
 
-    const yoloBody = new FormData();
-    yoloBody.append(
-      "image",
-      new Blob([imageBuffer], { type: image.type }),
-      image.name,
-    );
-
-    const yoloResponse = await fetch(yoloApiUrl, {
-      method: "POST",
-      body: yoloBody,
-    });
-
-    const yoloText = await yoloResponse.text();
-    const yoloJson = safeParseJson(yoloText);
-    const yoloData: YoloApiResponse = yoloJson ?? {};
-
-    if (!yoloResponse.ok) {
-      if (yoloResponse.status === 502 || yoloResponse.status === 503 || yoloResponse.status === 504) {
-        return toJsonError(
-          503,
-          "Photo detection service is currently unreachable or restarting",
-          "The server may be waking up from sleep or recovering from a timeout. Please wait 30 seconds and try again.",
-        );
+    let raw: unknown;
+    let providerModel: string;
+    if (providerSetting === "true") {
+      if (!process.env.GEMINI_API_KEY) return toJsonError(500, "Server misconfiguration: GEMINI_API_KEY is not set");
+      const mimeType = image.type === "image/png" ? "image/png" : image.type === "image/webp" ? "image/webp" : "image/jpeg";
+      const response = await analyzeImageWithGemini(imageBuffer, mimeType);
+      const validation = validateGeminiResult(response.result);
+      if (!validation.valid) {
+        console.error("[AI] Invalid Gemini response:", validation.error.message);
+        return toJsonError(422, "Analysis response failed validation");
       }
-
-      const yoloMessage =
-        yoloData.message ||
-        yoloData.error ||
-        (typeof yoloText === "string" && yoloText.length > 0 && !yoloText.includes("<html")
-          ? yoloText
-          : "Unknown detection error");
-
-      return toJsonError(
-        502,
-        `Detection request failed: ${yoloMessage}`,
-        "Check if the detection service is reachable.",
-      );
+      const result = validation.data;
+      raw = {
+        has_waste: result.hasWaste,
+        severity: result.severity === "None" ? "SPAM" : result.severity.toUpperCase(),
+        confidence: result.confidence,
+        labels: result.categories,
+        message: result.reason,
+      };
+      providerModel = response.modelName;
+    } else {
+      raw = await requestYoloPayload(imageBuffer, image.type, image.name);
+      providerModel = "yolo";
     }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return toJsonError(502, "Analysis service returned an invalid response");
+    }
+    const yoloJson = raw as YoloApiResponse;
+    const yoloData = yoloJson;
 
     const classification = classifyYoloPayload(yoloJson);
     const rawCount =
@@ -252,6 +230,19 @@ export async function POST(request: NextRequest) {
           wasteCount > 0;
 
     const status: DecisionStatus = hasWaste ? "DIRTY" : "CLEAN";
+    const labels = Array.isArray(yoloData.labels) ? yoloData.labels : classification.labels;
+    const labelNames = labels.flatMap((label: unknown) => {
+      if (typeof label === "string") return [label];
+      if (label && typeof label === "object" && "label" in label && typeof label.label === "string") return [label.label];
+      return [];
+    });
+    const severity = typeof yoloData.severity === "string" ? yoloData.severity.toUpperCase() : classification.severity;
+    const dbSeverity = severity === "MEDIUM" || severity === "LOW" ? "MODERATE"
+      : severity === "NONE" ? "SPAM" : severity;
+    const detectedObject = classification.detectedObject === "unknown"
+      ? labelNames[0] ?? "unknown"
+      : classification.detectedObject;
+    const wasteCategory = inferWasteCategory(labels, classification.dominantWaste);
     const decision = normalizeDecision(yoloJson);
     const thresholds =
       yoloJson && typeof yoloData.thresholds === "object"
@@ -307,12 +298,12 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           imageUrl: uploadedImage.url,
-          detectedObject: classification.detectedObject,
+          detectedObject,
           detections: classification.wasteDetections,
           dominantWaste: classification.dominantWaste,
           totalItems: classification.totalItems,
-          severity: classification.severity,
-          labels: classification.labels,
+          severity: dbSeverity,
+          labels: labelNames,
           latitude,
           longitude,
           address,
@@ -327,12 +318,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      detectedObject: classification.detectedObject,
+      detectedObject,
       dominantWaste: classification.dominantWaste,
       totalItems: classification.totalItems,
       severity: typeof yoloData.severity === "string" ? yoloData.severity : classification.severity,
       has_waste: hasWaste,
-      wasteCategory: classification.wasteCategory,
+      wasteCategory,
       confidence: typeof yoloData.confidence === "number" ? yoloData.confidence : classification.confidence,
       status,
       waste_count: wasteCount,
@@ -341,13 +332,16 @@ export async function POST(request: NextRequest) {
       decision,
       thresholds,
       model: modelInfo,
+      aiModel: providerModel,
+      provider: providerSetting === "true" ? "gemini" : "yolo",
       imageUrl: uploadedImageUrl,
-      labels: Array.isArray(yoloData.labels) ? yoloData.labels : classification.labels,
+      labels,
       all_labels: Array.isArray(yoloData.all_labels) ? yoloData.all_labels : [],
       detections: classification.detections,
       report: savedReport,
     });
   } catch (error: unknown) {
+    console.error("[AI] Legacy analysis failed:", error);
     const errMsg =
       error instanceof Error ? error.message : String(error || "Unknown error");
     const isNetworkError =

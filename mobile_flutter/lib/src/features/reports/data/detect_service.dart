@@ -102,8 +102,7 @@ class WasteLabel {
   }
 }
 
-/// Result from on-device TFLite YOLOv8n inference.
-/// Matches the shape expected by the UI layer.
+/// Result from on-device or server-side image analysis.
 class DetectResult {
   const DetectResult({
     required this.hasWaste,
@@ -119,6 +118,7 @@ class DetectResult {
     this.reportId,
     this.imageUrl,
     this.status,
+    this.model = "yolo-tflite",
   });
 
   /// Whether waste-related categories were detected.
@@ -159,6 +159,7 @@ class DetectResult {
 
   /// Initial report status.
   final String? status;
+  final String? model;
 
   /// Confidence as a percentage string, e.g. "87.3%"
   String get confidencePct =>
@@ -167,15 +168,15 @@ class DetectResult {
   factory DetectResult.fromJson(Map<String, dynamic> json) {
     final categoriesList = (json["categories"] is List)
         ? (json["categories"] as List)
-            .map((e) => e.toString())
-            .toList(growable: false)
+              .map((e) => e.toString())
+              .toList(growable: false)
         : (json["labels"] is List &&
-                json["labels"].isNotEmpty &&
-                json["labels"].first is String)
-            ? (json["labels"] as List)
-                .map((e) => e.toString())
-                .toList(growable: false)
-            : <String>[];
+              json["labels"].isNotEmpty &&
+              json["labels"].first is String)
+        ? (json["labels"] as List)
+              .map((e) => e.toString())
+              .toList(growable: false)
+        : <String>[];
 
     final confidenceVal = (json["confidence"] as num?)?.toDouble() ?? 0.0;
 
@@ -187,10 +188,12 @@ class DetectResult {
             .toList(growable: false);
       }
       return categoriesList
-          .map((cat) => WasteLabel(
-                label: wasteCategoryLabels[cat] ?? cat,
-                confidence: confidenceVal,
-              ))
+          .map(
+            (cat) => WasteLabel(
+              label: wasteCategoryLabels[cat] ?? cat,
+              confidence: confidenceVal,
+            ),
+          )
           .toList(growable: false);
     }
 
@@ -202,16 +205,19 @@ class DetectResult {
       message: reasonStr,
       confidence: confidenceVal,
       severity: WasteSeverity.fromString(json["severity"]?.toString()),
-      layer1Passed: json["layer1_passed"] != false && json["layer1Passed"] != false,
+      layer1Passed:
+          json["layer1_passed"] != false && json["layer1Passed"] != false,
       categories: categoriesList,
       labels: parseLabels(json["labels"] ?? json["categories"]),
       allLabels: parseLabels(json["all_labels"] ?? json["categories"]),
-      spamReason: (json["spamReason"] ?? json["spam_reason"])?.toString() ??
+      spamReason:
+          (json["spamReason"] ?? json["spam_reason"])?.toString() ??
           (!hasWasteVal ? "No visible waste detected in photo" : null),
       reason: reasonStr,
       reportId: json["reportId"]?.toString(),
       imageUrl: json["imageUrl"]?.toString(),
       status: json["status"]?.toString(),
+      model: json["model"]?.toString(),
     );
   }
 
@@ -232,21 +238,18 @@ class DetectResult {
 
 /// Thrown when the TFLite model cannot be loaded or fails to run.
 class DetectServerUnreachableException extends ApiException {
-  DetectServerUnreachableException(
-      [super.message = "The on-device detection model is unavailable."]);
+  DetectServerUnreachableException([
+    super.message = "The on-device detection model is unavailable.",
+  ]);
 }
 
 /// Thrown when inference produces an unexpected error.
 class DetectServerException extends ApiException {
   DetectServerException(super.message, [int? statusCode])
-      : super(statusCode: statusCode);
+    : super(statusCode: statusCode);
 }
 
-/// On-device image analysis service backed by YOLOv8n TFLite.
-///
-/// Replaces the previous HTTP call to the backend's `/ai/analyze-report`
-/// endpoint and the HuggingFace Gradio Space. All inference now runs
-/// locally on the device — no network request is required for detection.
+/// Image analysis runs on-device by default, or on the configured server.
 ///
 /// Usage:
 /// ```dart
@@ -255,7 +258,12 @@ class DetectServerException extends ApiException {
 /// if (result.hasWaste) { ... }
 /// ```
 class DetectService {
-  DetectService();
+  DetectService({Dio? dio, bool useServer = AppEnv.useGemini})
+    : _dio = dio,
+      _useServer = useServer;
+
+  final Dio? _dio;
+  final bool _useServer;
 
   /// Runs on-device YOLOv8n TFLite inference on [imageFile].
   ///
@@ -272,8 +280,8 @@ class DetectService {
     String? description,
     String? citizenId,
   }) async {
-    if (AppEnv.useGemini) {
-      return _detectWithGemini(
+    if (_useServer) {
+      return _detectWithServer(
         imageFile: imageFile,
         latitude: latitude,
         longitude: longitude,
@@ -295,22 +303,24 @@ class DetectService {
     }
   }
 
-  /// Sends [imageFile] to the backend's Gemini endpoint (`/ai/analyze-report`).
-  Future<DetectResult> _detectWithGemini({
+  /// Sends [imageFile] to the server-selected analysis provider.
+  Future<DetectResult> _detectWithServer({
     required File imageFile,
     required double latitude,
     required double longitude,
     String? description,
     String? citizenId,
   }) async {
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: AppEnv.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        sendTimeout: const Duration(seconds: 60),
-        receiveTimeout: const Duration(seconds: 60),
-      ),
-    );
+    final dio =
+        _dio ??
+        Dio(
+          BaseOptions(
+            baseUrl: AppEnv.analysisApiBaseUrl,
+            connectTimeout: const Duration(seconds: 15),
+            sendTimeout: const Duration(seconds: 60),
+            receiveTimeout: const Duration(seconds: 130),
+          ),
+        );
 
     try {
       final form = FormData.fromMap({
@@ -326,14 +336,33 @@ class DetectService {
       );
       final data = response.data;
       if (data == null) {
-        throw DetectServerException("Gemini returned an empty response.");
+        throw DetectServerException("Analysis returned an empty response.");
+      }
+      if (data["model"] is! String ||
+          (data["model"] as String).trim().isEmpty) {
+        throw DetectServerException("Analysis returned no model identifier.");
+      }
+      final confidence = data["confidence"];
+      final categories = data["categories"];
+      if ((data["provider"] != "gemini" && data["provider"] != "yolo") ||
+          data["hasWaste"] is! bool ||
+          confidence is! num ||
+          !confidence.isFinite ||
+          confidence < 0 ||
+          confidence > 1 ||
+          categories is! List ||
+          !categories.every((category) => category is String) ||
+          WasteSeverity.fromString(data["severity"]?.toString()) ==
+              WasteSeverity.unknown ||
+          data["reason"] is! String) {
+        throw DetectServerException("Analysis returned an invalid response.");
       }
       return DetectResult.fromJson(data);
     } on DioException catch (error) {
       final apiError = ApiException.fromDioError(error);
       if (apiError.isTimeoutOrNetworkError) {
         throw DetectServerUnreachableException(
-          "Could not reach the Gemini analysis service. Check your connection.",
+          "Could not reach the analysis service. Check your connection.",
         );
       }
       throw DetectServerException(apiError.message, apiError.statusCode);

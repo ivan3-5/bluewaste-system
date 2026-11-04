@@ -114,7 +114,7 @@ export function AiAnalysisPanel({
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100">
             <Brain className="h-5 w-5 text-violet-600" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900">Waste Analysis</h2>
+          <h2 className="text-xl font-bold text-slate-900">Analysis Summary</h2>
           <span className="rounded-full border border-violet-200 bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">
             ✦ Auto-analyzed
           </span>

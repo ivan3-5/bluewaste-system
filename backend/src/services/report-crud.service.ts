@@ -92,7 +92,7 @@ export class ReportCrudService {
         : null;
     const isSpam = clientSpamFlagged || data.category === "no_waste";
     const yoloConfidenceFraction =
-      typeof data.yoloConfidence === "number" && data.yoloConfidence > 0
+      typeof data.yoloConfidence === "number" && data.yoloConfidence >= 0
         ? data.yoloConfidence / 100.0
         : null;
 
@@ -138,7 +138,7 @@ export class ReportCrudService {
           spamMarkedAt: isSpam ? new Date() : null,
           spamReason: resolvedSpamReason,
           analysisConfidence:
-            typeof data.analysisConfidence === "number" && data.analysisConfidence > 0
+            typeof data.analysisConfidence === "number" && data.analysisConfidence >= 0
               ? data.analysisConfidence
               : yoloConfidenceFraction,
           ...((data.severity != null || data.aiModel != null || data.aiCategories != null) && {

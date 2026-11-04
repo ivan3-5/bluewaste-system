@@ -451,7 +451,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               (_detectResult?.hasWaste == true && !isDirectSpamSubmit)
               ? (_detectResult?.labels.length ?? 1)
               : 0,
-          "aiModel": _detectResult != null ? "gemini-3.5-flash" : null,
+          "aiModel": _detectResult?.model,
           "aiCategories": _detectResult?.categories.isNotEmpty == true
               ? _detectResult!.categories
               : (_detectResult?.labels.map((l) => l.label).toList() ?? []),

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { analyzeImageWithGemini, GeminiError } from "@/lib/ai/gemini";
 import { validateGeminiResult } from "@/lib/ai/validator";
+import { analyzeImageWithYolo, type YoloAnalysis } from "@/lib/ai/yolo";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import prisma from "@/lib/prisma";
 
@@ -25,6 +26,17 @@ function jsonError(status: number, message: string, details?: string) {
 /** SHA-256 hex hash of a buffer — used for deduplication */
 function hashBuffer(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
+}
+
+function normalizeCachedSeverity(severity: string | null): YoloAnalysis["severity"] {
+  switch (severity?.toUpperCase()) {
+    case "CRITICAL": return "Critical";
+    case "HIGH": return "High";
+    case "MODERATE":
+    case "MEDIUM": return "Medium";
+    case "LOW": return "Low";
+    default: return "None";
+  }
 }
 
 /** Compress image if it exceeds the target size threshold using sharp */
@@ -79,10 +91,16 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   const totalStart = Date.now();
+  const providerSetting = process.env.USE_GEMINI?.trim().toLowerCase() || "false";
+  const useGemini = providerSetting === "true";
 
   try {
+    if (providerSetting !== "true" && providerSetting !== "false") {
+      console.error("[AI] USE_GEMINI must be true or false");
+      return jsonError(500, "Server misconfiguration: USE_GEMINI must be true or false.");
+    }
     // ── 0. Early env var checks — fail fast with clear messages ───────────
-    if (!process.env.GEMINI_API_KEY) {
+    if (useGemini && !process.env.GEMINI_API_KEY) {
       console.error("[AI] GEMINI_API_KEY is not set in environment variables");
       return jsonError(500, "Server misconfiguration: GEMINI_API_KEY is not set. Contact the administrator.");
     }
@@ -151,6 +169,7 @@ export async function POST(request: NextRequest) {
         status
       FROM "Report"
       WHERE "aiImageHash" = ${imageHash}
+        AND "aiModel" = ${useGemini ? (process.env.GEMINI_MODEL || "gemini-3.5-flash") : "yolo"}
         AND "isDeleted" = false
       LIMIT 1
     `;
@@ -162,9 +181,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         hasWaste: cached.hasWaste,
         categories: cached.categories ?? [],
-        severity: cached.severity ?? "None",
+        severity: normalizeCachedSeverity(cached.severity),
         confidence: Number(cached.confidence ?? 0),
         reason: cached.aiReason ?? "",
+        model: cached.aiModel,
+        provider: useGemini ? "gemini" : "yolo",
         reportId: null,
         status: cached.status,
         cached: true,
@@ -186,73 +207,77 @@ export async function POST(request: NextRequest) {
       console.error("[AI] Cloudinary upload failed — continuing without stored image:", err);
     }
 
-    // ── 7. Compress image for Gemini if needed ────────────────────────────
-    const { buffer: geminiBuffer, mimeType: geminiMime } = await compressIfNeeded(
-      imageBuffer,
-      image.type,
-    );
+    let aiResult: YoloAnalysis;
+    let modelName: string;
+    if (useGemini) {
+      const { buffer: geminiBuffer, mimeType: geminiMime } = await compressIfNeeded(
+        imageBuffer,
+        image.type,
+      );
 
-    // ── 8. Call Gemini Vision ─────────────────────────────────────────────
-    let geminiResponse;
-    try {
-      geminiResponse = await analyzeImageWithGemini(geminiBuffer, geminiMime);
-    } catch (err) {
-      if (err instanceof GeminiError) {
-        if (err.code === "RATE_LIMIT") {
-          return jsonError(429, "Photo analysis rate limit reached. Please try again shortly.");
+      let geminiResponse;
+      try {
+        geminiResponse = await analyzeImageWithGemini(geminiBuffer, geminiMime);
+      } catch (err) {
+        if (err instanceof GeminiError) {
+          if (err.code === "RATE_LIMIT") {
+            return jsonError(429, "Photo analysis rate limit reached. Please try again shortly.");
+          }
+          if (err.code === "TIMEOUT" || err.code === "UNAVAILABLE") {
+            return jsonError(503, "Photo analysis service is temporarily unavailable. Please try again in a moment.");
+          }
+          if (err.code === "MODEL_NOT_FOUND") {
+            console.error("[AI] Gemini model not found — GEMINI_MODEL env var may be set to an invalid model name");
+            return jsonError(500, "Server misconfiguration: Analysis model not found. Please contact support.");
+          }
+          if (err.code === "INVALID_JSON") {
+            console.error("[AI] Gemini returned invalid JSON — logged for admin review. code:", err.code);
+            return jsonError(422, "Analysis service returned an unrecognized response. Please retry your upload.");
+          }
         }
-        if (err.code === "TIMEOUT" || err.code === "UNAVAILABLE") {
-          return jsonError(503, "Photo analysis service is temporarily unavailable. Please try again in a moment.");
-        }
-        if (err.code === "MODEL_NOT_FOUND") {
-          console.error("[AI] Gemini model not found — GEMINI_MODEL env var may be set to an invalid model name");
-          return jsonError(500, "Server misconfiguration: Analysis model not found. Please contact support.");
-        }
-        if (err.code === "INVALID_JSON") {
-          // Log the raw invalid output for admin review but do not expose it
-          console.error("[AI] Gemini returned invalid JSON — logged for admin review. code:", err.code);
-          return jsonError(422, "Analysis service returned an unrecognized response. Please retry your upload.");
-        }
+        console.error("[AI] Gemini unexpected error:", err);
+        return jsonError(500, `Unexpected error during photo analysis: ${err instanceof Error ? err.message : String(err)}`);
       }
-      console.error("[AI] Gemini unexpected error:", err);
-      return jsonError(500, `Unexpected error during photo analysis: ${err instanceof Error ? err.message : String(err)}`);
+
+      const { result: rawResult, modelName: geminiModelName, latencyMs, tokenUsage } = geminiResponse;
+      const validation = validateGeminiResult(rawResult);
+      if (!validation.valid) {
+        console.error(
+          "[AI] Validation failure — field:",
+          validation.error.field,
+          "message:",
+          validation.error.message,
+          "raw:",
+          JSON.stringify(rawResult).slice(0, 500),
+        );
+        return jsonError(
+          422,
+          "Analysis response failed validation. Please retry your upload.",
+          `Field: ${validation.error.field}`,
+        );
+      }
+
+      aiResult = validation.data;
+      modelName = geminiModelName;
+      console.info("[AI] Analysis complete", {
+        hasWaste: aiResult.hasWaste,
+        categories: aiResult.categories,
+        severity: aiResult.severity,
+        confidence: aiResult.confidence,
+        geminiLatencyMs: latencyMs,
+        totalMs: Date.now() - totalStart,
+        modelName,
+        tokenUsage,
+      });
+    } else {
+      try {
+        aiResult = await analyzeImageWithYolo(imageBuffer, image.type, image.name);
+      } catch (error) {
+        console.error("[AI] YOLO analysis failed:", error);
+        return jsonError(503, "YOLO analysis failed. Please try again or contact the administrator.");
+      }
+      modelName = "yolo";
     }
-
-    const { result: rawResult, modelName, latencyMs, tokenUsage } = geminiResponse;
-
-    // ── 9. Validate Gemini output ─────────────────────────────────────────
-    const validation = validateGeminiResult(rawResult);
-    if (!validation.valid) {
-      // Do not save a fabricated result — log for admin review
-      console.error(
-        "[AI] Validation failure — field:",
-        validation.error.field,
-        "message:",
-        validation.error.message,
-        "raw:",
-        JSON.stringify(rawResult).slice(0, 500),
-      );
-      return jsonError(
-        422,
-        "Analysis response failed validation. Please retry your upload.",
-        `Field: ${validation.error.field}`,
-      );
-    }
-
-    const aiResult = validation.data;
-    const totalMs = Date.now() - totalStart;
-
-    // ── 10. Logging (server-side only, never exposed to clients) ──────────
-    console.info("[AI] Analysis complete", {
-      hasWaste: aiResult.hasWaste,
-      categories: aiResult.categories,
-      severity: aiResult.severity,
-      confidence: aiResult.confidence,
-      geminiLatencyMs: latencyMs,
-      totalMs,
-      modelName,
-      tokenUsage,
-    });
 
     const isSpam = !aiResult.hasWaste;
     const reportStatus = isSpam ? "REJECTED" : "PENDING";
@@ -265,6 +290,8 @@ export async function POST(request: NextRequest) {
         severity: aiResult.severity,
         confidence: aiResult.confidence,
         reason: aiResult.reason,
+        model: modelName,
+        provider: useGemini ? "gemini" : "yolo",
         reportId: null,
         status: reportStatus,
         imageUrl,

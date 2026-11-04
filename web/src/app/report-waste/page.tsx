@@ -39,6 +39,7 @@ interface GeminiAnalysisResult {
   imageUrl?: string;
   message?: string; // polite spam message
   cached?: boolean;
+  model: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -273,6 +274,9 @@ export default function ReportWastePage() {
         analysisStatus: data.hasWaste ? "DIRTY" : "CLEAN",
         analysisConfidence: data.confidence,
         analysisWasteCount: data.hasWaste ? Math.max(1, data.categories?.length || 1) : 0,
+        aiModel: data.model,
+        aiCategories: data.categories,
+        aiReason: data.reason,
       });
 
       await uploadImages.mutateAsync({
@@ -572,8 +576,8 @@ export default function ReportWastePage() {
                 </div>
               )}
 
-              {/* Waste Result Grid */}
-              {result.hasWaste && (
+              {/* Analysis Summary */}
+              <h3 className="text-sm font-semibold text-gray-900">Analysis Summary</h3>
                 <div className="grid gap-5 md:grid-cols-2">
                   {/* Categories */}
                   <div>
@@ -603,7 +607,6 @@ export default function ReportWastePage() {
                     <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
                       Severity
                     </p>
-                    {result.severity !== "None" && (
                       <span
                         className={`inline-block rounded-full border px-3 py-1 text-sm font-semibold ${
                           SEVERITY_CONFIG[result.severity]?.classes ??
@@ -612,7 +615,6 @@ export default function ReportWastePage() {
                       >
                         {SEVERITY_CONFIG[result.severity]?.label ?? result.severity}
                       </span>
-                    )}
                   </div>
 
                   {/* Confidence */}
@@ -645,11 +647,10 @@ export default function ReportWastePage() {
                       Analysis Details
                     </p>
                     <p className="text-sm text-gray-700 leading-relaxed">
-                      {result.reason}
+                      {result.reason || "No additional analysis details are available."}
                     </p>
                   </div>
                 </div>
-              )}
 
               {/* Location summary */}
               {(latitude !== null || longitude !== null) && (

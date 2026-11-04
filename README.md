@@ -70,8 +70,21 @@ ALLOWED_ORIGINS="http://localhost:19006,http://127.0.0.1:19006"
 ```dotenv
 NEXT_PUBLIC_API_URL="http://localhost:5000/api"
 BACKEND_API_URL="http://localhost:5000/api"
-YOLO_API_URL="https://bluewaste-system.onrender.com/analyze"
+USE_GEMINI="false"
+YOLO_API_URL="https://ishuualt-bluewaste-yolo26.hf.space/analyze"
+GEMINI_API_KEY="your-gemini-api-key"
 ```
+
+The web server reads these settings from `web/.env.local` locally, or from the
+web deployment's environment in production. `USE_GEMINI=false` (the default)
+uses `YOLO_API_URL`; set it to `true` to use Gemini and configure
+`GEMINI_API_KEY` (and optionally `GEMINI_MODEL`). Restart the web server after
+changing them. The backend's separate background analysis has its own
+`YOLO_API_URL` and `USE_GEMINI` settings. Set `USE_GEMINI` to the same value
+in both deployments. When it is `true`, the backend sends unanalyzed report
+images to the web analysis service at `WEB_URL`; set `WEB_URL` to the web
+deployment's origin and configure Gemini on the web deployment. Existing
+analyzed reports are not reanalyzed.
 
 ### Mobile runtime config (Flutter)
 
@@ -80,6 +93,14 @@ Use `--dart-define` when launching the mobile app:
 ```bash
 flutter run --dart-define=API_BASE_URL=http://localhost:5000/api
 ```
+
+Flutter uses its on-device YOLO model by default. To use the server-selected
+provider instead, add `--dart-define=USE_GEMINI=true`; this legacy flag selects
+cloud analysis, while the web server's `USE_GEMINI` decides whether that cloud
+analysis uses Gemini or hosted YOLO. The flag must be set at build/run time.
+If the backend and web servers run separately, also set
+`--dart-define=ANALYSIS_API_BASE_URL=http://<web-host>:3000/api` to point to
+the web server. Use a host reachable by the device or emulator.
 
 ## 3) Prepare Database
 
