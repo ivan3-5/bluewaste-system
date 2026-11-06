@@ -11,9 +11,12 @@ class ApiException implements Exception {
   String toString() => message;
 
   static ApiException fromDioError(DioException error) {
+    // Dio 5 reports socket/DNS failures (no connection, wifi still
+    // connecting) as connectionError, which must count as a network problem.
     final isTimeoutOrNetwork = error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||
         error.type == DioExceptionType.sendTimeout ||
+        error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.unknown;
 
     final response = error.response;
