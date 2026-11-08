@@ -40,6 +40,7 @@ type DashboardReportRow = {
   assignedWorkerNames?: string | null;
   assignedWorkers?: Array<{ id: string; firstName: string; lastName: string; email?: string }> | null;
   cleanupScheduleId?: string | null;
+  cleanupScheduledAt?: Date | null;
   // Gemini AI fields
   aiCategories?: string[] | null;
   aiReason?: string | null;
@@ -132,6 +133,7 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
     updatedAt: row.updatedAt,
     analyzedAt: row.analyzedAt ?? null,
     cleanupScheduleId: row.cleanupScheduleId ?? null,
+    cleanupScheduledAt: row.cleanupScheduledAt ?? null,
     aiCategories: Array.isArray(row.aiCategories) ? row.aiCategories : null,
     aiReason: row.aiReason ?? null,
     aiModel: row.aiModel ?? null,
@@ -144,6 +146,7 @@ export async function getDashboardReports(limit: number) {
   const reports = await prisma.$queryRaw<DashboardReportRow[]>`
     SELECT
       r.id,
+      (SELECT cs."scheduledAt" FROM "CleanupSchedule" cs WHERE cs.id = r."cleanupScheduleId") AS "cleanupScheduledAt",
       r.title,
       r.description,
       r.category,
@@ -239,6 +242,7 @@ export async function getDashboardReportById(id: string) {
   const reports = await prisma.$queryRaw<DashboardReportRow[]>`
     SELECT
       r.id,
+      (SELECT cs."scheduledAt" FROM "CleanupSchedule" cs WHERE cs.id = r."cleanupScheduleId") AS "cleanupScheduledAt",
       r.title,
       r.description,
       r.category,

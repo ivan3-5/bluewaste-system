@@ -41,6 +41,7 @@
     "date-fns": "^4.4.0",
     "detect-node-es": "^1.1.0",
     "get-nonce": "^1.0.1",
+    "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "leaflet-draw": "^1.0.4",
     "leaflet.heat": "^0.2.0",

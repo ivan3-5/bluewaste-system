@@ -6,6 +6,7 @@ import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
 import { getReverseGeocodedLocation } from "@/lib/utils";
 import { AiAnalysisPanel } from "@/components/AiAnalysisPanel";
 import { ReportPhotoCarousel } from "@/components/ReportPhotoCarousel";
+import { GenerateReportButton } from "@/components/GenerateReportButton";
 import {
   ArrowLeft,
   Calendar,
@@ -172,6 +173,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
               reportId={report.id}
               initialStatus={report.status}
               compact
+            />
+
+            <GenerateReportButton
+              report={{ ...report, locationName: displayLocationName }}
             />
 
             {isAlreadyScheduled ? (

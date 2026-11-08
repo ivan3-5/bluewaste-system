@@ -24,6 +24,7 @@ export interface AdminReport {
   assignedWorkerNames?: string | null;
   assignedWorkers?: Array<{ id: string; firstName: string; lastName: string; email?: string }>;
   cleanupScheduleId?: string | null;
+  cleanupScheduledAt?: string | Date | null;
   reportedAt: string | Date;
   updatedAt: string | Date;
   // Gemini Vision AI fields

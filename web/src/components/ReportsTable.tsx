@@ -13,6 +13,7 @@ import {
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
+import { GenerateReportButton } from "@/components/GenerateReportButton";
 import { useAuth } from "@/providers/AuthProvider";
 import { cn } from "@/lib/utils";
 import {
@@ -408,12 +409,15 @@ export function ReportsTable({
                       })}
                     </td>
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/dashboard/reports/${report.id}`}
-                        className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-primary/90"
-                      >
-                        View
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/dashboard/reports/${report.id}`}
+                          className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-primary/90"
+                        >
+                          View
+                        </Link>
+                        <GenerateReportButton report={report} variant="table" />
+                      </div>
                     </td>
                   </tr>
                 );
