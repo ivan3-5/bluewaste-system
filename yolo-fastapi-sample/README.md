@@ -46,8 +46,8 @@ A FastAPI service that analyzes waste images using a two-layer YOLOv8 pipeline.
 |---|---|
 | ≥ 90% | CRITICAL 🔴 |
 | ≥ 70% | HIGH 🟠 |
-| ≥ 50% | MODERATE 🟡 |
-| < 50% | SPAM ⚪ |
+| ≥ 30% | MODERATE 🟡 |
+| < 30% | SPAM ⚪ (`has_waste: false`) |
 
 ## Usage
 

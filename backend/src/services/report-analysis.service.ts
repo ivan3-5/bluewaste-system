@@ -3,6 +3,9 @@ import { WasteCategory, AnalysisStatus, Severity } from "@prisma/client";
 import { NotificationService } from "./notification.service";
 import { env } from "../config/env";
 
+/** YOLO detections below this confidence (0–1) are treated as spam. */
+const YOLO_SPAM_CONFIDENCE_THRESHOLD = 0.3;
+
 interface YoloLabel {
   label: string;
   confidence?: number;
@@ -172,14 +175,21 @@ export class ReportAnalysisService {
     const yoloJson = raw as YoloApiResponse;
 
     // ── 5. Parse response (same shape as original /analyze) ─────────────────
-    const severity: string | null =
-      typeof yoloJson?.severity === "string" ? yoloJson.severity : null;
-
-    const hasWaste: boolean = yoloJson?.has_waste === true;
     const confidence: number | null = toFiniteNumberOrNull(yoloJson?.confidence);
+    const isLowConfidence =
+      yoloJson?.has_waste === true &&
+      confidence !== null &&
+      confidence < YOLO_SPAM_CONFIDENCE_THRESHOLD;
+    const severity: string | null = isLowConfidence
+      ? "SPAM"
+      : typeof yoloJson?.severity === "string" ? yoloJson.severity : null;
+
+    const hasWaste: boolean = yoloJson?.has_waste === true && !isLowConfidence;
     const layer1Passed: boolean = yoloJson?.layer1_passed !== false;
     const spamReason: string | null =
-      typeof yoloJson?.spam_reason === "string" ? yoloJson.spam_reason : null;
+      typeof yoloJson?.spam_reason === "string"
+        ? yoloJson.spam_reason
+        : isLowConfidence ? "Waste detected but confidence is too low." : null;
 
     const rawLabels = Array.isArray(yoloJson?.labels) ? yoloJson!.labels : [];
     const labels: string[] = rawLabels

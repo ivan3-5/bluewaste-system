@@ -42,6 +42,28 @@ describe("background report analysis", () => {
     }));
   });
 
+  it("marks YOLO results under 30% confidence as spam", async () => {
+    prismaMock.report.findUnique.mockResolvedValue({
+      id: "report-1", images: [{ imageUrl: "https://example.com/image.png" }],
+      analyzedAt: null, severity: null, reporterId: null,
+    } as never);
+    prismaMock.$transaction.mockResolvedValue([{ id: "report-1" }] as never);
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response("image", { headers: { "content-type": "image/png" } }))
+      .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
+      .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([{
+        has_waste: true, severity: "MODERATE", confidence: 0.29, labels: [{ label: "plastic" }],
+      }])}\n\n`)));
+
+    await ReportAnalysisService.analyzeReport("report-1");
+
+    expect(prismaMock.report.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        isSpam: true, severity: "SPAM", analysisStatus: "CLEAN", category: "no_waste",
+      }),
+    }));
+  });
+
   it("does not replace an existing web analysis", async () => {
     prismaMock.report.findUnique.mockResolvedValue({
       id: "report-1", images: [], analyzedAt: new Date(), severity: "SPAM",

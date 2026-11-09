@@ -146,6 +146,29 @@ describe("web image analysis", () => {
     expect(fetchMock.mock.calls[0][1].body).toBeInstanceOf(FormData);
   });
 
+  it("marks YOLO results under 30% confidence as spam in both endpoints", async () => {
+    const lowPayload = { ...yoloPayload, severity: "MODERATE", confidence: 0.29 };
+    const stubLow = () => vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
+      .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([lowPayload])}\n\n`)));
+
+    stubLow();
+    const response = await POST(request());
+    expect(await response.json()).toMatchObject({
+      hasWaste: false, severity: "None", status: "REJECTED",
+      message: expect.stringContaining("Spam"),
+    });
+
+    stubLow();
+    const legacy = await legacyPOST(legacyRequest());
+    expect(await legacy.json()).toMatchObject({ has_waste: false, status: "CLEAN", severity: "SPAM" });
+  });
+
+  it("keeps YOLO results at exactly 30% confidence as waste", () => {
+    expect(normalizeYoloResult({ ...yoloPayload, severity: "MODERATE", confidence: 0.3 }))
+      .toMatchObject({ hasWaste: true, severity: "Medium" });
+  });
+
   it("uses the Gradio protocol in the legacy endpoint", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))

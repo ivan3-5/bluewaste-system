@@ -31,6 +31,14 @@ Enum NotificationType {
   STATUS_CHANGE
   ASSIGNMENT
   SYSTEM
+  CLEANUP_SCHEDULE
+}
+
+Enum CleanupScheduleStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
 }
 
 Enum WasteType {
@@ -46,6 +54,13 @@ Enum AnalysisStatus {
   CLEAN
 }
 
+Enum Severity {
+  CRITICAL
+  HIGH
+  MODERATE
+  SPAM
+}
+
 Table User {
   id         uuid      [pk]
   email      varchar   [unique]
@@ -53,10 +68,11 @@ Table User {
   firstName  varchar
   lastName   varchar
   phone      varchar   [null]
+  address    varchar   [default: '']
   role       Role      [default: 'CITIZEN']
-  avatarUrl   varchar  [null]
+  avatarUrl  varchar   [null]
   isActive   boolean   [default: true]
-  createdAt  timestamp [default: now()]
+  createdAt  timestamp [default: `now()`]
   updatedAt  timestamp
 }
 
@@ -78,10 +94,19 @@ Table Report {
   analysisWasteCount int             [null]
   analysisConfidence float           [null]
   analyzedAt         timestamp       [null]
-  createdAt          timestamp       [default: now()]
+  severity           Severity        [null]
+  aiCategories       text[]
+  aiReason           text            [null]
+  aiModel            varchar         [null]
+  aiImageHash        varchar         [null]
+  aiProcessingMs     int             [null]
+  aiGeminiMs         int             [null]
+  createdAt          timestamp       [default: `now()`]
   updatedAt          timestamp
   reporterId         uuid            [null]
   assignedToId       uuid            [null]
+  cleanupScheduleId  uuid            [null]
+  incidentId         uuid            [null]
 }
 
 Table ReportImage {
@@ -89,7 +114,7 @@ Table ReportImage {
   imageUrl  varchar
   publicId  varchar
   type      ImageType [default: 'REPORT']
-  createdAt timestamp [default: now()]
+  createdAt timestamp [default: `now()`]
   reportId  uuid
 }
 
@@ -98,7 +123,7 @@ Table StatusHistory {
   previousStatus ReportStatus [null]
   newStatus      ReportStatus
   notes          text         [null]
-  createdAt      timestamp    [default: now()]
+  createdAt      timestamp    [default: `now()`]
   reportId       uuid
   changedById    uuid
 }
@@ -109,7 +134,7 @@ Table Notification {
   message   text
   type      NotificationType
   isRead    boolean           [default: false]
-  createdAt timestamp         [default: now()]
+  createdAt timestamp         [default: `now()`]
   userId    uuid
   reportId  uuid              [null]
 }
@@ -119,16 +144,78 @@ Table ReportingZone {
   name        varchar
   coordinates json
   isActive    boolean   [default: true]
-  createdAt   timestamp [default: now()]
+  createdAt   timestamp [default: `now()`]
   updatedAt   timestamp
   createdById uuid
 }
 
+Table CleanupSchedule {
+  id           uuid                  [pk]
+  title        varchar
+  description  text
+  barangay     varchar
+  latitude     float
+  longitude    float
+  scheduledAt  timestamp
+  status       CleanupScheduleStatus [default: 'UPCOMING']
+  notes        text                  [null]
+  equipment    text[]
+  createdAt    timestamp             [default: `now()`]
+  updatedAt    timestamp
+  createdById  uuid
+  verifiedById uuid                  [null]
+  verifiedAt   timestamp             [null]
+}
+
+Table CleanupScheduleWorker {
+  id         uuid      [pk]
+  assignedAt timestamp [default: `now()`]
+  scheduleId uuid
+  workerId   uuid
+
+  indexes {
+    (scheduleId, workerId) [unique]
+  }
+}
+
+Table ReportWorker {
+  id         uuid      [pk]
+  assignedAt timestamp [default: `now()`]
+  reportId   uuid
+  workerId   uuid
+
+  indexes {
+    (reportId, workerId) [unique]
+  }
+}
+
+Table WasteIncident {
+  id               uuid          [pk]
+  category         WasteCategory
+  latitude         float
+  longitude        float
+  address          varchar       [null]
+  contributorCount int           [default: 1]
+  status           ReportStatus  [default: 'PENDING']
+  severity         Severity      [null]
+  isResolved       boolean       [default: false]
+  createdAt        timestamp     [default: `now()`]
+  updatedAt        timestamp
+}
+
 Ref: Report.reporterId > User.id
 Ref: Report.assignedToId > User.id
-Ref: ReportImage.reportId > Report.id
-Ref: StatusHistory.reportId > Report.id
+Ref: Report.cleanupScheduleId > CleanupSchedule.id
+Ref: Report.incidentId > WasteIncident.id
+Ref: ReportWorker.reportId > Report.id [delete: cascade]
+Ref: ReportWorker.workerId > User.id
+Ref: CleanupScheduleWorker.scheduleId > CleanupSchedule.id [delete: cascade]
+Ref: CleanupScheduleWorker.workerId > User.id
+Ref: CleanupSchedule.createdById > User.id
+Ref: CleanupSchedule.verifiedById > User.id
+Ref: ReportImage.reportId > Report.id [delete: cascade]
+Ref: StatusHistory.reportId > Report.id [delete: cascade]
 Ref: StatusHistory.changedById > User.id
-Ref: Notification.userId > User.id
-Ref: Notification.reportId > Report.id
+Ref: Notification.userId > User.id [delete: cascade]
+Ref: Notification.reportId > Report.id [delete: set null]
 Ref: ReportingZone.createdById > User.id

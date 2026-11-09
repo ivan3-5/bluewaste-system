@@ -69,6 +69,9 @@ const Map<int, String> _cocoIdToWasteCategory = {
 // Minimum confidence to consider a detection valid (0-1).
 const double _confThreshold = 0.20;
 
+// Detections whose top confidence is below this are flagged as spam.
+const double _spamConfThreshold = 0.30;
+
 // NMS IoU threshold.
 const double _nmsIouThreshold = 0.45;
 
@@ -397,15 +400,18 @@ class TFLiteService {
 
     final categories = categorySet.toList();
     final severity = _confidenceToSeverity(maxConf);
+    final isSpam = severity == WasteSeverity.spam;
     final labels = labelConfidenceMap.entries
         .map((e) => WasteLabel(label: e.key, confidence: e.value))
         .toList()
       ..sort((a, b) => b.confidence.compareTo(a.confidence));
 
-    final message = _buildMessage(List.from(categories), maxConf);
+    final message = isSpam
+        ? "Low confidence (${(maxConf * 100).toStringAsFixed(1)}%) — report flagged as spam."
+        : _buildMessage(List.from(categories), maxConf);
 
     return DetectResult(
-      hasWaste: true,
+      hasWaste: !isSpam,
       message: message,
       confidence: maxConf,
       severity: severity,
@@ -413,8 +419,8 @@ class TFLiteService {
       categories: categories,
       labels: labels,
       allLabels: labels,
-      spamReason: severity == WasteSeverity.spam
-          ? "Waste detected with low confidence."
+      spamReason: isSpam
+          ? "Waste detected with confidence below 30%."
           : null,
       reason: message,
     );
@@ -424,7 +430,7 @@ class TFLiteService {
     if (conf >= 0.90) return WasteSeverity.critical;
     if (conf >= 0.70) return WasteSeverity.high;
     if (conf >= 0.50) return WasteSeverity.moderate;
-    if (conf >= 0.20) return WasteSeverity.low;
+    if (conf >= _spamConfThreshold) return WasteSeverity.low;
     return WasteSeverity.spam;
   }
 

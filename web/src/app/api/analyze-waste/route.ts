@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { classifyYoloPayload, inferWasteCategory } from "@/lib/waste-classification";
-import { requestYoloPayload } from "@/lib/ai/yolo";
+import { applyYoloSpamThreshold, requestYoloPayload } from "@/lib/ai/yolo";
 import { analyzeImageWithGemini } from "@/lib/ai/gemini";
 import { validateGeminiResult } from "@/lib/ai/validator";
 
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
       };
       providerModel = response.modelName;
     } else {
-      raw = await requestYoloPayload(imageBuffer, image.type, image.name);
+      raw = applyYoloSpamThreshold(await requestYoloPayload(imageBuffer, image.type, image.name));
       providerModel = "yolo";
     }
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {

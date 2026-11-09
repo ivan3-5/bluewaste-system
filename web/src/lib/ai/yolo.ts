@@ -8,7 +8,37 @@ export interface YoloAnalysis {
   reason: string;
 }
 
-export function normalizeYoloResult(raw: unknown): YoloAnalysis {
+/** YOLO detections below this confidence (0–1) are treated as spam. */
+export const YOLO_SPAM_CONFIDENCE_THRESHOLD = 0.3;
+
+const LOW_CONFIDENCE_REASON = "Waste detected but confidence is too low.";
+
+/**
+ * Forces a raw YOLO payload with waste detected below the spam threshold to
+ * the spam shape (has_waste=false, severity=SPAM). Other payloads pass through.
+ */
+export function applyYoloSpamThreshold<T>(raw: T): T {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const payload = raw as Record<string, unknown>;
+  const confidence = typeof payload.confidence === "number"
+    ? payload.confidence
+    : typeof payload.top_confidence === "number" ? payload.top_confidence : null;
+  if (payload.has_waste !== true || confidence === null ||
+      !Number.isFinite(confidence) || confidence >= YOLO_SPAM_CONFIDENCE_THRESHOLD) {
+    return raw;
+  }
+  return {
+    ...payload,
+    has_waste: false,
+    severity: "SPAM",
+    spam_reason: typeof payload.spam_reason === "string" && payload.spam_reason.trim()
+      ? payload.spam_reason
+      : LOW_CONFIDENCE_REASON,
+  } as T;
+}
+
+export function normalizeYoloResult(rawPayload: unknown): YoloAnalysis {
+  const raw = applyYoloSpamThreshold(rawPayload);
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error("YOLO returned an invalid response.");
   }

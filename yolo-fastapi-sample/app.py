@@ -39,7 +39,8 @@ CUSTOM_CONF_THRESHOLD      = float(os.getenv("CUSTOM_CONF",           "0.20"))
 DETECT_CONF_THRESHOLD      = float(os.getenv("DETECT_CONF",           "0.25"))
 SEVERITY_CRITICAL          = 0.90
 SEVERITY_HIGH              = 0.70
-SEVERITY_MODERATE          = 0.50
+SEVERITY_MODERATE          = 0.30   # also the spam threshold: below this → SPAM
+SPAM_CONF_THRESHOLD        = SEVERITY_MODERATE
 
 # ── COCO /predict thresholds (Layer-1 model reused for /predict) ──────────────
 WASTE_CONFIDENCE_THRESHOLD         = 0.20
@@ -227,16 +228,17 @@ def _analyze_gpu(image: Image.Image) -> dict:
     if   top_conf >= SEVERITY_CRITICAL: severity, msg = "CRITICAL", "Critical waste detected — immediate cleanup required! 🔴"
     elif top_conf >= SEVERITY_HIGH:     severity, msg = "HIGH",     "High-severity waste detected — schedule cleanup within 24 hours. 🟠"
     elif top_conf >= SEVERITY_MODERATE: severity, msg = "MODERATE", "Moderate waste detected — queued for cleanup. 🟡"
-    else:                               severity, msg = "SPAM",     "Low confidence — report flagged for admin review. ⚪"
+    else:                               severity, msg = "SPAM",     "Low confidence (< 30%) — report flagged as spam. ⚪"
 
+    is_spam = severity == "SPAM"
     return {
         "severity":     severity,
-        "has_waste":    True,
+        "has_waste":    not is_spam,
         "confidence":   round(top_conf, 4),
         "labels":       labels,
         "all_labels":   labels,
         "layer1_passed": True,
-        "spam_reason":  "Waste detected but confidence is too low." if severity == "SPAM" else None,
+        "spam_reason":  "Waste detected but confidence is below 30%." if is_spam else None,
         "message":      msg,
     }
 
@@ -301,10 +303,10 @@ def _detect_gpu(image: Image.Image) -> dict:
             c = float(box.conf.item())
             if c > top_conf:
                 top_conf = c
-    has_waste = top_conf > 0.0
+    has_waste = top_conf >= SPAM_CONF_THRESHOLD
     return {
         "has_waste":  has_waste,
-        "message":    "Waste detected!" if has_waste else "No waste detected.",
+        "message":    "Waste detected!" if has_waste else "No waste detected (confidence below 30% — flagged as spam).",
         "confidence": round(top_conf * 100.0, 2),
     }
 
@@ -346,7 +348,7 @@ with gr.Blocks(title="BlueWaste YOLO Analyzer", theme=gr.themes.Soft()) as demo:
     | 2 | `weights/best.pt` (custom) | Waste classification |
 
     **Severity scoring** — based on top detection confidence from `best.pt`:
-    `≥ 90%` → CRITICAL 🔴 · `≥ 70%` → HIGH 🟠 · `≥ 50%` → MODERATE 🟡 · `< 50%` → SPAM ⚪
+    `≥ 90%` → CRITICAL 🔴 · `≥ 70%` → HIGH 🟠 · `≥ 30%` → MODERATE 🟡 · `< 30%` → SPAM ⚪
     """)
 
     with gr.Tabs():
