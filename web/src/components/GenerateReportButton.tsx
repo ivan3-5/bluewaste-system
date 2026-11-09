@@ -106,6 +106,11 @@ export function GenerateReportButton({ report, variant = "detail" }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const reportedImages = useMemo(
+    () => report.images.filter((img) => img.type === "REPORT"),
+    [report.images],
+  );
+
   const cleanupImages = useMemo(
     () => report.images.filter((img) => img.type === "CLEANUP"),
     [report.images],
@@ -152,7 +157,8 @@ export function GenerateReportButton({ report, variant = "detail" }: Props) {
         preparedBy,
         notedBy,
         approvedBy,
-        photoUrls: cleanupImages.map((img) => img.imageUrl),
+        reportedPhotoUrls: reportedImages.map((img) => img.imageUrl),
+        cleanupPhotoUrls: cleanupImages.map((img) => img.imageUrl),
       };
       await generateCleanupReportPdf(
         data,

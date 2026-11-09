@@ -13,7 +13,6 @@ import {
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
-import { GenerateReportButton } from "@/components/GenerateReportButton";
 import { useAuth } from "@/providers/AuthProvider";
 import { cn } from "@/lib/utils";
 import {
@@ -416,7 +415,6 @@ export function ReportsTable({
                         >
                           View
                         </Link>
-                        <GenerateReportButton report={report} variant="table" />
                       </div>
                     </td>
                   </tr>

@@ -25,15 +25,15 @@ export interface CleanupReportData {
   preparedBy: Signatory[];
   notedBy: Signatory[];
   approvedBy: Signatory[];
-  photoUrls: string[];
+  reportedPhotoUrls: string[];
+  cleanupPhotoUrls: string[];
 }
 
 const PAGE_W = 210;
 const PAGE_H = 297;
 const MARGIN_X = 20;
 const CONTENT_W = PAGE_W - MARGIN_X * 2;
-const PHOTO_SLOTS_PER_PAGE = 2;
-const MAX_PHOTOS = PHOTO_SLOTS_PER_PAGE * 2;
+const PHOTOS_PER_GROUP = 2;
 const BODY_BOTTOM = 262;
 const NAVY: [number, number, number] = [31, 56, 100];
 const GRAY: [number, number, number] = [110, 110, 110];
@@ -389,46 +389,61 @@ export async function generateCleanupReportPdf(
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   doc.setProperties({ title: "Report on the Conducted Clean-up Drive Activity" });
 
-  const photos = await Promise.all(
-    data.photoUrls.slice(0, MAX_PHOTOS).map((url) => loadImage(url)),
+  const [reportedPhotos, cleanedPhotos] = await Promise.all(
+    [data.reportedPhotoUrls, data.cleanupPhotoUrls].map((urls) =>
+      Promise.all(urls.slice(0, PHOTOS_PER_GROUP).map((url) => loadImage(url))),
+    ),
   );
+
+  const drawGroup = (
+    title: string,
+    emptyText: string,
+    photos: LoadedImage[],
+    titleY: number,
+    maxH: number,
+  ) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text(title, PAGE_W / 2, titleY, { align: "center" });
+    if (photos.length === 0) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...GRAY);
+      doc.text(emptyText, PAGE_W / 2, titleY + 8, { align: "center" });
+      doc.setTextColor(0, 0, 0);
+      return titleY + 14;
+    }
+    const photoY = titleY + 4;
+    const photoH = Math.max(30, Math.min(maxH, BODY_BOTTOM - photoY));
+    drawPhotoRow(doc, photos, photoY, photoH);
+    return photoY + photoH + 8;
+  };
 
   // Page 1
   drawLetterhead(doc, data.cudNumber);
   const headerEnd = drawDocumentHeader(doc, data);
   const tableEnd = drawDetailsTable(doc, data, headerEnd);
-
-  let photoCursor = 0;
-  const photoTitleY = tableEnd + 10;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(0, 0, 0);
-  doc.text("Photo documentation", PAGE_W / 2, photoTitleY, { align: "center" });
-  if (photos.length === 0) {
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(8.5);
-    doc.setTextColor(...GRAY);
-    doc.text("No cleanup photos were uploaded for this report.", PAGE_W / 2, photoTitleY + 8, {
-      align: "center",
-    });
-    doc.setTextColor(0, 0, 0);
-  } else {
-    const photoY = photoTitleY + 4;
-    const photoH = Math.max(30, Math.min(55, BODY_BOTTOM - photoY));
-    drawPhotoRow(doc, photos.slice(0, PHOTO_SLOTS_PER_PAGE), photoY, photoH);
-    photoCursor = PHOTO_SLOTS_PER_PAGE;
-  }
+  drawGroup(
+    "Reported photos",
+    "No reported photos were uploaded for this report.",
+    reportedPhotos,
+    tableEnd + 10,
+    55,
+  );
   drawFooter(doc, 1, 2);
 
   // Page 2
   doc.addPage();
   drawLetterhead(doc, data.cudNumber);
-  let y2 = 50;
-  if (photoCursor < photos.length) {
-    drawPhotoRow(doc, photos.slice(photoCursor, photoCursor + PHOTO_SLOTS_PER_PAGE), y2, 55);
-    y2 += 55 + 12;
-  }
-  drawSignatures(doc, data, y2);
+  const y2 = drawGroup(
+    "Cleaned photos",
+    "No cleanup photos were uploaded for this report.",
+    cleanedPhotos,
+    50,
+    55,
+  );
+  drawSignatures(doc, data, y2 + 4);
   drawFooter(doc, 2, 2);
 
   doc.save(fileName);
