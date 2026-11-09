@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
+import { Plus, Search } from "lucide-react";
 import {
   useUsers,
   useCreateUser,
@@ -9,7 +10,21 @@ import {
 } from "@/hooks/useUsers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatDateTime } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { cn, formatDateTime } from "@/lib/utils";
 import {
   DataTableSkeleton,
   FilterToolbarSkeleton,
@@ -27,8 +42,26 @@ const ROLE_LABELS: Record<string, string> = {
 const ROLE_BADGE_CLASSES: Record<string, string> = {
   LGU_ADMIN: "bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300",
   FIELD_WORKER: "bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300",
-  CITIZEN: "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300",
+  CITIZEN: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
 };
+
+const ROLE_DOT_COLORS: Record<string, string> = {
+  LGU_ADMIN: "bg-blue-500",
+  FIELD_WORKER: "bg-green-500",
+  CITIZEN: "bg-slate-400",
+};
+
+const ROLE_AVATAR_CLASSES: Record<string, string> = {
+  LGU_ADMIN: "bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300",
+  FIELD_WORKER: "bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300",
+  CITIZEN: "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300",
+};
+
+const FIELD_CLASS =
+  "rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0 focus-visible:border-blue-500";
+
+const TH_CLASS =
+  "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400";
 
 const ROLES = ["LGU_ADMIN", "FIELD_WORKER", "CITIZEN"] as const;
 const ADD_ROLES = ["LGU_ADMIN", "FIELD_WORKER"] as const;
@@ -53,6 +86,10 @@ const emptyForm: UserFormData = {
   phone: "",
 };
 
+function getInitials(firstName: string, lastName: string) {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "?";
+}
+
 export default function UsersPage() {
   const { pushToast } = useLiveNotifications();
   const [page, setPage] = useState(1);
@@ -61,7 +98,8 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
 
-  const [showAddModal, setShowAddModal] = useState(false);
+  // editUser is kept after closing so the dialog doesn't swap forms mid fade-out.
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserRecord | null>(null);
 
   const [form, setForm] = useState<UserFormData>(emptyForm);
@@ -84,10 +122,8 @@ export default function UsersPage() {
 
   if (isLoading) {
     return (
-      <div>
-        <div className="mb-6 flex items-center justify-between">
-          <PageHeadingSkeleton withSubtitle={false} />
-        </div>
+      <div className="space-y-6">
+        <PageHeadingSkeleton />
         <FilterToolbarSkeleton blocks={1} />
         <DataTableSkeleton rows={8} cols={7} />
       </div>
@@ -112,7 +148,8 @@ export default function UsersPage() {
   const openAdd = () => {
     setForm(emptyForm);
     setFormError("");
-    setShowAddModal(true);
+    setEditUser(null);
+    setDialogOpen(true);
   };
 
   const openEdit = (user: UserRecord) => {
@@ -139,6 +176,7 @@ export default function UsersPage() {
     });
     setFormError("");
     setEditUser(user);
+    setDialogOpen(true);
   };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -172,7 +210,7 @@ export default function UsersPage() {
         isRead: true,
         createdAt: new Date().toISOString(),
       });
-      setShowAddModal(false);
+      setDialogOpen(false);
     } catch (err: any) {
       const errorMsg =
         err?.response?.data?.error || "Failed to create user. Try again.";
@@ -221,7 +259,7 @@ export default function UsersPage() {
         isRead: true,
         createdAt: new Date().toISOString(),
       });
-      setEditUser(null);
+      setDialogOpen(false);
     } catch (err: any) {
       const errorMsg =
         err?.response?.data?.error || "Failed to update user. Try again.";
@@ -245,7 +283,7 @@ export default function UsersPage() {
     required = false,
   ) => (
     <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
+      <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
         {required && <span className="ml-0.5 text-red-500">*</span>}
       </label>
@@ -253,273 +291,333 @@ export default function UsersPage() {
         type={type}
         value={form[key] as string}
         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-        className="w-full"
+        className={FIELD_CLASS}
       />
     </div>
   );
 
-  const isRoleLocked = Boolean(editUser);
-  const editRoles = editUser ? ([editUser.role] as const) : ROLES;
+  const roleField = (roles: readonly Role[], disabled = false) => (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        Role <span className="text-red-500">*</span>
+      </label>
+      <Select
+        value={form.role}
+        disabled={disabled}
+        onValueChange={(value) =>
+          setForm((f) => ({ ...f, role: value as Role }))
+        }
+      >
+        <SelectTrigger
+          aria-label="Select role"
+          className="w-full rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+        >
+          <div className="flex items-center gap-2 truncate">
+            <span
+              className={cn(
+                "h-2 w-2 shrink-0 rounded-full",
+                ROLE_DOT_COLORS[form.role],
+              )}
+            />
+            <SelectValue />
+          </div>
+        </SelectTrigger>
+        <SelectContent>
+          {roles.map((r) => (
+            <SelectItem key={r} value={r}>
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn("h-2 w-2 shrink-0 rounded-full", ROLE_DOT_COLORS[r])}
+                />
+                <span>{ROLE_LABELS[r]}</span>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const formFooter = (
+    onCancel: () => void,
+    isPending: boolean,
+    submitLabel: string,
+    pendingLabel: string,
+  ) => (
+    <>
+      {formError && (
+        <p className="rounded-xl border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+          {formError}
+        </p>
+      )}
+      <div className="flex justify-end gap-3 pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          className="rounded-xl border-slate-200 dark:border-slate-700 dark:text-slate-300"
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isPending} className="rounded-xl font-semibold">
+          {isPending ? pendingLabel : submitLabel}
+        </Button>
+      </div>
+    </>
+  );
+
+  const closeDialog = () => setDialogOpen(false);
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">User Management</h1>
-          {pagination && (
-            <p className="mt-0.5 text-sm text-gray-500 dark:text-slate-400">
-              {pagination.total} total user{pagination.total !== 1 ? "s" : ""}
-            </p>
-          )}
-        </div>
-        <Button onClick={openAdd}>+ Add User</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="User Management"
+        description={
+          <>
+            Manage admin, field worker, and citizen accounts.
+            {pagination && (
+              <>
+                {" "}
+                {pagination.total} total user{pagination.total !== 1 ? "s" : ""}.
+              </>
+            )}
+          </>
+        }
+        actions={
+          <Button onClick={openAdd} className="rounded-xl font-semibold">
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add User
+          </Button>
+        }
+      />
 
-      {/* Filters */}
-      <div className="mb-6 flex flex-wrap items-end gap-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-slate-400">
-            Role
-          </label>
-          <select
-            title="Filter by role"
-            className="rounded-md border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
-            value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
+      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200/80 dark:border-slate-800 p-4 bg-slate-50/40 dark:bg-slate-950/40">
+          <Select
+            value={roleFilter || "all"}
+            onValueChange={(value) => {
+              setRoleFilter(value === "all" ? "" : value);
               setPage(1);
             }}
           >
-            <option value="" className="dark:bg-slate-900 dark:text-slate-200">All Roles</option>
-            {ROLES.map((r) => (
-              <option key={r} value={r} className="dark:bg-slate-900 dark:text-slate-200">
-                {ROLE_LABELS[r]}
-              </option>
-            ))}
-          </select>
-        </div>
+            <SelectTrigger
+              aria-label="Filter by role"
+              className="w-[180px] rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold text-slate-700 dark:text-slate-200 shadow-xs transition-all hover:bg-slate-50/80 dark:hover:bg-slate-800"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <span
+                  className={cn(
+                    "h-2 w-2 shrink-0 rounded-full",
+                    roleFilter ? ROLE_DOT_COLORS[roleFilter] : "bg-slate-400",
+                  )}
+                />
+                <SelectValue placeholder="All Roles" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="w-[210px]">
+              <SelectItem value="all">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600" />
+                  <span>All Roles</span>
+                </div>
+              </SelectItem>
+              {ROLES.map((r) => (
+                <SelectItem key={r} value={r}>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn("h-2 w-2 shrink-0 rounded-full", ROLE_DOT_COLORS[r])}
+                    />
+                    <span>{ROLE_LABELS[r]}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-slate-400">
-              Search
-            </label>
-            <Input
-              placeholder="Name or email..."
+          <div className="relative min-w-[200px] max-w-sm flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
               value={searchInput}
               onChange={(e) => handleSearch(e.target.value)}
-              className="w-56"
+              placeholder="Search name or email..."
+              aria-label="Search users"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2 pl-9 pr-3.5 text-sm text-slate-900 dark:text-slate-100 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
+
+          {(roleFilter || search) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-slate-200 dark:border-slate-700"
+              onClick={() => {
+                setRoleFilter("");
+                setSearch("");
+                setSearchInput("");
+                setPage(1);
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
         </div>
 
-        {(roleFilter || search) && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setRoleFilter("");
-              setSearch("");
-              setSearchInput("");
-              setPage(1);
-            }}
-          >
-            Clear Filters
-          </Button>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-800">
-          <thead className="bg-gray-50 dark:bg-slate-800/80">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Name
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Email
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Role
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Phone
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Joined
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-            {users.length === 0 ? (
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+            <thead className="bg-slate-50 dark:bg-slate-800/60">
               <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-10 text-center text-gray-400 dark:text-slate-500"
-                >
-                  No users found
-                </td>
+                <th className={TH_CLASS}>Name</th>
+                <th className={TH_CLASS}>Email</th>
+                <th className={TH_CLASS}>Role</th>
+                <th className={TH_CLASS}>Phone</th>
+                <th className={TH_CLASS}>Status</th>
+                <th className={TH_CLASS}>Joined</th>
+                <th className={TH_CLASS}>Actions</th>
               </tr>
-            ) : (
-              users.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-slate-200">
-                    {user.firstName} {user.lastName}
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              {users.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
+                  >
+                    No users match the current filters.
                   </td>
-                  <td className="max-w-[180px] truncate px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
-                    {user.email}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_BADGE_CLASSES[user.role] ?? "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300"}`}
-                    >
-                      {ROLE_LABELS[user.role] ?? user.role}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
-                    {user.phone || "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${user.isActive ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300" : "bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300"}`}
-                    >
-                      {user.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-slate-400">
-                    {formatDateTime(user.createdAt)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                </tr>
+              ) : (
+                users.map((user) => (
+                  <tr
+                    key={user.id}
+                    className="transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-800/40"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                            ROLE_AVATAR_CLASSES[user.role] ?? ROLE_AVATAR_CLASSES.CITIZEN,
+                          )}
+                        >
+                          {getInitials(user.firstName, user.lastName)}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          {user.firstName} {user.lastName}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="max-w-[220px] truncate px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                      {user.email}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                          ROLE_BADGE_CLASSES[user.role] ?? ROLE_BADGE_CLASSES.CITIZEN,
+                        )}
+                      >
+                        {ROLE_LABELS[user.role] ?? user.role}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                      {user.phone || "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
+                          user.isActive
+                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300"
+                            : "bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "h-1.5 w-1.5 rounded-full",
+                            user.isActive ? "bg-emerald-500" : "bg-red-500",
+                          )}
+                        />
+                        {user.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                      {formatDateTime(user.createdAt)}
+                    </td>
+                    <td className="px-4 py-3">
                       {user.role === "CITIZEN" ? (
                         <Button
                           size="sm"
                           variant="outline"
                           disabled
-                          className="cursor-not-allowed opacity-40 text-xs bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-400 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-400"
+                          className="cursor-not-allowed rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-400 dark:text-slate-500 opacity-40"
                           title="Citizen accounts cannot be edited by administrators"
                         >
                           Edit
                         </Button>
                       ) : (
-                        <Button size="sm" onClick={() => openEdit(user)}>
+                        <Button
+                          size="sm"
+                          className="rounded-lg font-semibold"
+                          onClick={() => openEdit(user)}
+                        >
                           Edit
                         </Button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {pagination && (
+          <div className="border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pb-3">
+            <PaginationControls
+              currentPage={page}
+              totalRecords={pagination.total}
+              pageSize={pageSize}
+              totalPages={pagination.totalPages}
+              onPageChange={(newPage) => setPage(newPage)}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setPage(1);
+              }}
+              itemName="users"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      {pagination && (
-        <PaginationControls
-          currentPage={page}
-          totalRecords={pagination.total}
-          pageSize={pageSize}
-          totalPages={pagination.totalPages}
-          onPageChange={(newPage) => setPage(newPage)}
-          onPageSizeChange={(newSize) => {
-            setPageSize(newSize);
-            setPage(1);
-          }}
-          itemName="users"
-          className="mt-4 bg-white dark:bg-slate-900 p-3.5 rounded-lg border border-gray-200 dark:border-slate-800"
-        />
-      )}
-
-      {/* Add User Modal */}
-      {showAddModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setShowAddModal(false)}
+      {/* Add / Edit User Dialog */}
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => !open && closeDialog()}
+      >
+        <DialogContent
+          overlayClassName="bg-black/40 backdrop-blur-sm"
+          className="max-w-lg gap-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0 shadow-2xl sm:rounded-2xl"
         >
-          <div
-            className="w-full max-w-lg rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl border border-gray-100 dark:border-slate-800"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-5 text-lg font-semibold text-gray-800 dark:text-slate-100">
-              Add New User
-            </h3>
-            <form onSubmit={handleAddSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                {field("First Name", "firstName", "text", true)}
-                {field("Last Name", "lastName", "text", true)}
-              </div>
-              {field("Email", "email", "email", true)}
-              {field("Password", "password", "password", true)}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
-                    Role <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    title="Select role"
-                    className="w-full rounded-md border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
-                    value={form.role}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, role: e.target.value as Role }))
-                    }
-                  >
-                    {ADD_ROLES.map((r) => (
-                      <option key={r} value={r} className="dark:bg-slate-900 dark:text-slate-200">
-                        {ROLE_LABELS[r]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {field("Phone", "phone")}
-              </div>
-
-              {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
-
-              <div className="flex justify-end gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowAddModal(false)}
-                  className="dark:border-slate-700 dark:text-slate-300"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createUser.isPending}>
-                  {createUser.isPending ? "Creating..." : "Create User"}
-                </Button>
-              </div>
-            </form>
+          <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 px-6 pb-4 pt-6">
+            <DialogTitle className="text-xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+              {editUser ? "Edit User" : "Add New User"}
+            </DialogTitle>
+            <DialogDescription className="mt-1">
+              {editUser
+                ? "Update this account's details."
+                : "Create a new admin or field worker account."}
+            </DialogDescription>
           </div>
-        </div>
-      )}
 
-      {/* Edit User Modal */}
-      {editUser && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setEditUser(null)}
-        >
-          <div
-            className="w-full max-w-lg rounded-lg bg-white dark:bg-slate-900 p-6 shadow-xl border border-gray-100 dark:border-slate-800"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-5 text-lg font-semibold text-gray-800 dark:text-slate-100">
-              Edit User
-            </h3>
-            {editUser.role === "CITIZEN" ? (
+          <div className="px-6 py-5">
+            {editUser?.role === "CITIZEN" ? (
               <div className="space-y-4">
-                <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm text-amber-800 dark:text-amber-300">
+                <div className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm text-amber-800 dark:text-amber-300">
                   <p className="font-semibold">Citizen Account Protected</p>
                   <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
                     Citizen accounts are private and managed directly by the citizen. Administrators cannot modify citizen personal details.
@@ -529,65 +627,44 @@ export default function UsersPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setEditUser(null)}
-                    className="dark:border-slate-700 dark:text-slate-300"
+                    onClick={closeDialog}
+                    className="rounded-xl border-slate-200 dark:border-slate-700 dark:text-slate-300"
                   >
                     Close
                   </Button>
                 </div>
               </div>
-            ) : (
+            ) : editUser ? (
               <form onSubmit={handleEditSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   {field("First Name", "firstName", "text", true)}
                   {field("Last Name", "lastName", "text", true)}
                 </div>
                 {field("Email", "email", "email", true)}
-
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
-                      Role <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      title="Select role"
-                      className="w-full rounded-md border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
-                      value={form.role}
-                      disabled={isRoleLocked}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, role: e.target.value as Role }))
-                      }
-                    >
-                      {editRoles.map((r) => (
-                        <option key={r} value={r} className="dark:bg-slate-900 dark:text-slate-200">
-                          {ROLE_LABELS[r]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {roleField([editUser.role as Role], true)}
                   {field("Phone", "phone")}
                 </div>
-
-                {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
-
-                <div className="flex justify-end gap-3 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditUser(null)}
-                    className="dark:border-slate-700 dark:text-slate-300"
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={updateUser.isPending}>
-                    {updateUser.isPending ? "Saving..." : "Save Changes"}
-                  </Button>
+                {formFooter(closeDialog, updateUser.isPending, "Save Changes", "Saving...")}
+              </form>
+            ) : (
+              <form onSubmit={handleAddSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {field("First Name", "firstName", "text", true)}
+                  {field("Last Name", "lastName", "text", true)}
                 </div>
+                {field("Email", "email", "email", true)}
+                {field("Password", "password", "password", true)}
+                <div className="grid grid-cols-2 gap-4">
+                  {roleField(ADD_ROLES)}
+                  {field("Phone", "phone")}
+                </div>
+                {formFooter(closeDialog, createUser.isPending, "Create User", "Creating...")}
               </form>
             )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -5,15 +5,19 @@ import Image from "next/image";
 import { useReports, useDeleteSpamReport } from "@/hooks/useReports";
 import { Button } from "@/components/ui/button";
 import { WASTE_CATEGORY_LABELS } from "@/types";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import {
   DataTableSkeleton,
   FilterToolbarSkeleton,
   PageHeadingSkeleton,
 } from "@/components/skeletons/page-skeletons";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { PaginationControls } from "@/components/ui/pagination";
 
 const RETENTION_DAYS = 3;
+
+const TH_CLASS =
+  "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400";
 
 function getAutoDeleteAt(spamMarkedAt?: string | null) {
   if (!spamMarkedAt) return null;
@@ -73,10 +77,8 @@ export default function SpamReportsPage() {
 
   if (isLoading) {
     return (
-      <div>
-        <div className="mb-6 flex items-center justify-between">
-          <PageHeadingSkeleton withSubtitle={false} />
-        </div>
+      <div className="space-y-6">
+        <PageHeadingSkeleton />
         <FilterToolbarSkeleton blocks={2} />
         <DataTableSkeleton rows={8} cols={7} />
       </div>
@@ -84,115 +86,108 @@ export default function SpamReportsPage() {
   }
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Spam Reports</h1>
-          {pagination && (
-            <p className="mt-0.5 text-sm text-gray-500 dark:text-slate-400">
-              {pagination.total} spam report{pagination.total !== 1 ? "s" : ""}
-              {" — "}reports flagged as having no waste detected; excluded from
-              the main reports list.
-            </p>
-          )}
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Spam Reports"
+        description={
+          <>
+            Reports flagged as having no waste detected or confidence below 30%;
+            excluded from the main reports list.
+            {pagination && (
+              <>
+                {" "}
+                {pagination.total} spam report{pagination.total !== 1 ? "s" : ""}.
+              </>
+            )}
+          </>
+        }
+      />
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-800">
-          <thead className="bg-gray-50 dark:bg-slate-800/80">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Image
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Report
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Source
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Confidence
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Reason
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Marked Spam
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Auto Delete
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-slate-400">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-            {records.length === 0 ? (
+      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+            <thead className="bg-slate-50 dark:bg-slate-800/60">
               <tr>
-                <td
-                  colSpan={8}
-                  className="px-4 py-10 text-center text-gray-400 dark:text-slate-500"
-                >
-                  No spam reports
-                </td>
+                <th className={TH_CLASS}>Image</th>
+                <th className={TH_CLASS}>Report</th>
+                <th className={TH_CLASS}>Source</th>
+                <th className={TH_CLASS}>Confidence</th>
+                <th className={TH_CLASS}>Reason</th>
+                <th className={TH_CLASS}>Marked Spam</th>
+                <th className={TH_CLASS}>Auto Delete</th>
+                <th className={TH_CLASS}>Actions</th>
               </tr>
-            ) : (
-              records.map((report) => {
-                const source = getSpamSource(report);
-                return (
-                  <tr key={report.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                    <td className="px-4 py-3">
-                      {report.images?.[0]?.imageUrl ? (
-                        <Image
-                          src={report.images[0].imageUrl}
-                          alt={report.title}
-                          width={56}
-                          height={56}
-                          className="h-14 w-14 rounded-md border border-gray-200 dark:border-slate-700 object-cover"
-                        />
-                      ) : (
-                        <div className="h-14 w-14 rounded-md border border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-800" />
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="max-w-[240px] truncate text-sm font-medium text-gray-800 dark:text-slate-200">
-                        {report.title}
-                      </p>
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-slate-400">
-                        {WASTE_CATEGORY_LABELS[report.category]}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${source.color}`}
-                      >
-                        {source.label}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-sm text-gray-700 dark:text-slate-300">
-                      {formatConfidence(report.analysisConfidence)}
-                    </td>
-                    <td className="max-w-[260px] px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
-                      {report.spamReason ||
-                        "No visible waste or pollution detected in the submitted image."}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
-                      {report.spamMarkedAt
-                        ? formatDateTime(report.spamMarkedAt)
-                        : "-"}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600 dark:text-slate-400">
-                      {report.autoDeleteAt
-                        ? formatDateTime(report.autoDeleteAt.toISOString())
-                        : "-"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              {records.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
+                  >
+                    No spam reports
+                  </td>
+                </tr>
+              ) : (
+                records.map((report) => {
+                  const source = getSpamSource(report);
+                  return (
+                    <tr
+                      key={report.id}
+                      className="transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-800/40"
+                    >
+                      <td className="px-4 py-3">
+                        {report.images?.[0]?.imageUrl ? (
+                          <Image
+                            src={report.images[0].imageUrl}
+                            alt={report.title}
+                            width={56}
+                            height={56}
+                            className="h-14 w-14 rounded-xl object-cover"
+                          />
+                        ) : (
+                          <div className="h-14 w-14 rounded-xl bg-slate-100 dark:bg-slate-800" />
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="max-w-[240px] truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          {report.title}
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                          {WASTE_CATEGORY_LABELS[report.category]}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                            source.color,
+                          )}
+                        >
+                          {source.label}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300">
+                        {formatConfidence(report.analysisConfidence)}
+                      </td>
+                      <td className="max-w-[260px] px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        {report.spamReason ||
+                          "No visible waste or pollution detected in the submitted image."}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        {report.spamMarkedAt
+                          ? formatDateTime(report.spamMarkedAt)
+                          : "-"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        {report.autoDeleteAt
+                          ? formatDateTime(report.autoDeleteAt.toISOString())
+                          : "-"}
+                      </td>
+                      <td className="px-4 py-3">
                         <Button
                           size="sm"
-                          className="bg-red-600 text-white hover:bg-red-700"
+                          className="rounded-lg bg-red-600 font-semibold text-white hover:bg-red-700"
                           disabled={pendingAction}
                           onClick={async () => {
                             await deleteSpam.mutateAsync(report.id);
@@ -200,32 +195,33 @@ export default function SpamReportsPage() {
                         >
                           Delete Now
                         </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      {pagination && (
-        <PaginationControls
-          currentPage={page}
-          totalRecords={pagination.total}
-          pageSize={pageSize}
-          totalPages={pagination.totalPages}
-          onPageChange={(newPage) => setPage(newPage)}
-          onPageSizeChange={(newSize) => {
-            setPageSize(newSize);
-            setPage(1);
-          }}
-          disabled={pendingAction}
-          itemName="spam reports"
-          className="mt-4 bg-white dark:bg-slate-900 p-3.5 rounded-lg border border-gray-200 dark:border-slate-800"
-        />
-      )}
+        {pagination && (
+          <div className="border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pb-3">
+            <PaginationControls
+              currentPage={page}
+              totalRecords={pagination.total}
+              pageSize={pageSize}
+              totalPages={pagination.totalPages}
+              onPageChange={(newPage) => setPage(newPage)}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setPage(1);
+              }}
+              disabled={pendingAction}
+              itemName="spam reports"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
