@@ -39,6 +39,8 @@ type DashboardReportRow = {
   assignedToName?: string | null;
   assignedWorkerNames?: string | null;
   assignedWorkers?: Array<{ id: string; firstName: string; lastName: string; email?: string }> | null;
+  cleanedByName?: string | null;
+  cleanedAt?: Date | null;
   cleanupScheduleId?: string | null;
   cleanupScheduledAt?: Date | null;
   // Gemini AI fields
@@ -129,6 +131,8 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
     assignedToName: row.assignedToName ?? null,
     assignedWorkerNames: row.assignedWorkerNames ?? null,
     assignedWorkers,
+    cleanedByName: row.cleanedByName ?? null,
+    cleanedAt: row.cleanedAt ?? null,
     reportedAt: row.reportedAt,
     updatedAt: row.updatedAt,
     analyzedAt: row.analyzedAt ?? null,
@@ -174,7 +178,9 @@ export async function getDashboardReports(limit: number) {
       r."assignedToId",
       COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
       COALESCE(rep_workers."assignedWorkers", '[]'::json) AS "assignedWorkers",
-      COALESCE(rep_workers."reportWorkerNames", schedule_workers."assignedWorkerNames", u."firstName" || ' ' || u."lastName", null) AS "assignedWorkerNames"
+      COALESCE(rep_workers."reportWorkerNames", schedule_workers."assignedWorkerNames", u."firstName" || ' ' || u."lastName", null) AS "assignedWorkerNames",
+      cleaned_by."cleanedByName" AS "cleanedByName",
+      cleaned_by."cleanedAt" AS "cleanedAt"
     FROM "Report" r
     LEFT JOIN "User" rep ON rep.id = r."reporterId"
     LEFT JOIN "User" u ON u.id = r."assignedToId"
@@ -229,6 +235,16 @@ export async function getDashboardReports(limit: number) {
       JOIN "User" sw ON sw.id = csw."workerId"
       WHERE cs.id = r."cleanupScheduleId"
     ) schedule_workers ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        cb."firstName" || ' ' || cb."lastName" AS "cleanedByName",
+        sh."createdAt" AS "cleanedAt"
+      FROM "StatusHistory" sh
+      JOIN "User" cb ON cb.id = sh."changedById"
+      WHERE sh."reportId" = r.id AND sh."newStatus" = 'CLEANED'
+      ORDER BY sh."createdAt" DESC
+      LIMIT 1
+    ) cleaned_by ON TRUE
     WHERE r."isDeleted" = false
       AND r."isSpam" = false
     ORDER BY r."createdAt" DESC
@@ -270,7 +286,9 @@ export async function getDashboardReportById(id: string) {
       r."assignedToId",
       COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
       COALESCE(rep_workers."assignedWorkers", '[]'::json) AS "assignedWorkers",
-      COALESCE(rep_workers."reportWorkerNames", schedule_workers."assignedWorkerNames", u."firstName" || ' ' || u."lastName", null) AS "assignedWorkerNames"
+      COALESCE(rep_workers."reportWorkerNames", schedule_workers."assignedWorkerNames", u."firstName" || ' ' || u."lastName", null) AS "assignedWorkerNames",
+      cleaned_by."cleanedByName" AS "cleanedByName",
+      cleaned_by."cleanedAt" AS "cleanedAt"
     FROM "Report" r
     LEFT JOIN "User" rep ON rep.id = r."reporterId"
     LEFT JOIN "User" u ON u.id = r."assignedToId"
@@ -325,6 +343,16 @@ export async function getDashboardReportById(id: string) {
       JOIN "User" sw ON sw.id = csw."workerId"
       WHERE cs.id = r."cleanupScheduleId"
     ) schedule_workers ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        cb."firstName" || ' ' || cb."lastName" AS "cleanedByName",
+        sh."createdAt" AS "cleanedAt"
+      FROM "StatusHistory" sh
+      JOIN "User" cb ON cb.id = sh."changedById"
+      WHERE sh."reportId" = r.id AND sh."newStatus" = 'CLEANED'
+      ORDER BY sh."createdAt" DESC
+      LIMIT 1
+    ) cleaned_by ON TRUE
     WHERE r.id = ${id}
     LIMIT 1
   `;

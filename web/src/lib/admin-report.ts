@@ -23,6 +23,8 @@ export interface AdminReport {
   assignedToName?: string | null;
   assignedWorkerNames?: string | null;
   assignedWorkers?: Array<{ id: string; firstName: string; lastName: string; email?: string }>;
+  cleanedByName?: string | null;
+  cleanedAt?: string | Date | null;
   cleanupScheduleId?: string | null;
   cleanupScheduledAt?: string | Date | null;
   reportedAt: string | Date;
