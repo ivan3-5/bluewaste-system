@@ -37,7 +37,14 @@ export function handleControllerError(
   if (message === "User not found") return sendError(res, 404, message, "USER_NOT_FOUND");
 
   // 403 Forbidden mappings
-  if (message === "Insufficient permissions.") return sendError(res, 403, message, "FORBIDDEN");
+  if (
+    message === "Insufficient permissions." ||
+    message === "Citizen user accounts cannot be edited by administrators." ||
+    message.includes("Citizen user accounts cannot be edited") ||
+    message.includes("Citizen accounts cannot be edited")
+  ) {
+    return sendError(res, 403, message, "FORBIDDEN");
+  }
 
   // 401 Unauthorized mappings
   if (message === "Invalid email or password" || message === "Invalid or expired refresh token") {

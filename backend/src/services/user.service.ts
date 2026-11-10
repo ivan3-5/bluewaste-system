@@ -140,7 +140,7 @@ export class UserService {
       throw new Error("User not found");
     }
 
-    if (existing.role === Role.CITIZEN && requestingUserId && requestingUserId !== id) {
+    if (existing.role === Role.CITIZEN && (!requestingUserId || requestingUserId !== id)) {
       throw new Error("Citizen user accounts cannot be edited by administrators.");
     }
 

@@ -96,7 +96,6 @@ const FILTER_OPTIONS = [
   { key: "ALL", label: "All Alerts" },
   { key: "NEW_REPORT", label: "Waste Reports" },
   { key: "STATUS_CHANGE", label: "Status Updates" },
-  { key: "ASSIGNMENT", label: "Crew Assignments" },
   { key: "SYSTEM", label: "System Alerts" },
 ] as const;
 
@@ -232,7 +231,7 @@ export default function NotificationsPage() {
             </h1>
 
             <p className="text-sm text-gray-500 dark:text-slate-400 max-w-2xl leading-relaxed">
-              Stay informed on real-time waste report submissions, coastal cleanup schedules, crew assignments, and verification milestones.
+              Stay informed on real-time waste report submissions, coastal cleanup schedules, and verification milestones.
             </p>
           </div>
 

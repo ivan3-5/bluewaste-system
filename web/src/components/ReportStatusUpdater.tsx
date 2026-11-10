@@ -49,11 +49,13 @@ export function ReportStatusUpdater({
   initialStatus,
   compact = false,
   className = "",
+  onStatusChange,
 }: {
   reportId: string;
   initialStatus: AdminReportStatus;
   compact?: boolean;
   className?: string;
+  onStatusChange?: (nextStatus: AdminReportStatus) => void;
 }) {
   const router = useRouter();
   const { pushToast } = useLiveNotifications();
@@ -105,6 +107,7 @@ export function ReportStatusUpdater({
       router.refresh();
     } catch (error) {
       setStatus(initialStatus);
+      onStatusChange?.(initialStatus);
       const errorMsg =
         error instanceof Error ? error.message : "Failed to update status.";
       setMessage(errorMsg);
@@ -130,6 +133,7 @@ export function ReportStatusUpdater({
         onValueChange={(nextVal) => {
           const nextStatus = nextVal as AdminReportStatus;
           setStatus(nextStatus);
+          onStatusChange?.(nextStatus);
           void saveStatus(nextStatus);
         }}
       >

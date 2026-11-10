@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Copy, ExternalLink, MapPin, CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Check, Copy, ExternalLink, MapPin, CheckCircle2, Circle, AlertCircle, CalendarDays } from "lucide-react";
 import type { AdminReportStatus } from "@/lib/admin-report";
+import { ReportStatusUpdater } from "@/components/ReportStatusUpdater";
 
 export function CopyButton({
   text,
@@ -162,5 +164,100 @@ export function GoogleMapsLink({
       <ExternalLink className="h-3 w-3 text-slate-400" />
       <span>Google Maps</span>
     </a>
+  );
+}
+
+export function ScheduleCleanupButton({
+  status,
+  isAlreadyScheduled,
+  className = "",
+}: {
+  status: AdminReportStatus;
+  isAlreadyScheduled: boolean;
+  className?: string;
+}) {
+  if (isAlreadyScheduled) {
+    return (
+      <Link
+        href="/dashboard/schedules"
+        className={`inline-flex items-center gap-1.5 rounded-lg border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition shadow-2xs ${className}`}
+        title="View schedule details"
+      >
+        <CheckCircle2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+        <span>Scheduled</span>
+      </Link>
+    );
+  }
+
+  const isEligible = status === "VERIFIED";
+
+  if (!isEligible) {
+    return (
+      <button
+        type="button"
+        disabled
+        aria-disabled="true"
+        title={
+          status === "PENDING"
+            ? "Report status is Pending. Verify report before scheduling cleanup."
+            : "Only verified reports can be scheduled for cleanup."
+        }
+        className={`inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/60 px-3 py-1.5 text-xs font-semibold text-slate-400 dark:text-slate-500 opacity-60 cursor-not-allowed shadow-none select-none transition ${className}`}
+      >
+        <CalendarDays className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+        <span>Schedule Cleanup</span>
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href="/dashboard/schedules"
+      className={`inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-primary/90 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 cursor-pointer ${className}`}
+    >
+      <CalendarDays className="h-3.5 w-3.5 text-white/90" />
+      <span>Schedule Cleanup</span>
+    </Link>
+  );
+}
+
+export function ReportDetailActionHub({
+  reportId,
+  initialStatus,
+  isAlreadyScheduled,
+  children,
+}: {
+  reportId: string;
+  initialStatus: AdminReportStatus;
+  isAlreadyScheduled: boolean;
+  children?: React.ReactNode;
+}) {
+  const [currentStatus, setCurrentStatus] =
+    useState<AdminReportStatus>(initialStatus);
+
+  useEffect(() => {
+    setCurrentStatus(initialStatus);
+  }, [initialStatus]);
+
+  const isScheduled =
+    isAlreadyScheduled ||
+    ["CLEANUP_SCHEDULED", "IN_PROGRESS", "CLEANED"].includes(currentStatus);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0 border-t border-slate-100 dark:border-slate-800 lg:border-t-0">
+      <ReportStatusUpdater
+        reportId={reportId}
+        initialStatus={initialStatus}
+        compact
+        onStatusChange={setCurrentStatus}
+      />
+
+      {children}
+
+      <ScheduleCleanupButton
+        status={currentStatus}
+        isAlreadyScheduled={isScheduled}
+      />
+    </div>
   );
 }

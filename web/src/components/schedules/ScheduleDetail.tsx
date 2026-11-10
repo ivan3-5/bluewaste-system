@@ -28,7 +28,6 @@ import {
   CheckCircle2,
   FileText,
   Wrench,
-  Link2,
   X,
   Phone,
   Copy,
@@ -380,14 +379,6 @@ export function ScheduleDetail({
                   <FileText className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                   Waste Reports ({schedule.reports?.length || 0})
                 </h4>
-                {isAdmin && !isLinkingReports && (
-                  <button
-                    onClick={openLinkPanel}
-                    className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 px-3 py-1 rounded-xl border border-indigo-100 dark:border-indigo-800 transition-colors"
-                  >
-                    <Link2 className="w-3.5 h-3.5" /> Link Additional Reports
-                  </button>
-                )}
               </div>
 
               {/* Inline Link Reports Selector */}
@@ -594,9 +585,8 @@ export function ScheduleDetail({
                     <Edit className="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" /> Edit Operation
                   </Button>
                   <Button
-                    variant="outline"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="rounded-xl border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 h-10 px-4 text-xs font-bold gap-1.5"
+                    className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-10 px-4 text-xs font-bold gap-1.5 shadow-sm shadow-red-500/20"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Delete
                   </Button>
@@ -717,7 +707,7 @@ export function ScheduleDetail({
                 size="sm"
                 onClick={confirmDelete}
                 disabled={isDeleting}
-                className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs h-9 px-5 font-bold"
+                className="bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs h-9 px-5 font-bold shadow-sm shadow-red-500/20"
               >
                 {isDeleting ? "Deleting..." : "Yes, Delete Schedule"}
               </Button>

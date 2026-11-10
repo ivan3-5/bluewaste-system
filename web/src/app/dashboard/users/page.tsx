@@ -549,19 +549,19 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-3">
                       {user.role === "CITIZEN" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
+                        <button
+                          type="button"
                           disabled
-                          className="cursor-not-allowed rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-400 dark:text-slate-500 opacity-40"
+                          aria-disabled="true"
+                          className="inline-flex items-center justify-center h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-400 dark:text-slate-500 opacity-40 cursor-not-allowed select-none shadow-none"
                           title="Citizen accounts cannot be edited by administrators"
                         >
                           Edit
-                        </Button>
+                        </button>
                       ) : (
                         <Button
                           size="sm"
-                          className="rounded-lg font-semibold"
+                          className="rounded-lg font-semibold cursor-pointer"
                           onClick={() => openEdit(user)}
                         >
                           Edit

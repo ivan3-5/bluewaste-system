@@ -1,6 +1,5 @@
 import { getDashboardReportById } from "@/lib/dashboard-reports";
 import MapView from "@/components/MapView";
-import { ReportStatusUpdater } from "@/components/ReportStatusUpdater";
 import Link from "next/link";
 import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
 import { getReverseGeocodedLocation } from "@/lib/utils";
@@ -19,12 +18,11 @@ import {
   ShieldCheck,
   User,
   Users,
-  CalendarDays,
 } from "lucide-react";
 import {
   CopyButton,
   StatusWorkflowStepper,
-  GoogleMapsLink,
+  ReportDetailActionHub,
 } from "@/components/ReportDetailClient";
 
 export const dynamic = "force-dynamic";
@@ -168,36 +166,15 @@ export default async function ReportDetailPage({ params }: PageProps) {
           </div>
 
           {/* Immediate Action Hub (Zero scrolling required) */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0 border-t border-slate-100 dark:border-slate-800 lg:border-t-0">
-            <ReportStatusUpdater
-              reportId={report.id}
-              initialStatus={report.status}
-              compact
-            />
-
+          <ReportDetailActionHub
+            reportId={report.id}
+            initialStatus={report.status}
+            isAlreadyScheduled={isAlreadyScheduled}
+          >
             <GenerateReportButton
               report={{ ...report, locationName: displayLocationName }}
             />
-
-            {isAlreadyScheduled ? (
-              <Link
-                href="/dashboard/schedules"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition shadow-2xs"
-                title="View schedule details"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                <span>Scheduled</span>
-              </Link>
-            ) : (
-              <Link
-                href="/dashboard/schedules"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-primary/90 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
-              >
-                <CalendarDays className="h-3.5 w-3.5 text-white/90" />
-                <span>Schedule Cleanup</span>
-              </Link>
-            )}
-          </div>
+          </ReportDetailActionHub>
         </div>
 
         {/* Visual Lifecycle Stepper */}
@@ -297,13 +274,6 @@ export default async function ReportDetailPage({ params }: PageProps) {
                   </h2>
                 </div>
               </div>
-
-              <div className="flex items-center gap-1.5">
-                <GoogleMapsLink
-                  latitude={report.latitude}
-                  longitude={report.longitude}
-                />
-              </div>
             </div>
 
             <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner">
@@ -402,12 +372,28 @@ export default async function ReportDetailPage({ params }: PageProps) {
                   </span>
                 </dd>
                 <div className="mt-1 flex items-center gap-1.5">
-                  <Link
-                    href="/dashboard/schedules"
-                    className="text-[11px] font-semibold text-primary hover:underline"
-                  >
-                    {isAlreadyScheduled ? "View Schedule →" : "+ Assign Team"}
-                  </Link>
+                  {isAlreadyScheduled ? (
+                    <Link
+                      href="/dashboard/schedules"
+                      className="text-[11px] font-semibold text-primary hover:underline"
+                    >
+                      View Schedule →
+                    </Link>
+                  ) : report.status === "VERIFIED" ? (
+                    <Link
+                      href="/dashboard/schedules"
+                      className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                    >
+                      + Assign Team
+                    </Link>
+                  ) : (
+                    <span
+                      className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60 select-none"
+                      title="Report must be verified before assigning a team"
+                    >
+                      + Assign Team
+                    </span>
+                  )}
                 </div>
               </div>
 
