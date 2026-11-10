@@ -67,6 +67,9 @@ export function handleControllerError(
   ) {
     return sendError(res, 400, message, "REPORT_ALREADY_SCHEDULED");
   }
+  if (message.startsWith("Reports can only be submitted within")) {
+    return sendError(res, 400, message, "OUTSIDE_REPORTING_ZONE");
+  }
   if (message === "Zone name is required" || message.startsWith("A zone needs")) {
     return sendError(res, 400, message, "ZONE_VALIDATION_FAILED");
   }

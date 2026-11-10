@@ -12,12 +12,43 @@ vi.mock("../../src/utils/geo-cache", () => ({
   GeoCache: { invalidateAll: vi.fn() },
 }));
 
+const zone = {
+  coordinates: [
+    { lat: 0, lng: 0 },
+    { lat: 0, lng: 5 },
+    { lat: 5, lng: 5 },
+    { lat: 5, lng: 0 },
+  ],
+};
+
 describe("report confidence persistence", () => {
+  it("rejects reports located outside every active zone", async () => {
+    prismaMock.reportingZone.findMany.mockResolvedValue([zone] as never);
+    await expect(
+      ReportCrudService.create({
+        title: "Test", description: "Test description", category: "with_waste",
+        latitude: 20, longitude: 20,
+      }),
+    ).rejects.toThrow("Reports can only be submitted within");
+    expect(prismaMock.report.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects reports when no zones are active", async () => {
+    prismaMock.reportingZone.findMany.mockResolvedValue([] as never);
+    await expect(
+      ReportCrudService.create({
+        title: "Test", description: "Test description", category: "with_waste",
+        latitude: 1, longitude: 2,
+      }),
+    ).rejects.toThrow("Reports can only be submitted within");
+  });
+
   it("persists an explicit zero rather than discarding it", async () => {
     prismaMock.$transaction.mockImplementation(async (transaction) => {
       if (typeof transaction !== "function") throw new Error("Expected an interactive transaction");
       return transaction(prismaMock);
     });
+    prismaMock.reportingZone.findMany.mockResolvedValue([zone] as never);
     prismaMock.report.create.mockResolvedValue({ id: "report-1", reporterId: null } as never);
     await ReportCrudService.create({
       title: "Test", description: "Test description", category: "no_waste",
