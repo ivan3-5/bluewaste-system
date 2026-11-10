@@ -2,20 +2,19 @@ import { StatsCards } from "@/components/StatsCards";
 import { DashboardInsights } from "@/components/DashboardInsights";
 import {
   getDashboardCategoryDistribution,
+  getDashboardMonthlyTrend,
   getDashboardStats,
-  getDashboardTrend,
 } from "@/lib/dashboard-reports";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [statsResult, trendResult, categoriesResult] = await Promise.allSettled(
-    [
+  const [statsResult, monthlyTrendResult, categoriesResult] =
+    await Promise.allSettled([
       getDashboardStats(),
-      getDashboardTrend(30),
+      getDashboardMonthlyTrend("thisYear"),
       getDashboardCategoryDistribution(),
-    ],
-  );
+    ]);
 
   const stats =
     statsResult.status === "fulfilled"
@@ -27,12 +26,13 @@ export default async function DashboardPage() {
           cleanedCount: 0,
         };
 
-  const trend = trendResult.status === "fulfilled" ? trendResult.value : [];
+  const initialMonthlyTrend =
+    monthlyTrendResult.status === "fulfilled" ? monthlyTrendResult.value : [];
   const categories =
     categoriesResult.status === "fulfilled" ? categoriesResult.value : [];
   const hasDatabaseError =
     statsResult.status === "rejected" ||
-    trendResult.status === "rejected" ||
+    monthlyTrendResult.status === "rejected" ||
     categoriesResult.status === "rejected";
 
   return (
@@ -67,7 +67,10 @@ export default async function DashboardPage() {
         cleanedCount={stats.cleanedCount}
       />
 
-      <DashboardInsights trend={trend} categories={categories} />
+      <DashboardInsights
+        initialMonthlyTrend={initialMonthlyTrend}
+        categories={categories}
+      />
     </div>
   );
 }

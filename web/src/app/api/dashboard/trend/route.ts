@@ -1,12 +1,30 @@
 import { NextRequest } from "next/server";
 import { corsEmptyResponse, corsResponse } from "@/lib/cors";
-import { getDashboardTrend } from "@/lib/dashboard-reports";
+import {
+  getDashboardMonthlyTrend,
+  getDashboardTrend,
+  type MonthlyTrendRange,
+} from "@/lib/dashboard-reports";
 
 export async function OPTIONS() {
   return corsEmptyResponse();
 }
 
 export async function GET(request: NextRequest) {
+  const rangeParam = request.nextUrl.searchParams.get("range");
+  const typeParam = request.nextUrl.searchParams.get("type");
+
+  if (rangeParam || typeParam === "monthly") {
+    const range = (
+      rangeParam === "6months" || rangeParam === "12months" || rangeParam === "thisYear"
+        ? rangeParam
+        : "thisYear"
+    ) as MonthlyTrendRange;
+
+    const rows = await getDashboardMonthlyTrend(range);
+    return corsResponse(rows);
+  }
+
   const daysParam = request.nextUrl.searchParams.get("days");
   const days = daysParam ? Math.max(1, Number(daysParam) || 30) : 30;
 
