@@ -19,6 +19,7 @@ import {
   WASTE_CATEGORY_COLORS,
   REPORT_STATUS_LABELS,
   STATUS_COLORS,
+  getStatusColor,
 } from "@/types";
 
 interface WasteMapProps {
@@ -73,18 +74,22 @@ function timeAgo(dateStr: string): string {
 }
 
 function createMarkerIcon(category: string, status: string) {
-  const color =
-    (WASTE_CATEGORY_COLORS as Record<string, string>)[category] || "#3b82f6";
-  const statusColor =
-    (STATUS_COLORS as Record<string, string>)[status] || "#3b82f6";
-  const size = 16;
+  const statusColor = getStatusColor(status);
 
   return L.divIcon({
-    html: `<div class="waste-marker waste-marker--pulse" style="--mc:${color};width:${size + 8}px;height:${size + 8}px;background:${color};border:3px solid #ffffff;border-radius:50%;box-shadow:0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;cursor:pointer;"><div style="width:${Math.max(5, Math.round(size * 0.4))}px;height:${Math.max(5, Math.round(size * 0.4))}px;background:${statusColor};border-radius:50%;border:1.5px solid rgba(255,255,255,0.9);"></div></div>`,
+    html: `
+      <div class="waste-marker-pin" style="position:relative;width:34px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.35));transition:transform 0.15s ease;transform-origin:50% 100%;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44" fill="none">
+          <path d="M17 1C8.16 1 1 8.16 1 17c0 11.25 16 26 16 26S33 28.25 33 17C33 8.16 25.84 1 17 1z"
+                fill="${statusColor}" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="17" cy="17" r="6.5" fill="#ffffff"/>
+          <circle cx="17" cy="17" r="3.5" fill="${statusColor}"/>
+        </svg>
+      </div>`,
     className: "custom-waste-marker-icon",
-    iconSize: [size + 8, size + 8],
-    iconAnchor: [(size + 8) / 2, (size + 8) / 2],
-    popupAnchor: [0, -((size + 8) / 2)],
+    iconSize: [34, 44],
+    iconAnchor: [17, 43],
+    popupAnchor: [0, -42],
   });
 }
 
@@ -551,7 +556,7 @@ export default function WasteMap({
         </div>`;
       marker.bindTooltip(tooltipContent, {
         direction: "top",
-        offset: [0, -10],
+        offset: [0, -42],
         opacity: 0.95,
         className: "waste-marker-tooltip",
       });

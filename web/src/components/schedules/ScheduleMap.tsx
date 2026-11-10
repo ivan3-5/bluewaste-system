@@ -117,7 +117,7 @@ export default function ScheduleMap({
         const statusColor = SCHEDULE_STATUS_COLORS[schedule.status] || "#3b82f6";
         const statusLabel = SCHEDULE_STATUS_LABELS[schedule.status] || schedule.status;
         const timeFormatted = format(new Date(schedule.scheduledAt), "MMM d, yyyy • h:mm a");
-        const crewCount = schedule.workers?.length || 0;
+        const workerCount = schedule.workers?.length || 0;
         const gearCount = schedule.equipment?.length || 0;
 
         popupDiv.innerHTML = `
@@ -127,7 +127,7 @@ export default function ScheduleMap({
               ${statusLabel}
             </span>
             <span style="font-size:11px; font-weight:600; color:#6b7280;">
-              👥 ${crewCount} crew
+              👥 ${workerCount} worker
             </span>
           </div>
 

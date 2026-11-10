@@ -9,12 +9,20 @@ import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import {
-  ADMIN_REPORT_STATUS_LABELS,
   type AdminReport,
   type IncidentMapData,
 } from "@/lib/admin-report";
+import { getStatusColor } from "@/types";
 import { useAuth } from "@/providers/AuthProvider";
 import api from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { AlertTriangle, Trash2 } from "lucide-react";
 
 type MapViewProps = {
   reports: AdminReport[];
@@ -32,20 +40,25 @@ const PLACEHOLDER_IMAGE = "https://placehold.co/400x300?text=No+Image";
 
 function buildIcon(color: string) {
   return L.divIcon({
-    className: "marker-pulse",
+    className: "incident-marker-icon",
     html: `
-      <div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;background:${color};border:3px solid white;box-shadow:0 8px 20px rgba(0,0,0,0.25)">
-        <div style="width:8px;height:8px;border-radius:999px;background:white"></div>
+      <div style="position:relative;width:34px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.35));transition:transform 0.15s ease;transform-origin:50% 100%;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44" fill="none">
+          <path d="M17 1C8.16 1 1 8.16 1 17c0 11.25 16 26 16 26S33 28.25 33 17C33 8.16 25.84 1 17 1z"
+                fill="${color}" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="17" cy="17" r="6.5" fill="#ffffff"/>
+          <circle cx="17" cy="17" r="3.5" fill="${color}"/>
+        </svg>
       </div>
     `,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-    popupAnchor: [0, -12],
+    iconSize: [34, 44],
+    iconAnchor: [17, 43],
+    popupAnchor: [0, -42],
   });
 }
 
 /**
- * Incident icon — larger + badge when count > 1.
+ * Incident icon — location pin + badge when count > 1.
  * Single-contributor incidents look identical to regular report icons.
  */
 function buildIncidentIcon(color: string, count: number) {
@@ -55,32 +68,38 @@ function buildIncidentIcon(color: string, count: number) {
 
   const badgeCount = count > 99 ? "99+" : String(count);
   return L.divIcon({
-    className: "incident-marker",
+    className: "incident-marker-icon",
     html: `
-      <div style="position:relative;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:${color};border:3px solid white;box-shadow:0 8px 24px rgba(0,0,0,0.32)">
-        <div style="width:9px;height:9px;border-radius:999px;background:white"></div>
+      <div style="position:relative;width:34px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.35));transition:transform 0.15s ease;transform-origin:50% 100%;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44" fill="none">
+          <path d="M17 1C8.16 1 1 8.16 1 17c0 11.25 16 26 16 26S33 28.25 33 17C33 8.16 25.84 1 17 1z"
+                fill="${color}" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="17" cy="17" r="6.5" fill="#ffffff"/>
+          <circle cx="17" cy="17" r="3.5" fill="${color}"/>
+        </svg>
         <div style="
           position:absolute;
-          top:-6px;right:-8px;
-          min-width:18px;height:18px;
+          top:-5px;right:-8px;
+          min-width:20px;height:20px;
           background:#1e3a5f;
           color:#fff;
-          font-size:10px;font-weight:800;
+          font-size:11px;font-weight:800;
           border-radius:999px;
           border:2px solid white;
           display:flex;align-items:center;justify-content:center;
-          padding:0 4px;
-          box-shadow:0 2px 6px rgba(0,0,0,0.28);
-          font-family:system-ui,sans-serif;
+          padding:0 5px;
+          box-shadow:0 2px 6px rgba(0,0,0,0.32);
+          font-family:system-ui,-apple-system,sans-serif;
           letter-spacing:-0.3px;
+          z-index:10;
         ">
           <span style="margin-top:-0.5px">${badgeCount}</span>
         </div>
       </div>
     `,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -14],
+    iconSize: [34, 44],
+    iconAnchor: [17, 43],
+    popupAnchor: [0, -42],
   });
 }
 
@@ -182,18 +201,6 @@ function buildIncidentPopupHtml(incident: IncidentMapData) {
   `;
 }
 
-function isPointInPolygon(point: [number, number], vs: [number, number][]) {
-  const x = point[0], y = point[1];
-  let inside = false;
-  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-    const xi = vs[i][0], yi = vs[i][1];
-    const xj = vs[j][0], yj = vs[j][1];
-    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function MapView({
@@ -205,11 +212,10 @@ export default function MapView({
   mapHeightClassName,
 }: MapViewProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<
-    "ALL" | AdminReport["status"]
-  >("ALL");
   const [isEditingZone, setIsEditingZone] = useState(false);
   const [isDrawingZone, setIsDrawingZone] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [groupedMode, setGroupedMode] = useState(true); // default: incident-grouped view
   const [incidents, setIncidents] = useState<IncidentMapData[]>([]);
   const [incidentsLoading, setIncidentsLoading] = useState(false);
@@ -225,19 +231,66 @@ export default function MapView({
     reportingZonesHook = null;
   }
 
-  const { useReportingZones, useUpdateReportingZone, useCreateReportingZone } =
-    reportingZonesHook || {};
+  const {
+    useReportingZones,
+    useUpdateReportingZone,
+    useCreateReportingZone,
+    useDeleteReportingZone,
+  } = reportingZonesHook || {};
   const zonesQuery = useReportingZones
     ? useReportingZones(false)
     : { data: [] };
   const zonesData = zonesQuery?.data;
   const zones = useMemo(() => zonesData || [], [zonesData]);
+
+  const selectedZone = useMemo(
+    () => (zones || []).find((z: any) => z.id === selectedZoneId) || null,
+    [zones, selectedZoneId],
+  );
+
+  // Default to "Panabo Coastal Area" (or first zone) as soon as zones load
+  useEffect(() => {
+    if (!selectedZoneId && zones.length > 0) {
+      const panaboZone = zones.find((z: any) =>
+        z.name?.toLowerCase().includes("panabo coastal area")
+      );
+      setSelectedZoneId(panaboZone ? panaboZone.id : zones[0].id);
+    }
+  }, [zones, selectedZoneId]);
   const updateZoneMutation = useUpdateReportingZone
     ? useUpdateReportingZone()
     : null;
   const createZoneMutation = useCreateReportingZone
     ? useCreateReportingZone()
     : null;
+  const deleteZoneMutation = useDeleteReportingZone
+    ? useDeleteReportingZone()
+    : null;
+
+  const handleDeleteZone = async () => {
+    if (!selectedZoneId) return;
+    setIsDeleting(true);
+    try {
+      if (deleteZoneMutation) {
+        await deleteZoneMutation.mutateAsync(selectedZoneId);
+      } else {
+        await api.delete(`/reporting-zones/${selectedZoneId}`);
+      }
+      setIsEditingZone(false);
+      setIsDrawingZone(false);
+      // Pick next available zone (preferably Panabo Coastal Area, or remaining[0])
+      const remainingZones = (zones || []).filter((z: any) => z.id !== selectedZoneId);
+      const panaboZone = remainingZones.find((z: any) =>
+        z.name?.toLowerCase().includes("panabo coastal area")
+      );
+      setSelectedZoneId(panaboZone ? panaboZone.id : remainingZones[0]?.id || null);
+      setIsDeleteModalOpen(false);
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "Failed to delete coastal zone. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
@@ -246,14 +299,6 @@ export default function MapView({
   const editControlRef = useRef<any>(null);
   const drawControlRef = useRef<any>(null);
   const zoneDrawnGroupRef = useRef<L.FeatureGroup | null>(null);
-
-  const icons = useMemo(
-    () => ({
-      withWaste: buildIcon("#ef4444"),
-      noWaste: buildIcon("#22c55e"),
-    }),
-    [],
-  );
 
   // ── Fetch grouped incident data ─────────────────────────────────────────────
 
@@ -266,11 +311,8 @@ export default function MapView({
     let cancelled = false;
     setIncidentsLoading(true);
 
-    const params: Record<string, string> = {};
-    if (selectedStatus !== "ALL") params.status = selectedStatus;
-
     api
-      .get<IncidentMapData[]>("/reports/incidents/map", { params })
+      .get<IncidentMapData[]>("/reports/incidents/map")
       .then((res) => {
         if (!cancelled) setIncidents(res.data);
       })
@@ -282,56 +324,17 @@ export default function MapView({
       });
 
     return () => { cancelled = true; };
-  }, [groupedMode, selectedStatus]);
+  }, [groupedMode]);
 
   // ── Filtered data ────────────────────────────────────────────────────────────
 
   const filteredReports = useMemo(() => {
-    // Always hide cleaned reports from the map
-    let result = reports.filter((report) => report.status !== "CLEANED");
-
-    if (selectedStatus !== "ALL") {
-      result = result.filter((report) => report.status === selectedStatus);
-    }
-
-    if (selectedZoneId) {
-      const zone = zones.find((z: any) => z.id === selectedZoneId);
-      if (zone) {
-        const polygonCoords = zone.coordinates.map((c: any) => [Number(c.lat), Number(c.lng)] as [number, number]);
-        result = result.filter((r) => isPointInPolygon([Number(r.latitude), Number(r.longitude)], polygonCoords));
-      }
-    }
-
-    console.log("MapView debug:", {
-      reportsCount: reports.length,
-      filteredCount: result.length,
-      selectedZoneId,
-      zonesCount: zones.length,
-      sampleReport: reports[0],
-      isInside: reports.length > 0 && zones.length > 0 ? isPointInPolygon([reports[0].latitude, reports[0].longitude], zones[0].coordinates.map((c: any) => [c.lat, c.lng] as [number, number])) : null
-    });
-
-    return result;
-  }, [reports, selectedStatus, selectedZoneId, zones]);
+    return reports;
+  }, [reports]);
 
   const filteredIncidents = useMemo(() => {
-    let result = incidents.filter((inc) => inc.status !== "CLEANED");
-
-    if (selectedStatus !== "ALL") {
-      result = result.filter((inc) => inc.status === selectedStatus);
-    }
-
-    if (selectedZoneId) {
-      const zone = zones.find((z: any) => z.id === selectedZoneId);
-      if (zone) {
-        const polygonCoords = zone.coordinates.map((c: any) => [Number(c.lat), Number(c.lng)] as [number, number]);
-        result = result.filter((inc) =>
-          isPointInPolygon([Number(inc.latitude), Number(inc.longitude)], polygonCoords),
-        );
-      }
-    }
-    return result;
-  }, [incidents, selectedStatus, selectedZoneId, zones]);
+    return incidents;
+  }, [incidents]);
 
   // ── Map init ─────────────────────────────────────────────────────────────────
 
@@ -608,18 +611,19 @@ export default function MapView({
     if (groupedMode) {
       // ── Incident-grouped mode ──────────────────────────────────────────────
       filteredIncidents.forEach((incident) => {
-        const color = incident.category === "with_waste" ? "#ef4444" : "#22c55e";
+        const color = getStatusColor(incident.status);
         const icon = buildIncidentIcon(color, incident.contributorCount);
         const marker = L.marker([incident.latitude, incident.longitude], { icon });
         marker.bindPopup(buildIncidentPopupHtml(incident), { maxWidth: 280 });
         newMarkers.push(marker);
       });
     } else {
-      // ── Raw per-report mode (original behaviour) ───────────────────────────
+      // ── Raw per-report mode ───────────────────────────────────────────────
       filteredReports.forEach((report) => {
+        const color = getStatusColor(report.status);
+        const icon = buildIcon(color);
         const marker = L.marker([report.latitude, report.longitude], {
-          icon:
-            report.category === "with_waste" ? icons.withWaste : icons.noWaste,
+          icon,
         });
         marker.bindPopup(buildPopupHtml(report), { maxWidth: 260 });
         newMarkers.push(marker);
@@ -638,7 +642,7 @@ export default function MapView({
         mapRef.current?.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
       }
     }
-  }, [filteredReports, filteredIncidents, icons, groupedMode]);
+  }, [filteredReports, filteredIncidents, groupedMode]);
 
   // render reporting zones as polygon layers (and put the selected one into editable group)
   useEffect(() => {
@@ -677,6 +681,18 @@ export default function MapView({
     }
   }, [zones, selectedZoneId, isAdmin, hideControls]);
 
+  // Fit bounds to selected zone when selected
+  useEffect(() => {
+    if (!selectedZoneId || !mapRef.current) return;
+    const zone = (zones || []).find((z: any) => z.id === selectedZoneId);
+    if (!zone || !zone.coordinates || zone.coordinates.length === 0) return;
+    const latlngs = zone.coordinates.map((p: any) => [Number(p.lat), Number(p.lng)] as [number, number]);
+    const bounds = L.latLngBounds(latlngs);
+    if (bounds.isValid()) {
+      mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+    }
+  }, [selectedZoneId, zones]);
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   const activeCount = groupedMode ? filteredIncidents.length : filteredReports.length;
@@ -696,44 +712,15 @@ export default function MapView({
                 </label>
                 <select
                   id="coastal-zone-select"
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:focus:ring-sky-900/30"
+                  className="w-full appearance-none rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:focus:ring-sky-900/30 [&::-ms-expand]:hidden"
                   value={selectedZoneId || ""}
-                  onChange={(e) => setSelectedZoneId(e.target.value || null)}
+                  onChange={(e) => setSelectedZoneId(e.target.value)}
                 >
-                  <option value="" className="dark:bg-slate-900 dark:text-slate-200">Select a zone</option>
                   {zones.map((z: any) => (
                     <option key={z.id} value={z.id} className="dark:bg-slate-900 dark:text-slate-200">
                       {z.name}
                     </option>
                   ))}
-                </select>
-              </div>
-
-              <div className="w-full sm:w-56 lg:w-64">
-                <label
-                  htmlFor="status-filter-select"
-                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400"
-                >
-                  All Status
-                </label>
-                <select
-                  id="status-filter-select"
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:focus:ring-sky-900/30"
-                  value={selectedStatus}
-                  onChange={(e) =>
-                    setSelectedStatus(
-                      e.target.value as "ALL" | AdminReport["status"],
-                    )
-                  }
-                >
-                  <option value="ALL" className="dark:bg-slate-900 dark:text-slate-200">All Status</option>
-                  {Object.entries(ADMIN_REPORT_STATUS_LABELS).map(
-                    ([value, label]) => (
-                      <option key={value} value={value} className="dark:bg-slate-900 dark:text-slate-200">
-                        {label}
-                      </option>
-                    ),
-                  )}
                 </select>
               </div>
             </div>
@@ -790,14 +777,39 @@ export default function MapView({
                   >
                     {isEditingZone ? "Stop Editing" : "Edit Zone"}
                   </button>
+                  <button
+                    disabled={!selectedZoneId}
+                    className="flex items-center gap-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 transition hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-40"
+                    onClick={() => {
+                      if (selectedZoneId) {
+                        setIsDeleteModalOpen(true);
+                      }
+                    }}
+                    title={selectedZone ? `Delete zone "${selectedZone.name}"` : "Select a zone to delete"}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete Zone</span>
+                  </button>
                 </>
               )}
               <button
                 className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-700"
                 onClick={() => {
-                  setSelectedZoneId(null);
+                  const panaboZone = (zones || []).find((z: any) =>
+                    z.name?.toLowerCase().includes("panabo coastal area")
+                  );
+                  setSelectedZoneId(panaboZone ? panaboZone.id : zones[0]?.id || null);
                   setIsEditingZone(false);
                   setIsDrawingZone(false);
+                  const positions = groupedMode
+                    ? filteredIncidents.map((i) => [i.latitude, i.longitude] as [number, number])
+                    : filteredReports.map((r) => [r.latitude, r.longitude] as [number, number]);
+                  if (positions.length > 0) {
+                    const bounds = L.latLngBounds(positions);
+                    if (bounds.isValid()) {
+                      mapRef.current?.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+                    }
+                  }
                 }}
               >
                 Reset
@@ -808,18 +820,16 @@ export default function MapView({
           {(selectedZoneId ||
             isDrawingZone ||
             isEditingZone ||
-            selectedStatus !== "ALL" ||
-            groupedMode) && (
+            groupedMode ||
+            true) && (
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
               {isDrawingZone
                 ? "Drawing mode enabled: draw a polygon on the map."
                 : isEditingZone
                   ? "Editing mode enabled: drag vertices to adjust the selected zone."
                   : groupedMode
-                    ? `Showing ${activeCount} grouped waste incident${activeCount !== 1 ? "s" : ""}${selectedStatus !== "ALL" ? ` with status "${ADMIN_REPORT_STATUS_LABELS[selectedStatus]}"` : ""}. Markers with a blue badge have multiple citizen reports.`
-                    : selectedStatus !== "ALL"
-                      ? `Showing ${activeCount} report${activeCount !== 1 ? "s" : ""} with ${ADMIN_REPORT_STATUS_LABELS[selectedStatus]}.`
-                      : "Zone selected: you can start editing or drawing."}
+                    ? `Showing ${activeCount} grouped waste incident${activeCount !== 1 ? "s" : ""}. Markers with a blue badge have multiple citizen reports.`
+                    : `Showing ${activeCount} report${activeCount !== 1 ? "s" : ""}.`}
             </p>
           )}
         </div>
@@ -828,6 +838,64 @@ export default function MapView({
       <div className={`relative ${mapHeightClassName || (isAdmin ? "h-[62vh]" : "h-[70vh]")}`}>
         <div ref={containerRef} className="h-full w-full" />
       </div>
+
+      {/* Delete Zone Confirmation Warning Dialog */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                Delete Coastal Zone
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+
+          <div className="py-2">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                &ldquo;{selectedZone?.name || "this zone"}&rdquo;
+              </span>
+              ?
+            </p>
+            <p className="mt-2 rounded-lg bg-rose-50 dark:bg-rose-950/30 p-3 text-xs text-rose-700 dark:text-rose-400 border border-rose-100 dark:border-rose-900/40">
+              ⚠️ <strong>Warning:</strong> This action cannot be undone. The zone polygon and boundaries will be permanently removed.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <button
+              type="button"
+              disabled={isDeleting}
+              onClick={() => setIsDeleteModalOpen(false)}
+              className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isDeleting}
+              onClick={handleDeleteZone}
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-50"
+            >
+              {isDeleting ? (
+                <>
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span>Deleting...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete Zone</span>
+                </>
+              )}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

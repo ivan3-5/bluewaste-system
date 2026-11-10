@@ -285,9 +285,15 @@
   border-color: #ef444440;
 }
 
-.custom-waste-marker-icon {
+.custom-waste-marker-icon,
+.incident-marker-icon {
   background: transparent !important;
   border: none !important;
+}
+
+.custom-waste-marker-icon:hover .waste-marker-pin,
+.incident-marker-icon:hover > div {
+  transform: scale(1.12);
 }
 
 .waste-marker {
