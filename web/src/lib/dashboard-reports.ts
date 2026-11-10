@@ -68,6 +68,32 @@ type DashboardCategoryRow = {
   count: bigint | number;
 };
 
+export type MonthlyTrendRange = "6months" | "12months" | "thisYear";
+
+type DashboardMonthlyTrendRow = {
+  month_date: Date;
+  month_name: string;
+  month_key: string;
+  year: number;
+  month_num: number;
+  pendingCount: bigint | number;
+  inProgressCount: bigint | number;
+  cleanedCount: bigint | number;
+  totalCount: bigint | number;
+};
+
+export type MonthlyTrendPoint = {
+  monthDate: string;
+  monthName: string;
+  monthKey: string;
+  year: number;
+  monthNum: number;
+  pendingCount: number;
+  inProgressCount: number;
+  cleanedCount: number;
+  totalCount: number;
+};
+
 const WASTE_BUCKET_LABELS: Record<string, string> = {
   with_waste: "With Waste",
   no_waste: "No Waste",
@@ -407,6 +433,96 @@ export async function getDashboardTrend(days = 30) {
   return rows.map((row: DashboardTrendRow) => ({
     day: row.day,
     count: toNumber(row.count),
+  }));
+}
+
+export async function getDashboardMonthlyTrend(
+  range: MonthlyTrendRange = "thisYear",
+): Promise<MonthlyTrendPoint[]> {
+  let rows: DashboardMonthlyTrendRow[];
+
+  if (range === "thisYear") {
+    rows = await prisma.$queryRaw<DashboardMonthlyTrendRow[]>`
+      WITH months AS (
+        SELECT generate_series(
+          DATE_TRUNC('year', CURRENT_DATE),
+          DATE_TRUNC('year', CURRENT_DATE) + interval '11 months',
+          interval '1 month'
+        )::date AS month_date
+      ),
+      aggregated AS (
+        SELECT
+          DATE_TRUNC('month', r."createdAt")::date AS month_date,
+          COUNT(*) FILTER (WHERE r."status" = 'PENDING')::bigint AS "pendingCount",
+          COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
+          COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount",
+          COUNT(*)::bigint AS "totalCount"
+        FROM "Report" r
+        GROUP BY 1
+      )
+      SELECT
+        m.month_date,
+        TO_CHAR(m.month_date, 'FMMonth') AS month_name,
+        TO_CHAR(m.month_date, 'YYYY-MM') AS month_key,
+        EXTRACT(YEAR FROM m.month_date)::int AS year,
+        EXTRACT(MONTH FROM m.month_date)::int AS month_num,
+        COALESCE(a."pendingCount", 0)::bigint AS "pendingCount",
+        COALESCE(a."inProgressCount", 0)::bigint AS "inProgressCount",
+        COALESCE(a."cleanedCount", 0)::bigint AS "cleanedCount",
+        COALESCE(a."totalCount", 0)::bigint AS "totalCount"
+      FROM months m
+      LEFT JOIN aggregated a ON a.month_date = m.month_date
+      ORDER BY m.month_date ASC
+    `;
+  } else {
+    const monthsBack = range === "6months" ? 5 : 11;
+    rows = await prisma.$queryRaw<DashboardMonthlyTrendRow[]>`
+      WITH months AS (
+        SELECT generate_series(
+          DATE_TRUNC('month', CURRENT_DATE) - (${monthsBack} || ' months')::interval,
+          DATE_TRUNC('month', CURRENT_DATE),
+          interval '1 month'
+        )::date AS month_date
+      ),
+      aggregated AS (
+        SELECT
+          DATE_TRUNC('month', r."createdAt")::date AS month_date,
+          COUNT(*) FILTER (WHERE r."status" = 'PENDING')::bigint AS "pendingCount",
+          COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
+          COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount",
+          COUNT(*)::bigint AS "totalCount"
+        FROM "Report" r
+        GROUP BY 1
+      )
+      SELECT
+        m.month_date,
+        TO_CHAR(m.month_date, 'FMMonth') AS month_name,
+        TO_CHAR(m.month_date, 'YYYY-MM') AS month_key,
+        EXTRACT(YEAR FROM m.month_date)::int AS year,
+        EXTRACT(MONTH FROM m.month_date)::int AS month_num,
+        COALESCE(a."pendingCount", 0)::bigint AS "pendingCount",
+        COALESCE(a."inProgressCount", 0)::bigint AS "inProgressCount",
+        COALESCE(a."cleanedCount", 0)::bigint AS "cleanedCount",
+        COALESCE(a."totalCount", 0)::bigint AS "totalCount"
+      FROM months m
+      LEFT JOIN aggregated a ON a.month_date = m.month_date
+      ORDER BY m.month_date ASC
+    `;
+  }
+
+  return rows.map((row) => ({
+    monthDate:
+      row.month_date instanceof Date
+        ? row.month_date.toISOString()
+        : String(row.month_date),
+    monthName: row.month_name?.trim() || "",
+    monthKey: row.month_key,
+    year: Number(row.year),
+    monthNum: Number(row.month_num),
+    pendingCount: toNumber(row.pendingCount),
+    inProgressCount: toNumber(row.inProgressCount),
+    cleanedCount: toNumber(row.cleanedCount),
+    totalCount: toNumber(row.totalCount),
   }));
 }
 
