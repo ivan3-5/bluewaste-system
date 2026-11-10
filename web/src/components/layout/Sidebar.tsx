@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 const adminLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "DASHBOARD", icon: LayoutDashboard },
   {
     href: "/dashboard/reports",
     label: "Report Management",
