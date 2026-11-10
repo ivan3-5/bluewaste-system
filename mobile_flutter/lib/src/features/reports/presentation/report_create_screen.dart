@@ -5,6 +5,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:geolocator/geolocator.dart";
 import "package:image_picker/image_picker.dart";
+import "package:latlong2/latlong.dart";
 import "package:dio/dio.dart";
 
 import "../../../core/theme/app_colors.dart";
@@ -20,6 +21,7 @@ import "../domain/report_models.dart";
 import "widgets/pending_reports_banner.dart";
 import "widgets/report_result_card.dart";
 import "widgets/report_step_indicator.dart";
+import "location_picker_screen.dart";
 import "my_reports_screen.dart";
 import "../../notifications/presentation/notification_providers.dart";
 
@@ -304,6 +306,24 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     }
   }
 
+  Future<void> _markLocationOnMap() async {
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          initialLocation: _hasLocation
+              ? LatLng(_latitude!, _longitude!)
+              : null,
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _latitude = picked.latitude;
+      _longitude = picked.longitude;
+      _isOutsideZone = false;
+    });
+  }
+
   /// Returns true if [lat]/[lng] is NOT inside any active reporting zone.
   /// Falls back to false (allow) on network errors so offline users aren't blocked.
   Future<bool> _checkOutsideZones(double lat, double lng) async {
@@ -379,7 +399,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           _longitude ??= 0.0;
         }
       } else {
-        _showMessage("Please capture your location first.");
+        _showMessage("Please mark your location on the map first.");
         return;
       }
     }
@@ -838,11 +858,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 ],
                 const SizedBox(height: AppSpacing.sm),
                 FilledButton.tonalIcon(
-                  onPressed: _getCurrentLocation,
-                  icon: const Icon(Icons.my_location),
-                  label: Text(
-                    _hasLocation ? "Update Location" : "Capture Location",
-                  ),
+                  onPressed: _markLocationOnMap,
+                  icon: const Icon(Icons.edit_location_alt),
+                  label: const Text("Mark on Map"),
                 ),
               ],
             ),
@@ -1152,8 +1170,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 icon: Icons.my_location,
                 title: "Location",
                 subtitle: _hasLocation
-                    ? "Location captured. You can update it anytime."
-                    : "Capture your current location before submitting.",
+                    ? "Location set. You can re-mark it on the map anytime."
+                    : "Mark the waste location on the map before submitting.",
               ),
               const SizedBox(height: AppSpacing.sm),
               Container(
@@ -1210,11 +1228,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               ],
               const SizedBox(height: AppSpacing.sm),
               FilledButton.tonalIcon(
-                onPressed: _getCurrentLocation,
-                icon: const Icon(Icons.my_location),
-                label: Text(
-                  _hasLocation ? "Update Location" : "Capture Location",
-                ),
+                onPressed: _markLocationOnMap,
+                icon: const Icon(Icons.edit_location_alt),
+                label: const Text("Mark on Map"),
               ),
             ],
           ),
