@@ -5,6 +5,7 @@ import { NotificationService } from "./notification.service";
 import { GeoCache } from "../utils/geo-cache";
 import { ReportSpamService } from "./report-spam.service";
 import { ReportDedupService } from "./report-dedup.service";
+import { ReportingZoneService, OUTSIDE_ZONE_MESSAGE } from "./reportingZone.service";
 
 type Viewer = {
   id: string;
@@ -82,6 +83,10 @@ export class ReportCrudService {
     aiProcessingMs?: number | null;
     aiGeminiMs?: number | null;
   }) {
+    if (!(await ReportingZoneService.isInsideActiveZone(data.latitude, data.longitude))) {
+      throw new Error(OUTSIDE_ZONE_MESSAGE);
+    }
+
     await ReportSpamService.purgeExpiredSpamIfDue();
 
     const clientSpamFlagged = data.isSpamFlagged === true;

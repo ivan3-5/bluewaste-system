@@ -293,17 +293,23 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       position.longitude,
     );
 
+    if (!mounted) return;
+
+    if (outside) {
+      // Reports are only allowed inside admin-defined zones; keep the old
+      // location (if any) and ask the user to mark one on the map instead.
+      if (!_hasLocation) setState(() => _isOutsideZone = true);
+      _showMessage(
+        "Your current location is outside the reporting zones. Use \"Mark on Map\" to pick a spot inside a zone.",
+      );
+      return;
+    }
+
     setState(() {
       _latitude = position.latitude;
       _longitude = position.longitude;
-      _isOutsideZone = outside;
+      _isOutsideZone = false;
     });
-
-    if (outside) {
-      _showMessage(
-        "Notice: Location outside coastal zone (Submission allowed for testing demonstration).",
-      );
-    }
   }
 
   Future<void> _markLocationOnMap() async {
@@ -325,7 +331,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   }
 
   /// Returns true if [lat]/[lng] is NOT inside any active reporting zone.
-  /// Falls back to false (allow) on network errors so offline users aren't blocked.
+  /// Treated as outside when zones can't be loaded or none are active, since
+  /// reporting is only allowed inside admin-defined zones.
   Future<bool> _checkOutsideZones(double lat, double lng) async {
     try {
       final dio = Dio(
@@ -340,7 +347,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         queryParameters: <String, dynamic>{"activeOnly": "true"},
       );
       final zones = response.data;
-      if (zones == null || zones.isEmpty) return false;
+      if (zones == null || zones.isEmpty) return true;
       for (final zone in zones) {
         final coords = (zone["coordinates"] as List<dynamic>)
             .map(
@@ -354,7 +361,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       }
       return true;
     } catch (_) {
-      return false; // Allow on error
+      return true;
     }
   }
 
@@ -392,16 +399,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     }
 
     if (_latitude == null || _longitude == null) {
-      if (isDirectSpamSubmit) {
-        await _getCurrentLocation();
-        if (_latitude == null || _longitude == null) {
-          _latitude ??= 0.0;
-          _longitude ??= 0.0;
-        }
-      } else {
-        _showMessage("Please mark your location on the map first.");
-        return;
-      }
+      _showMessage("Please mark your location on the map first.");
+      return;
     }
 
     if (_images.isEmpty) {
@@ -416,13 +415,12 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       return;
     }
 
-    // Hard zone guard — temporarily bypassed for testing demonstration
-    // if (_isOutsideZone) {
-    //   _showMessage(
-    //     "Reporting is only allowed within the designated coastal zone.",
-    //   );
-    //   return;
-    // }
+    if (_isOutsideZone) {
+      _showMessage(
+        "Reporting is only allowed within the designated reporting zones.",
+      );
+      return;
+    }
 
     setState(() => _isSubmitting = true);
     try {
@@ -797,8 +795,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   icon: Icons.my_location_rounded,
                   title: "GPS Location Status",
                   subtitle: _hasLocation
-                      ? "Location captured automatically. Ready for report."
-                      : "Locating your position within coastal reporting zones...",
+                      ? "Location set inside a reporting zone. Ready for report."
+                      : _isOutsideZone
+                      ? "Mark a spot inside a reporting zone on the map."
+                      : "Locating your position within reporting zones...",
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Container(
@@ -831,7 +831,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                         child: Text(
                           _hasLocation
                               ? "${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}"
-                              : "Acquiring coastal coordinates...",
+                              : _isOutsideZone
+                              ? "No valid location yet."
+                              : "Acquiring coordinates...",
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: _hasLocation
@@ -849,7 +851,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 if (_isOutsideZone) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    "⚠️ Location outside designated coastal zone (Allowed for testing demonstration).",
+                    "⚠️ Your location is outside the reporting zones. Mark a spot inside a zone on the map.",
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.info,
                       fontWeight: FontWeight.w600,
@@ -1219,7 +1221,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               if (_isOutsideZone) ...[
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  "⚠️ Location outside designated coastal zone (Allowed for testing demonstration).",
+                  "⚠️ Your location is outside the reporting zones. Mark a spot inside a zone on the map.",
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.info,
                     fontWeight: FontWeight.w600,

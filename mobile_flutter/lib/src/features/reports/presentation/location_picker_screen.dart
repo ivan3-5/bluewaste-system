@@ -61,7 +61,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         final ring = <LatLng>[
           for (final c in raw)
             if (c is Map && c["lat"] is num && c["lng"] is num)
-              LatLng((c["lat"] as num).toDouble(), (c["lng"] as num).toDouble()),
+              LatLng(
+                (c["lat"] as num).toDouble(),
+                (c["lng"] as num).toDouble(),
+              ),
         ];
         if (ring.length >= 3) zones.add(ring);
       }
@@ -114,7 +117,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       final yj = polygon[j].latitude;
       final intersect =
           ((yi > point.latitude) != (yj > point.latitude)) &&
-          (point.longitude < (xj - xi) * (point.latitude - yi) / (yj - yi) + xi);
+          (point.longitude <
+              (xj - xi) * (point.latitude - yi) / (yj - yi) + xi);
       if (intersect) inside = !inside;
       j = i;
     }

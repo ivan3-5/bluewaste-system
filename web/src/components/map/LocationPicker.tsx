@@ -3,11 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { isPointInZone } from "@/hooks/useReportingZones";
+import type { ReportingZone } from "@/types";
 
 interface LocationPickerProps {
   value: { lat: number; lng: number } | null;
   onChange: (loc: { lat: number; lng: number }) => void;
   zones?: Array<{ coordinates: Array<{ lat: number; lng: number }> }>;
+  /** When true, pins can only be placed inside one of the given zones. */
+  restrictToZones?: boolean;
 }
 
 const PANABO: [number, number] = [7.3132, 125.6844];
@@ -34,6 +38,7 @@ export default function LocationPicker({
   value,
   onChange,
   zones = [],
+  restrictToZones = false,
 }: LocationPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -41,6 +46,9 @@ export default function LocationPicker({
   const zoneLayersRef = useRef<L.Polygon[]>([]);
   // Stable ref so closures inside useEffect always call the latest onChange
   const onChangeRef = useRef(onChange);
+  const zonesRef = useRef(zones);
+  const restrictRef = useRef(restrictToZones);
+  const lastValidRef = useRef<{ lat: number; lng: number } | null>(value);
   // Ref to the placeMarker fn so handleGps can call it after effect teardown
   const placeMarkerRef = useRef<
     ((lat: number, lng: number, pan?: boolean) => void) | null
@@ -53,6 +61,27 @@ export default function LocationPicker({
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+
+  useEffect(() => {
+    zonesRef.current = zones;
+    restrictRef.current = restrictToZones;
+  }, [zones, restrictToZones]);
+
+  // Returns true when the point may be used; otherwise shows a message.
+  const isAllowed = (lat: number, lng: number) => {
+    if (!restrictRef.current) return true;
+    const allowed = zonesRef.current.some((z) =>
+      isPointInZone(lat, lng, z as unknown as ReportingZone),
+    );
+    setGpsError(
+      allowed
+        ? ""
+        : zonesRef.current.length === 0
+          ? "No reporting zones are available right now."
+          : "You can only pin a location inside the highlighted reporting zones.",
+    );
+    return allowed;
+  };
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -83,6 +112,12 @@ export default function LocationPicker({
         m.addTo(map);
         m.on("dragend", () => {
           const { lat: la, lng: ln } = m.getLatLng();
+          if (!isAllowed(la, ln)) {
+            const back = lastValidRef.current;
+            if (back) m.setLatLng([back.lat, back.lng]);
+            return;
+          }
+          lastValidRef.current = { lat: la, lng: ln };
           onChangeRef.current({ lat: la, lng: ln });
         });
         markerRef.current = m;
@@ -99,6 +134,8 @@ export default function LocationPicker({
     // Click → drop / move pin
     map.on("click", (e) => {
       const { lat, lng } = e.latlng;
+      if (!isAllowed(lat, lng)) return;
+      lastValidRef.current = { lat, lng };
       placeMarker(lat, lng);
       onChangeRef.current({ lat, lng });
     });
@@ -154,6 +191,11 @@ export default function LocationPicker({
     }
     navigator.geolocation.getCurrentPosition(
       ({ coords: { latitude: lat, longitude: lng } }) => {
+        if (!isAllowed(lat, lng)) {
+          setGpsLoading(false);
+          return;
+        }
+        lastValidRef.current = { lat, lng };
         placeMarkerRef.current?.(lat, lng, true);
         onChangeRef.current({ lat, lng });
         setGpsLoading(false);
@@ -202,7 +244,7 @@ export default function LocationPicker({
         {/* Tap-hint shown until first pin is placed */}
         {!hasPin && (
           <div className="pointer-events-none absolute bottom-10 left-1/2 z-[1000] -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-xs font-medium text-white whitespace-nowrap">
-            Tap anywhere on the map to drop a pin
+            {restrictToZones ? "Tap inside a highlighted zone to drop a pin" : "Tap anywhere on the map to drop a pin"}
           </div>
         )}
       </div>
