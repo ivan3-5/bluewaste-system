@@ -165,6 +165,35 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 If you deploy YOLO to Render, set `YOLO_API_URL` to your deployed `/analyze` endpoint (e.g. `https://bluewaste-system.onrender.com/analyze`).
 
+## Publishing an Updated YOLO Model
+
+After replacing `yolo-fastapi-sample/weights/best.pt`, run one command from the repo root to publish it everywhere:
+
+```bash
+pip install "ultralytics[export-litert]" huggingface_hub
+hf auth login                     # one-time; the token is saved locally
+python publish_model.py
+```
+
+The script:
+
+1. Exports `yolo-fastapi-sample/weights/best.pt` to LiteRT/TFLite (FP32, 640×640) and writes `yolo-fastapi-sample/weights/best.tflite`.
+2. Copies it to `mobile_flutter/assets/models/best.tflite` for offline use in the app.
+3. Uploads the whole `yolo-fastapi-sample/` folder to Hugging Face (`ishuualt/bluewaste-yolo26`, Space). Files matching `.venv/`, `__pycache__/`, `runs/`, `datasets/`, `logs/`, and `.env*` are skipped.
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--repo-id owner/name` | Target repo (default `ishuualt/bluewaste-yolo26`) |
+| `--repo-type space\|model\|dataset` | Repo type (default `space`) |
+| `--skip-export` | Upload only, without re-exporting |
+| `--skip-upload` | Export and copy to Flutter only |
+| `--skip-flutter` | Skip copying into `mobile_flutter/` |
+| `--dry-run` | List the files that would be uploaded and exit |
+
+After the script runs, rebuild the app with `cd mobile_flutter && flutter clean && flutter run`. Assets are bundled at build time, so a hot reload won't pick up the new model.
+
 ## Useful Commands
 
 From root:
