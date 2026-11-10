@@ -97,6 +97,12 @@ export default async function ReportDetailPage({ params }: PageProps) {
           .join(", ")
       : null);
 
+  const cleanupWorkerName =
+    report.cleanedByName ||
+    assignedWorkersText ||
+    report.assignedToName ||
+    "Assigned Field Worker";
+
   const hasWasteAnalysis = Boolean(
     report.aiModel != null ||
     report.analyzedAt != null ||
@@ -208,53 +214,89 @@ export default async function ReportDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            <div className="grid gap-2.5 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {/* Citizen Submission Box */}
-              <figure className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
-                <figcaption className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
-                  <span>Citizen Submission</span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">Original</span>
-                </figcaption>
-                {reportImages.length > 0 ? (
-                  <ReportPhotoCarousel
-                    images={reportImages}
-                    heightClassName="h-48 sm:h-52"
-                  />
-                ) : (
-                  <div className="flex h-48 sm:h-52 items-center justify-center p-4 text-center text-xs text-slate-400 dark:text-slate-500">
-                    No citizen submission photo available.
-                  </div>
-                )}
+              <figure className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex flex-col justify-between">
+                <div>
+                  <figcaption className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                    <span className="flex items-center gap-1.5">
+                      <Camera className="h-3.5 w-3.5 text-slate-500" />
+                      Citizen Submission
+                    </span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">Original Report</span>
+                  </figcaption>
+                  {reportImages.length > 0 ? (
+                    <ReportPhotoCarousel
+                      images={reportImages}
+                      heightClassName="h-60 sm:h-72"
+                      reporterName={report.reporterName || "Anonymous Citizen"}
+                      reportedAt={report.reportedAt}
+                    />
+                  ) : (
+                    <div className="flex h-60 sm:h-72 items-center justify-center p-4 text-center text-xs text-slate-400 dark:text-slate-500">
+                      No citizen submission photo available.
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-3 py-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                  <span className="truncate">
+                    Reported by:{" "}
+                    <strong className="font-semibold text-slate-800 dark:text-slate-200">
+                      {report.reporterName || "Anonymous Citizen"}
+                    </strong>
+                  </span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">
+                    Click photo to view large
+                  </span>
+                </div>
               </figure>
 
               {/* Cleanup Result Box */}
-              <figure className="overflow-hidden rounded-lg border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/20">
-                <figcaption className="flex items-center justify-between border-b border-emerald-200 dark:border-emerald-500/30 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                    Cleanup Result
-                  </span>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">Verification</span>
-                </figcaption>
-                {cleanupImages.length > 0 ? (
-                  <CleanupPhotoCarousel
-                    images={cleanupImages.map((image) => ({
-                      id: image.id,
-                      imageUrl: image.imageUrl,
-                    }))}
-                    heightClassName="h-48 sm:h-52"
-                  />
-                ) : (
-                  <div className="flex h-48 sm:h-52 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4 text-center">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mb-1.5">
-                      <Clock className="h-4 w-4" />
+              <figure className="overflow-hidden rounded-lg border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/20 flex flex-col justify-between">
+                <div>
+                  <figcaption className="flex items-center justify-between border-b border-emerald-200 dark:border-emerald-500/30 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      Cleanup Result
+                    </span>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">Field Verification</span>
+                  </figcaption>
+                  {cleanupImages.length > 0 ? (
+                    <CleanupPhotoCarousel
+                      images={cleanupImages.map((image) => ({
+                        id: image.id,
+                        imageUrl: image.imageUrl,
+                      }))}
+                      heightClassName="h-60 sm:h-72"
+                      submittedBy={cleanupWorkerName}
+                      submittedAt={report.cleanedAt}
+                    />
+                  ) : (
+                    <div className="flex h-60 sm:h-72 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4 text-center">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mb-1.5">
+                        <Clock className="h-4 w-4" />
+                      </div>
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Awaiting Cleanup Proof
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400 max-w-[200px]">
+                        Field workers will upload resolution photos once the site has been cleaned.
+                      </p>
                     </div>
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Awaiting Cleanup Proof
-                    </p>
-                    <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400 max-w-[200px]">
-                      Field crew will upload resolution photos once the site has been cleaned.
-                    </p>
+                  )}
+                </div>
+                {cleanupImages.length > 0 && (
+                  <div className="flex items-center justify-between border-t border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/30 px-3 py-1.5 text-[11px] text-emerald-900 dark:text-emerald-200">
+                    <span className="truncate flex items-center gap-1">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      Proof submitted by:{" "}
+                      <strong className="font-semibold text-emerald-800 dark:text-emerald-200">
+                        {cleanupWorkerName}
+                      </strong>
+                    </span>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 shrink-0">
+                      Click photo to view large
+                    </span>
                   </div>
                 )}
               </figure>
@@ -357,7 +399,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
               <div className="rounded-lg bg-slate-50/80 dark:bg-slate-800/60 p-2.5">
                 <div className="flex items-center justify-between">
                   <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Assigned Crew
+                    Assigned Worker
                   </dt>
                   {isAlreadyScheduled && (
                     <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/50 px-1 py-0.2 rounded">

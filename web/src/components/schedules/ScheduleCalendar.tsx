@@ -268,8 +268,8 @@ export function ScheduleCalendar({
               `Time: ${timeStr}`,
               schedule?.barangay ? `Barangay: ${schedule.barangay}` : null,
               workerCount > 0
-                ? `Crew: ${workerCount} assigned`
-                : "Crew: Unassigned",
+                ? `Worker: ${workerCount} assigned`
+                : "Worker: Unassigned",
               reportCount > 0 ? `Reports: ${reportCount} linked` : null,
               schedule?.equipment?.length
                 ? `Equipment: ${schedule.equipment.join(", ")}`
@@ -322,7 +322,7 @@ export function ScheduleCalendar({
                   <div className="flex items-center gap-2 mt-2 pt-1 border-t border-gray-100/60 dark:border-slate-800 text-[10px] text-gray-500 dark:text-slate-400">
                     <span className="flex items-center gap-1">
                       <Users className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                      <span className="font-semibold">{workerCount} Crew</span>
+                      <span className="font-semibold">{workerCount} Worker</span>
                     </span>
                     {reportCount > 0 && (
                       <span className="flex items-center gap-1">

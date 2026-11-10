@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import dynamic from "next/dynamic";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CleanupSchedule, User } from "@/types";
 import api from "@/lib/api";
@@ -20,7 +19,6 @@ import {
   XCircle,
   LayoutList,
   MapPin,
-  Map as MapIcon,
   Search,
   Filter,
   RotateCw,
@@ -33,28 +31,12 @@ import { useAuth } from "@/providers/AuthProvider";
 import { SchedulePageSkeleton } from "@/components/skeletons/page-skeletons";
 
 
-// Dynamically load Leaflet Map without SSR to prevent window errors
-const ScheduleMap = dynamic(
-  () => import("@/components/schedules/ScheduleMap"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-[620px] w-full rounded-3xl bg-white/70 backdrop-blur-xl border border-gray-100 flex flex-col items-center justify-center text-gray-400 gap-3 shadow-sm animate-pulse">
-        <MapIcon className="w-10 h-10 text-indigo-400 animate-bounce" />
-        <p className="text-sm font-semibold text-gray-600">
-          Loading Coastal GIS Map & Deployment Pins...
-        </p>
-      </div>
-    ),
-  },
-);
-
 export default function SchedulesPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   // View state
-  const [view, setView] = useState<"calendar" | "list" | "map">("calendar");
+  const [view, setView] = useState<"calendar" | "list">("calendar");
 
   // Modals state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -385,7 +367,7 @@ export default function SchedulesPage() {
             <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">active</span>
           </div>
           <p className="text-xs text-gray-400 dark:text-slate-500 mt-1 relative z-10">
-            Pending crew mobilization
+            Pending worker mobilization
           </p>
         </div>
 
@@ -534,7 +516,7 @@ export default function SchedulesPage() {
           )}
         </div>
 
-        {/* 3-Way View Switcher */}
+        {/* 2-Way View Switcher */}
         <div className="bg-gray-100/90 dark:bg-slate-800 p-1 rounded-2xl inline-flex self-start lg:self-auto gap-1 border border-gray-200/50 dark:border-slate-700 shadow-inner">
           <button
             onClick={() => setView("calendar")}
@@ -555,16 +537,6 @@ export default function SchedulesPage() {
             }`}
           >
             <List className="w-4 h-4" /> List
-          </button>
-          <button
-            onClick={() => setView("map")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-              view === "map"
-                ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
-                : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-white/40 dark:hover:bg-slate-700/40"
-            }`}
-          >
-            <MapIcon className="w-4 h-4" /> Coastal Map
           </button>
         </div>
       </div>
@@ -620,16 +592,6 @@ export default function SchedulesPage() {
               }}
               onEditClick={(schedule) => {
                 handleEdit(schedule);
-              }}
-            />
-          )}
-
-          {view === "map" && (
-            <ScheduleMap
-              schedules={filteredSchedules}
-              onScheduleClick={(schedule) => {
-                setSelectedSchedule(schedule);
-                setIsDetailOpen(true);
               }}
             />
           )}

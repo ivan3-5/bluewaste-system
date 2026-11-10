@@ -148,7 +148,7 @@ export function ScheduleList({
                       </div>
                     </td>
 
-                    {/* Field Crew */}
+                    {/* Field Worker */}
                     <td className="px-6 py-4.5">
                       {workerCount === 0 ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-500/30 text-xs font-semibold">
@@ -295,7 +295,7 @@ export function ScheduleList({
                 {getRelativeTimeBadge(schedule.scheduledAt)}
               </div>
 
-              {/* Crew and gear summary */}
+              {/* Worker and gear summary */}
               <div className="flex items-center justify-between pt-1 text-xs">
                 <div className="flex items-center gap-2">
                   <Users className="w-3.5 h-3.5 text-gray-400" />

@@ -433,7 +433,7 @@ export default function NotificationsPage() {
 
           <div className="flex items-center justify-between mb-3 relative z-10">
             <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-              Crew & Milestones
+              Worker & Milestones
             </span>
             <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
               <Activity className="w-5 h-5" />

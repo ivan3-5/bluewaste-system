@@ -12,6 +12,7 @@ import {
   type AdminReport,
   type IncidentMapData,
 } from "@/lib/admin-report";
+import { getStatusColor } from "@/types";
 import { useAuth } from "@/providers/AuthProvider";
 import api from "@/lib/api";
 import {
@@ -39,20 +40,25 @@ const PLACEHOLDER_IMAGE = "https://placehold.co/400x300?text=No+Image";
 
 function buildIcon(color: string) {
   return L.divIcon({
-    className: "marker-pulse",
+    className: "incident-marker-icon",
     html: `
-      <div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;background:${color};border:3px solid white;box-shadow:0 8px 20px rgba(0,0,0,0.25)">
-        <div style="width:8px;height:8px;border-radius:999px;background:white"></div>
+      <div style="position:relative;width:34px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.35));transition:transform 0.15s ease;transform-origin:50% 100%;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44" fill="none">
+          <path d="M17 1C8.16 1 1 8.16 1 17c0 11.25 16 26 16 26S33 28.25 33 17C33 8.16 25.84 1 17 1z"
+                fill="${color}" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="17" cy="17" r="6.5" fill="#ffffff"/>
+          <circle cx="17" cy="17" r="3.5" fill="${color}"/>
+        </svg>
       </div>
     `,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-    popupAnchor: [0, -12],
+    iconSize: [34, 44],
+    iconAnchor: [17, 43],
+    popupAnchor: [0, -42],
   });
 }
 
 /**
- * Incident icon — larger + badge when count > 1.
+ * Incident icon — location pin + badge when count > 1.
  * Single-contributor incidents look identical to regular report icons.
  */
 function buildIncidentIcon(color: string, count: number) {
@@ -62,32 +68,38 @@ function buildIncidentIcon(color: string, count: number) {
 
   const badgeCount = count > 99 ? "99+" : String(count);
   return L.divIcon({
-    className: "incident-marker",
+    className: "incident-marker-icon",
     html: `
-      <div style="position:relative;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;background:${color};border:3px solid white;box-shadow:0 8px 24px rgba(0,0,0,0.32)">
-        <div style="width:9px;height:9px;border-radius:999px;background:white"></div>
+      <div style="position:relative;width:34px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.35));transition:transform 0.15s ease;transform-origin:50% 100%;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44" fill="none">
+          <path d="M17 1C8.16 1 1 8.16 1 17c0 11.25 16 26 16 26S33 28.25 33 17C33 8.16 25.84 1 17 1z"
+                fill="${color}" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="17" cy="17" r="6.5" fill="#ffffff"/>
+          <circle cx="17" cy="17" r="3.5" fill="${color}"/>
+        </svg>
         <div style="
           position:absolute;
-          top:-6px;right:-8px;
-          min-width:18px;height:18px;
+          top:-5px;right:-8px;
+          min-width:20px;height:20px;
           background:#1e3a5f;
           color:#fff;
-          font-size:10px;font-weight:800;
+          font-size:11px;font-weight:800;
           border-radius:999px;
           border:2px solid white;
           display:flex;align-items:center;justify-content:center;
-          padding:0 4px;
-          box-shadow:0 2px 6px rgba(0,0,0,0.28);
-          font-family:system-ui,sans-serif;
+          padding:0 5px;
+          box-shadow:0 2px 6px rgba(0,0,0,0.32);
+          font-family:system-ui,-apple-system,sans-serif;
           letter-spacing:-0.3px;
+          z-index:10;
         ">
           <span style="margin-top:-0.5px">${badgeCount}</span>
         </div>
       </div>
     `,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -14],
+    iconSize: [34, 44],
+    iconAnchor: [17, 43],
+    popupAnchor: [0, -42],
   });
 }
 
@@ -287,14 +299,6 @@ export default function MapView({
   const editControlRef = useRef<any>(null);
   const drawControlRef = useRef<any>(null);
   const zoneDrawnGroupRef = useRef<L.FeatureGroup | null>(null);
-
-  const icons = useMemo(
-    () => ({
-      withWaste: buildIcon("#ef4444"),
-      noWaste: buildIcon("#22c55e"),
-    }),
-    [],
-  );
 
   // ── Fetch grouped incident data ─────────────────────────────────────────────
 
@@ -607,18 +611,19 @@ export default function MapView({
     if (groupedMode) {
       // ── Incident-grouped mode ──────────────────────────────────────────────
       filteredIncidents.forEach((incident) => {
-        const color = incident.category === "with_waste" ? "#ef4444" : "#22c55e";
+        const color = getStatusColor(incident.status);
         const icon = buildIncidentIcon(color, incident.contributorCount);
         const marker = L.marker([incident.latitude, incident.longitude], { icon });
         marker.bindPopup(buildIncidentPopupHtml(incident), { maxWidth: 280 });
         newMarkers.push(marker);
       });
     } else {
-      // ── Raw per-report mode (original behaviour) ───────────────────────────
+      // ── Raw per-report mode ───────────────────────────────────────────────
       filteredReports.forEach((report) => {
+        const color = getStatusColor(report.status);
+        const icon = buildIcon(color);
         const marker = L.marker([report.latitude, report.longitude], {
-          icon:
-            report.category === "with_waste" ? icons.withWaste : icons.noWaste,
+          icon,
         });
         marker.bindPopup(buildPopupHtml(report), { maxWidth: 260 });
         newMarkers.push(marker);
@@ -637,7 +642,7 @@ export default function MapView({
         mapRef.current?.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
       }
     }
-  }, [filteredReports, filteredIncidents, icons, groupedMode]);
+  }, [filteredReports, filteredIncidents, groupedMode]);
 
   // render reporting zones as polygon layers (and put the selected one into editable group)
   useEffect(() => {
