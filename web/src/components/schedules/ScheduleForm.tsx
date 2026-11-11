@@ -30,6 +30,7 @@ import {
   Info,
   Compass,
   ShieldCheck,
+  Layers,
 } from "lucide-react";
 
 interface ScheduleFormProps {
@@ -152,6 +153,24 @@ export function ScheduleForm({
     enabled: isOpen,
   });
 
+  const { data: allSchedules = [] } = useQuery({
+    queryKey: ["schedules", "conflict-check"],
+    queryFn: async () => {
+      const res = await api.get("/schedules?limit=200");
+      return (res.data.data as any[]) || [];
+    },
+    enabled: isOpen && !isEditing,
+  });
+
+  const existingScheduleOnDate = useMemo(() => {
+    if (!formData.scheduledAt || isEditing) return null;
+    const targetDateStr = formData.scheduledAt.slice(0, 10);
+    return allSchedules.find((s: any) => {
+      if (s.status === "CANCELLED" || s.status === "COMPLETED") return false;
+      return s.scheduledAt && s.scheduledAt.slice(0, 10) === targetDateStr;
+    });
+  }, [formData.scheduledAt, allSchedules, isEditing]);
+
   const displayedReports = useMemo(() => {
     if (isEditing && initialData?.reports) {
       const currentReports = (initialData.reports as Report[]) || [];
@@ -164,6 +183,19 @@ export function ScheduleForm({
     }
     return eligibleReports.filter((r) => !r.cleanupScheduleId);
   }, [isEditing, initialData?.reports, eligibleReports]);
+
+  const selectedCitizenCount = useMemo(() => {
+    const selected = displayedReports.filter((r: any) =>
+      formData.reportIds.includes(r.id),
+    );
+    const set = new Set<string>();
+    let anon = 0;
+    selected.forEach((r: any) => {
+      if (r.reporterId) set.add(r.reporterId);
+      else anon++;
+    });
+    return set.size + anon;
+  }, [formData.reportIds, displayedReports]);
 
   const [geocodedAddresses, setGeocodedAddresses] = useState<Record<string, string>>({});
 
@@ -629,6 +661,17 @@ export function ScheduleForm({
                       }
                       className="rounded-xl border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500 h-11 text-sm font-medium"
                     />
+                    {existingScheduleOnDate && (
+                      <div className="flex items-start gap-2 p-3 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 mt-1.5">
+                        <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold">Auto-Consolidation Active</p>
+                          <p className="text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">
+                            A cleanup schedule (<strong>&quot;{existingScheduleOnDate.title}&quot;</strong>) already exists on this date. Newly scheduled reports will automatically be consolidated into this schedule without duplicating activities.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Location Name / Coastal Site */}
@@ -673,6 +716,15 @@ export function ScheduleForm({
                         Protected: Reports already assigned to another cleanup schedule cannot be re-selected.
                       </span>
                     </div>
+
+                    {formData.reportIds.length > 1 && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-800/60 text-[11px] font-semibold text-indigo-900 dark:text-indigo-200">
+                        <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span>
+                          Consolidating <strong>{formData.reportIds.length}</strong> reports from <strong>{selectedCitizenCount}</strong> citizen{selectedCitizenCount === 1 ? "" : "s"} into one unified cleanup activity.
+                        </span>
+                      </div>
+                    )}
 
                     <div className="border border-gray-200 dark:border-slate-800 rounded-2xl divide-y dark:divide-slate-800 max-h-60 overflow-y-auto bg-gray-50/30 dark:bg-slate-900/50">
                       {displayedReports.length === 0 ? (
@@ -788,6 +840,17 @@ export function ScheduleForm({
                       }
                       className="rounded-xl border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500 h-11 text-sm font-medium"
                     />
+                    {existingScheduleOnDate && (
+                      <div className="flex items-start gap-2 p-3 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 mt-1.5">
+                        <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold">Auto-Consolidation Active</p>
+                          <p className="text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">
+                            A cleanup schedule (<strong>&quot;{existingScheduleOnDate.title}&quot;</strong>) already exists on this date. Newly scheduled reports will automatically be consolidated into this schedule without duplicating activities.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

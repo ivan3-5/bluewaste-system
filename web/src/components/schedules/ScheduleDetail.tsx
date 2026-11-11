@@ -41,6 +41,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { ConsolidatedReportModal } from "./ConsolidatedReportModal";
+import { Layers } from "lucide-react";
 
 interface ScheduleDetailProps {
   schedule: CleanupSchedule | null;
@@ -80,6 +82,18 @@ export function ScheduleDetail({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [verifyNotes, setVerifyNotes] = useState("");
+  const [showConsolidatedModal, setShowConsolidatedModal] = useState(false);
+
+  const uniqueCitizensCount = useMemo(() => {
+    const reports = schedule?.reports || [];
+    const set = new Set<string>();
+    let anon = 0;
+    reports.forEach((r: any) => {
+      if (r.reporterId) set.add(r.reporterId);
+      else anon++;
+    });
+    return set.size + anon;
+  }, [schedule?.reports]);
 
   const isAllReportsCleaned = useMemo(() => {
     const reports = schedule?.reports || [];
@@ -236,7 +250,24 @@ export function ScheduleDetail({
                 <DialogTitle className="text-2xl font-black text-gray-900 dark:text-slate-100 tracking-tight leading-tight">
                   {schedule.title}
                 </DialogTitle>
+                {schedule.reports && schedule.reports.length > 1 && (
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/60 text-xs font-semibold text-indigo-900 dark:text-indigo-200 mt-1 inline-flex">
+                    <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <span>
+                      Consolidated Activity: <strong>{schedule.reports.length}</strong> waste locations grouped from <strong>{uniqueCitizensCount}</strong> citizen{uniqueCitizensCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                )}
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowConsolidatedModal(true)}
+                className="gap-1.5 rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-xs font-bold shrink-0 mt-1"
+              >
+                <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                Combined Report
+              </Button>
             </div>
 
             {/* Quick Metadata Grid */}
@@ -540,7 +571,7 @@ export function ScheduleDetail({
                               {r.title}
                             </p>
                             <Link
-                              href={`/dashboard/reports/${r.id}`}
+                              href={isAdmin ? `/dashboard/reports/${r.id}` : `/field-worker/tasks/${r.id}`}
                               target="_blank"
                               className="text-gray-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400"
                               title="View report details"
@@ -550,10 +581,19 @@ export function ScheduleDetail({
                           </div>
                           <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate mt-0.5">
                             {r.address || schedule.barangay || "Panabo"}
+                            {r.latitude && r.longitude ? ` • (${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)})` : ""}
                           </p>
                         </div>
-                        <div className="mt-1">
+                        <div className="mt-1.5 flex items-center justify-between gap-2">
                           <StatusBadge status={r.status} />
+                          {!isAdmin && (
+                            <Link
+                              href={`/field-worker/tasks/${r.id}`}
+                              className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                            >
+                              Inspect Location &rarr;
+                            </Link>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -577,7 +617,15 @@ export function ScheduleDetail({
           </div>
 
           {/* Action Footer */}
-          <div className="px-8 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-900/90 flex flex-wrap items-center justify-end gap-3">
+          <div className="px-8 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowConsolidatedModal(true)}
+              className="rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 h-10 px-4 text-xs font-bold gap-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+            >
+              <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Combined Cleanup Report
+            </Button>
+
             {isAdmin && (
               <div className="flex items-center gap-2">
                 <Button
@@ -597,11 +645,11 @@ export function ScheduleDetail({
             )}
 
             {!isAdmin && onWorkerUpdateStatus && (
-              <div className="w-full flex items-center gap-3">
+              <div className="flex items-center gap-3">
                 {effectiveStatus === "UPCOMING" && (
                   <Button
                     onClick={() => handleWorkerUpdate("ONGOING")}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold h-10 w-full"
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold h-10 px-5"
                   >
                     Start Cleanup Operation
                   </Button>
@@ -609,10 +657,16 @@ export function ScheduleDetail({
                 {effectiveStatus === "ONGOING" && (
                   <Button
                     onClick={() => handleWorkerUpdate("COMPLETED")}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold h-10 w-full gap-2"
+                    disabled={!isAllReportsCleaned}
+                    className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold h-10 px-5 gap-2"
+                    title={
+                      !isAllReportsCleaned
+                        ? "All associated locations must be cleaned first before completing operation"
+                        : "Mark consolidated operation as completed"
+                    }
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    Mark as Completed
+                    {isAllReportsCleaned ? "Mark as Completed" : "Partial (Locations Pending)"}
                   </Button>
                 )}
               </div>
@@ -717,6 +771,15 @@ export function ScheduleDetail({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Consolidated Mission Report Modal */}
+      {showConsolidatedModal && (
+        <ConsolidatedReportModal
+          scheduleId={schedule.id}
+          isOpen={showConsolidatedModal}
+          onClose={() => setShowConsolidatedModal(false)}
+        />
+      )}
     </>
   );
 }

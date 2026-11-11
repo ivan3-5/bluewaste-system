@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Edit2,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaginationControls, useClientPagination } from "@/components/ui/pagination";
@@ -114,17 +115,23 @@ export function ScheduleList({
                     {/* Operation Title & Location */}
                     <td className="px-6 py-4.5">
                       <div className="font-bold text-gray-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors text-sm mb-1 line-clamp-1 flex items-center gap-2">
-                        {schedule.title}
+                        <span>{schedule.title}</span>
+                        {reportCount > 1 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full border border-indigo-200/60 dark:border-indigo-800/60 shrink-0">
+                            <Layers className="w-3 h-3" />
+                            Consolidated ({reportCount})
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-slate-300 font-medium bg-gray-100/80 dark:bg-slate-800 px-2 py-0.5 rounded-md">
                           <MapPin className="w-3 h-3 text-blue-500" />
                           {schedule.barangay || "Panabo Coastal Zone"}
                         </span>
-                        {reportCount > 0 && (
+                        {reportCount === 1 && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md border border-indigo-100/60 dark:border-indigo-800/60">
                             <FileText className="w-3 h-3" />
-                            {reportCount} {reportCount === 1 ? "report" : "reports"}
+                            1 report
                           </span>
                         )}
                       </div>
@@ -259,9 +266,17 @@ export function ScheduleList({
               {/* Header: Title and Status */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-bold text-gray-900 dark:text-slate-100 text-sm leading-snug truncate">
-                    {schedule.title}
-                  </h4>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4 className="font-bold text-gray-900 dark:text-slate-100 text-sm leading-snug truncate">
+                      {schedule.title}
+                    </h4>
+                    {reportCount > 1 && (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.2 rounded-full border border-indigo-200/60 dark:border-indigo-800/60 shrink-0">
+                        <Layers className="w-2.5 h-2.5" />
+                        Consolidated ({reportCount})
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3 h-3 text-blue-500" />
                     {schedule.barangay || "Panabo Coastal Zone"}
