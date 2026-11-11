@@ -117,7 +117,7 @@ export function DashboardInsights({
         const res = await fetch(`/api/dashboard/trend?range=${selectedRange}`, {
           signal: controller.signal,
         });
-        if (!res.ok) throw new Error("Failed to fetch report trends");
+        if (!res.ok) throw new Error("Failed to fetch report data");
         const data: MonthlyTrendPoint[] = await res.json();
         if (!controller.signal.aborted) {
           setCache((prev) => ({ ...prev, [selectedRange]: data }));
@@ -297,13 +297,13 @@ export function DashboardInsights({
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      {/* Monthly Report Trends Section */}
+      {/* Waste Reports by Date */}
       <section className="flex flex-col justify-between rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
         <div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
-                Monthly Report Trends
+                Waste Reports by Date
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 {showDaily
@@ -349,13 +349,13 @@ export function DashboardInsights({
             <div role="status" className="flex h-full items-center justify-center">
               <div className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700">
                 <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                Updating trends...
+                Loading report data…
               </div>
             </div>
           ) : hasTrendError ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-sm">
               <p role="alert" className="text-slate-700 dark:text-slate-200">
-                Couldn’t load report trends for this date range.
+                Couldn’t load reports for this date range.
               </p>
               <button
                 type="button"
