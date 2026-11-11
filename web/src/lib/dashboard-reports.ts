@@ -68,7 +68,7 @@ type DashboardCategoryRow = {
   count: bigint | number;
 };
 
-export type MonthlyTrendRange = "6months" | "12months" | "thisYear";
+export type MonthlyTrendRange = "thisYear" | "thisMonth" | "6months" | "12months";
 
 type DashboardMonthlyTrendRow = {
   month_date: Date;
@@ -76,6 +76,7 @@ type DashboardMonthlyTrendRow = {
   month_key: string;
   year: number;
   month_num: number;
+  day_of_month: number;
   pendingCount: bigint | number;
   inProgressCount: bigint | number;
   cleanedCount: bigint | number;
@@ -88,6 +89,7 @@ export type MonthlyTrendPoint = {
   monthKey: string;
   year: number;
   monthNum: number;
+  dayOfMonth?: number;
   pendingCount: number;
   inProgressCount: number;
   cleanedCount: number;
@@ -443,80 +445,59 @@ export async function getDashboardTrend(days = 30) {
 export async function getDashboardMonthlyTrend(
   range: MonthlyTrendRange = "thisYear",
 ): Promise<MonthlyTrendPoint[]> {
-  let rows: DashboardMonthlyTrendRow[];
-
-  if (range === "thisYear") {
-    rows = await prisma.$queryRaw<DashboardMonthlyTrendRow[]>`
-      WITH months AS (
-        SELECT generate_series(
-          DATE_TRUNC('year', CURRENT_DATE),
-          DATE_TRUNC('year', CURRENT_DATE) + interval '11 months',
-          interval '1 month'
-        )::date AS month_date
-      ),
-      aggregated AS (
-        SELECT
-          DATE_TRUNC('month', r."createdAt")::date AS month_date,
-          COUNT(*) FILTER (WHERE r."status" = 'PENDING')::bigint AS "pendingCount",
-          COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
-          COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount",
-          COUNT(*)::bigint AS "totalCount"
-        FROM "Report" r
-        WHERE r."isDeleted" = false
-          AND r."isSpam" = false
-        GROUP BY 1
-      )
+  const rows = await prisma.$queryRaw<DashboardMonthlyTrendRow[]>`
+    WITH settings AS (
+      SELECT ${range}::text AS range,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date AS today
+    ), bounds AS (
       SELECT
-        m.month_date,
-        TO_CHAR(m.month_date, 'FMMonth') AS month_name,
-        TO_CHAR(m.month_date, 'YYYY-MM') AS month_key,
-        EXTRACT(YEAR FROM m.month_date)::int AS year,
-        EXTRACT(MONTH FROM m.month_date)::int AS month_num,
-        COALESCE(a."pendingCount", 0)::bigint AS "pendingCount",
-        COALESCE(a."inProgressCount", 0)::bigint AS "inProgressCount",
-        COALESCE(a."cleanedCount", 0)::bigint AS "cleanedCount",
-        COALESCE(a."totalCount", 0)::bigint AS "totalCount"
-      FROM months m
-      LEFT JOIN aggregated a ON a.month_date = m.month_date
-      ORDER BY m.month_date ASC
-    `;
-  } else {
-    const monthsBack = range === "6months" ? 5 : 11;
-    rows = await prisma.$queryRaw<DashboardMonthlyTrendRow[]>`
-      WITH months AS (
-        SELECT generate_series(
-          DATE_TRUNC('month', CURRENT_DATE) - (${monthsBack} || ' months')::interval,
-          DATE_TRUNC('month', CURRENT_DATE),
-          interval '1 month'
-        )::date AS month_date
-      ),
-      aggregated AS (
-        SELECT
-          DATE_TRUNC('month', r."createdAt")::date AS month_date,
-          COUNT(*) FILTER (WHERE r."status" = 'PENDING')::bigint AS "pendingCount",
-          COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
-          COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount",
-          COUNT(*)::bigint AS "totalCount"
-        FROM "Report" r
-        WHERE r."isDeleted" = false
-          AND r."isSpam" = false
-        GROUP BY 1
-      )
+        CASE range
+          WHEN 'thisYear' THEN DATE_TRUNC('year', today::timestamp)
+          WHEN 'thisMonth' THEN DATE_TRUNC('month', today::timestamp)
+          WHEN '6months' THEN DATE_TRUNC('month', today::timestamp) - interval '5 months'
+          ELSE DATE_TRUNC('month', today::timestamp) - interval '11 months'
+        END AS start_date,
+        CASE range
+          WHEN 'thisYear' THEN DATE_TRUNC('year', today::timestamp) + interval '1 year'
+          WHEN 'thisMonth' THEN today + interval '1 day'
+          ELSE DATE_TRUNC('month', today::timestamp) + interval '1 month'
+        END AS end_date,
+        CASE WHEN range = 'thisMonth' THEN 'day' ELSE 'month' END AS bucket_unit,
+        CASE WHEN range = 'thisMonth' THEN interval '1 day' ELSE interval '1 month' END AS step
+      FROM settings
+    ), buckets AS (
+      SELECT generate_series(start_date, end_date - step, step)::date AS bucket_date
+      FROM bounds
+    ), aggregated AS (
       SELECT
-        m.month_date,
-        TO_CHAR(m.month_date, 'FMMonth') AS month_name,
-        TO_CHAR(m.month_date, 'YYYY-MM') AS month_key,
-        EXTRACT(YEAR FROM m.month_date)::int AS year,
-        EXTRACT(MONTH FROM m.month_date)::int AS month_num,
-        COALESCE(a."pendingCount", 0)::bigint AS "pendingCount",
-        COALESCE(a."inProgressCount", 0)::bigint AS "inProgressCount",
-        COALESCE(a."cleanedCount", 0)::bigint AS "cleanedCount",
-        COALESCE(a."totalCount", 0)::bigint AS "totalCount"
-      FROM months m
-      LEFT JOIN aggregated a ON a.month_date = m.month_date
-      ORDER BY m.month_date ASC
-    `;
-  }
+        DATE_TRUNC(bounds.bucket_unit, (r."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Manila')::date AS bucket_date,
+        COUNT(*) FILTER (WHERE r."status" = 'PENDING')::bigint AS "pendingCount",
+        COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
+        COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount",
+        COUNT(*)::bigint AS "totalCount"
+      FROM "Report" r
+      CROSS JOIN bounds
+      WHERE r."isDeleted" = false
+        AND r."isSpam" = false
+        AND r."createdAt" >= (bounds.start_date AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC'
+        AND r."createdAt" < (bounds.end_date AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC'
+      GROUP BY 1
+    )
+    SELECT
+      b.bucket_date AS month_date,
+      TO_CHAR(b.bucket_date, 'FMMonth') AS month_name,
+      TO_CHAR(b.bucket_date, 'YYYY-MM') AS month_key,
+      EXTRACT(YEAR FROM b.bucket_date)::int AS year,
+      EXTRACT(MONTH FROM b.bucket_date)::int AS month_num,
+      EXTRACT(DAY FROM b.bucket_date)::int AS day_of_month,
+      COALESCE(a."pendingCount", 0)::bigint AS "pendingCount",
+      COALESCE(a."inProgressCount", 0)::bigint AS "inProgressCount",
+      COALESCE(a."cleanedCount", 0)::bigint AS "cleanedCount",
+      COALESCE(a."totalCount", 0)::bigint AS "totalCount"
+    FROM buckets b
+    LEFT JOIN aggregated a ON a.bucket_date = b.bucket_date
+    ORDER BY b.bucket_date ASC
+  `;
 
   return rows.map((row) => ({
     monthDate:
@@ -527,6 +508,7 @@ export async function getDashboardMonthlyTrend(
     monthKey: row.month_key,
     year: Number(row.year),
     monthNum: Number(row.month_num),
+    ...(range === "thisMonth" && { dayOfMonth: Number(row.day_of_month) }),
     pendingCount: toNumber(row.pendingCount),
     inProgressCount: toNumber(row.inProgressCount),
     cleanedCount: toNumber(row.cleanedCount),

@@ -3,7 +3,6 @@ import { corsEmptyResponse, corsResponse } from "@/lib/cors";
 import {
   getDashboardMonthlyTrend,
   getDashboardTrend,
-  type MonthlyTrendRange,
 } from "@/lib/dashboard-reports";
 
 export async function OPTIONS() {
@@ -15,11 +14,12 @@ export async function GET(request: NextRequest) {
   const typeParam = request.nextUrl.searchParams.get("type");
 
   if (rangeParam || typeParam === "monthly") {
-    const range = (
-      rangeParam === "6months" || rangeParam === "12months" || rangeParam === "thisYear"
+    const range =
+      rangeParam === "thisMonth" ||
+      rangeParam === "6months" ||
+      rangeParam === "12months"
         ? rangeParam
-        : "thisYear"
-    ) as MonthlyTrendRange;
+        : "thisYear";
 
     const rows = await getDashboardMonthlyTrend(range);
     return corsResponse(rows);

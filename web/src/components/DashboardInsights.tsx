@@ -49,9 +49,11 @@ const CATEGORY_COLORS = ["#3b82f6", "#84cc16"];
 
 const RANGE_OPTIONS: Array<{ value: MonthlyTrendRange; label: string }> = [
   { value: "thisYear", label: "This Year" },
+  { value: "thisMonth", label: "This Month" },
   { value: "6months", label: "Last 6 Months" },
   { value: "12months", label: "Last 12 Months" },
 ];
+const EMPTY_TREND: MonthlyTrendPoint[] = [];
 
 function toDonutGradient(categories: CategoryPoint[]) {
   const total = categories.reduce((sum, item) => sum + item.count, 0);
@@ -76,18 +78,18 @@ export function DashboardInsights({
 }: DashboardInsightsProps) {
   const [selectedRange, setSelectedRange] =
     useState<MonthlyTrendRange>("thisYear");
-  const [monthlyData, setMonthlyData] =
-    useState<MonthlyTrendPoint[]>(initialMonthlyTrend);
-  const [isLoading, setIsLoading] = useState(false);
+  const [hasTrendError, setHasTrendError] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isDark, setIsDark] = useState(false);
-  const [cache, setCache] = useState<Record<string, MonthlyTrendPoint[]>>(() => {
-    const initialCache: Record<string, MonthlyTrendPoint[]> = {};
-    if (initialMonthlyTrend.length > 0) {
-      initialCache.thisYear = initialMonthlyTrend;
-    }
-    return initialCache;
-  });
+  const [cache, setCache] = useState<
+    Partial<Record<MonthlyTrendRange, MonthlyTrendPoint[]>>
+  >(
+    () => (initialMonthlyTrend.length > 0 ? { thisYear: initialMonthlyTrend } : {}),
+  );
+  const selectedData = cache[selectedRange];
+  const trendData = selectedData ?? EMPTY_TREND;
+  const isLoading = !selectedData && !hasTrendError;
+  const showDaily = selectedRange === "thisMonth";
 
   // Watch for theme changes and client mounting
   useEffect(() => {
@@ -106,51 +108,46 @@ export function DashboardInsights({
     return () => observer.disconnect();
   }, []);
 
-  // Fetch initial data if not provided
   useEffect(() => {
-    if (initialMonthlyTrend.length === 0 && !cache.thisYear) {
-      void handleRangeChange("thisYear");
-    }
-  }, []);
+    if (selectedData || hasTrendError) return;
 
-  const handleRangeChange = async (newRange: MonthlyTrendRange) => {
-    setSelectedRange(newRange);
-    if (cache[newRange]) {
-      setMonthlyData(cache[newRange]);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/dashboard/trend?range=${newRange}`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch monthly trend data");
+    const controller = new AbortController();
+    const loadTrend = async () => {
+      try {
+        const res = await fetch(`/api/dashboard/trend?range=${selectedRange}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("Failed to fetch report trends");
+        const data: MonthlyTrendPoint[] = await res.json();
+        if (!controller.signal.aborted) {
+          setCache((prev) => ({ ...prev, [selectedRange]: data }));
+        }
+      } catch {
+        if (!controller.signal.aborted) setHasTrendError(true);
       }
-      const data: MonthlyTrendPoint[] = await res.json();
-      setMonthlyData(data);
-      setCache((prev) => ({ ...prev, [newRange]: data }));
-    } catch (err) {
-      console.error("Error fetching monthly trend:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    void loadTrend();
+    return () => controller.abort();
+  }, [selectedRange, selectedData, hasTrendError]);
 
   const totalReports = categories.reduce((sum, item) => sum + item.count, 0);
   const donutGradient = toDonutGradient(categories);
 
   const totalInPeriod = useMemo(
-    () => monthlyData.reduce((sum, item) => sum + item.totalCount, 0),
-    [monthlyData],
+    () => trendData.reduce((sum, item) => sum + item.totalCount, 0),
+    [trendData],
   );
 
   const chartData: ChartData<"bar"> = useMemo(() => {
     return {
-      labels: monthlyData.map((item) => item.monthName),
+      labels: trendData.map((item) =>
+        showDaily ? String(item.dayOfMonth) : item.monthName,
+      ),
       datasets: [
         {
           label: "Pending",
-          data: monthlyData.map((item) => item.pendingCount),
+          data: trendData.map((item) => item.pendingCount),
           backgroundColor: "#F59E0B",
           hoverBackgroundColor: "#D97706",
           borderRadius: 4,
@@ -159,7 +156,7 @@ export function DashboardInsights({
         },
         {
           label: "In Progress",
-          data: monthlyData.map((item) => item.inProgressCount),
+          data: trendData.map((item) => item.inProgressCount),
           backgroundColor: "#A855F7",
           hoverBackgroundColor: "#9333EA",
           borderRadius: 4,
@@ -168,7 +165,7 @@ export function DashboardInsights({
         },
         {
           label: "Cleaned",
-          data: monthlyData.map((item) => item.cleanedCount),
+          data: trendData.map((item) => item.cleanedCount),
           backgroundColor: "#22C55E",
           hoverBackgroundColor: "#16A34A",
           borderRadius: 4,
@@ -177,7 +174,7 @@ export function DashboardInsights({
         },
       ],
     };
-  }, [monthlyData]);
+  }, [trendData, showDaily]);
 
   const chartOptions: ChartOptions<"bar"> = useMemo(() => {
     return {
@@ -223,8 +220,11 @@ export function DashboardInsights({
             title: (items) => {
               if (!items.length) return "";
               const item = items[0];
-              const point = monthlyData[item.dataIndex];
-              return point ? `${point.monthName} ${point.year}` : item.label;
+              const point = trendData[item.dataIndex];
+              if (!point) return item.label;
+              return showDaily
+                ? `${point.monthName} ${point.dayOfMonth}, ${point.year}`
+                : `${point.monthName} ${point.year}`;
             },
             label: (context) => {
               const label = context.dataset.label || "";
@@ -255,7 +255,7 @@ export function DashboardInsights({
             },
             maxRotation: 45,
             minRotation: 0,
-            autoSkip: false,
+            autoSkip: showDaily,
           },
           border: {
             display: false,
@@ -293,7 +293,7 @@ export function DashboardInsights({
         },
       },
     };
-  }, [isDark, monthlyData]);
+  }, [isDark, trendData, showDaily]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -306,7 +306,9 @@ export function DashboardInsights({
                 Monthly Report Trends
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Monthly breakdown by report status
+                {showDaily
+                  ? "Daily breakdown by report status"
+                  : "Monthly breakdown by report status"}
               </p>
             </div>
 
@@ -320,11 +322,11 @@ export function DashboardInsights({
                 <select
                   id="trend-range-select"
                   value={selectedRange}
-                  onChange={(e) =>
-                    handleRangeChange(e.target.value as MonthlyTrendRange)
-                  }
+                  onChange={(e) => {
+                    setSelectedRange(e.target.value as MonthlyTrendRange);
+                    setHasTrendError(false);
+                  }}
                   className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-1.5 pl-8 pr-8 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm transition hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
-                  disabled={isLoading}
                 >
                   {RANGE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -339,18 +341,29 @@ export function DashboardInsights({
 
         {/* Chart Area */}
         <div className="relative min-h-[260px] h-64 sm:h-72 w-full">
-          {isLoading && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-[1px]">
+          {!isMounted ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <div className="h-full w-full animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+            </div>
+          ) : isLoading ? (
+            <div role="status" className="flex h-full items-center justify-center">
               <div className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700">
                 <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
                 Updating trends...
               </div>
             </div>
-          )}
-
-          {!isMounted ? (
-            <div className="flex h-full w-full items-center justify-center">
-              <div className="h-full w-full animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+          ) : hasTrendError ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-sm">
+              <p role="alert" className="text-slate-700 dark:text-slate-200">
+                Couldn’t load report trends for this date range.
+              </p>
+              <button
+                type="button"
+                className="font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                onClick={() => setHasTrendError(false)}
+              >
+                Try again
+              </button>
             </div>
           ) : totalInPeriod === 0 ? (
             <div className="flex h-full w-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 p-6 text-center">

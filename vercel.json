@@ -29,6 +29,10 @@
       "dest": "/web/api/ai/$1"
     },
     {
+      "src": "/api/dashboard/trend$",
+      "dest": "/web/api/dashboard/trend"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/[...path].ts"
     },
