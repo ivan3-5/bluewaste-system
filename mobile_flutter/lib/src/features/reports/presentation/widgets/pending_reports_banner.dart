@@ -35,7 +35,7 @@ class _PendingReportsBannerState extends ConsumerState<PendingReportsBanner> {
       final result = await action();
       if (result.offline) {
         _toast(
-          "You're offline. Reports will upload when you reconnect.",
+          "Couldn't reach the server. Saved reports will retry automatically.",
           error: true,
         );
       } else if (result.uploaded > 0 && result.remaining + result.failed == 0) {
@@ -59,6 +59,8 @@ class _PendingReportsBannerState extends ConsumerState<PendingReportsBanner> {
           error: true,
         );
       }
+    } catch (_) {
+      _toast("Couldn't sync saved reports. Please try again.", error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

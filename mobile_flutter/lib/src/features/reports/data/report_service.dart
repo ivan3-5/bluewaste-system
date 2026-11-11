@@ -102,10 +102,23 @@ class ReportService {
 
   Future<ReportRecord> getReportById(String reportId) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
-        "/reports/$reportId",
+      final base = Uri.parse(_dio.options.baseUrl);
+      final segments = base.pathSegments
+          .where((segment) => segment.isNotEmpty)
+          .toList();
+      // /api/reports/:id can be handled by the web dashboard on Vercel.
+      if (segments.isNotEmpty && segments.last == "api") segments.add("v1");
+      final response = await _dio.getUri<Map<String, dynamic>>(
+        base.replace(pathSegments: [...segments, "reports", reportId]),
       );
-      return ReportRecord.fromJson(response.data ?? <String, dynamic>{});
+      final data = response.data;
+      if (data?["id"] != reportId || data?["images"] is! List) {
+        throw ApiException(
+          "Could not verify the saved report.",
+          statusCode: 502,
+        );
+      }
+      return ReportRecord.fromJson(data!);
     } on DioException catch (error) {
       throw ApiException.fromDioError(error);
     }

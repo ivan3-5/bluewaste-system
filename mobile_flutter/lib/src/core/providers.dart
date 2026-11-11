@@ -53,11 +53,15 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.add(
     QueuedInterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await storage.readToken();
-        if (token != null && token.isNotEmpty) {
-          options.headers["Authorization"] = "Bearer $token";
+        try {
+          final token = await storage.readToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers["Authorization"] = "Bearer $token";
+          }
+          handler.next(options);
+        } catch (error) {
+          handler.reject(DioException(requestOptions: options, error: error));
         }
-        handler.next(options);
       },
       onError: (error, handler) async {
         final request = error.requestOptions;
@@ -90,6 +94,10 @@ final dioProvider = Provider<Dio>((ref) {
           handler.resolve(await plainDio.fetch<dynamic>(request));
         } on DioException catch (retryError) {
           handler.next(retryError);
+        } catch (retryError) {
+          handler.next(
+            DioException(requestOptions: request, error: retryError),
+          );
         }
       },
     ),

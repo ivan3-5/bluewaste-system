@@ -1,9 +1,10 @@
 import "dart:async";
 import "dart:convert";
 import "dart:io";
+import "dart:math";
 
 import "package:connectivity_plus/connectivity_plus.dart";
-import "package:flutter/foundation.dart";
+import "package:flutter/widgets.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:hive/hive.dart";
 import "package:path_provider/path_provider.dart";
@@ -146,7 +147,11 @@ class OfflineService {
 
   static const String boxName = "offline_reports";
   Future<SyncResult>? _inFlight;
+  bool _syncRequested = false;
+  bool _disposed = false;
+  final _stagingIds = <String>{};
   StreamSubscription<ConnectivityResult>? _connectivitySub;
+  AppLifecycleListener? _lifecycleListener;
   Timer? _retryTimer;
   static const Duration _retryInterval = Duration(seconds: 30);
 
@@ -162,20 +167,24 @@ class OfflineService {
   }) async {
     final id = DateTime.now().microsecondsSinceEpoch.toString();
     final userJson = await _storage.readUserJson();
-    final durablePaths = await _copyImages(id, imagePaths);
-
-    await _save(
-      OfflineReportPayload(
-        id: id,
-        data: data,
-        imagePaths: durablePaths,
-        userId: userJson?["id"]?.toString(),
-        remoteReportId: remoteReportId,
-        uploadedCount: uploadedCount,
-        maybeCreated: maybeCreated,
-        lastError: lastError,
-      ),
-    );
+    _stagingIds.add(id);
+    try {
+      final durablePaths = await _copyImages(id, imagePaths);
+      await _save(
+        OfflineReportPayload(
+          id: id,
+          data: data,
+          imagePaths: durablePaths,
+          userId: userJson?["id"]?.toString(),
+          remoteReportId: remoteReportId,
+          uploadedCount: uploadedCount,
+          maybeCreated: maybeCreated,
+          lastError: lastError,
+        ),
+      );
+    } finally {
+      _stagingIds.remove(id);
+    }
   }
 
   Future<void> _save(OfflineReportPayload payload) async {
@@ -253,11 +262,10 @@ class OfflineService {
       final base = Directory("${root.path}/offline_reports");
       if (!await base.exists()) return;
 
-      final keep = box.keys.map((k) => k.toString()).toSet();
       await for (final entity in base.list()) {
         if (entity is! Directory) continue;
         final name = entity.path.split(Platform.pathSeparator).last;
-        if (!keep.contains(name)) {
+        if (!_stagingIds.contains(name) && !box.containsKey(name)) {
           await entity.delete(recursive: true);
         }
       }
@@ -320,43 +328,99 @@ class OfflineService {
     return null;
   }
 
-  /// Uploads queued reports. Concurrent calls share one pass, so the result is
-  /// always returned to whoever asked (e.g. the "Sync now" button).
-  Future<SyncResult> syncOfflineReports() {
-    return _inFlight ??= _runSync().whenComplete(() => _inFlight = null);
+  /// Serializes uploads. A tap, reconnect, or resume during a pass requests
+  /// a fresh pass so an old connection failure cannot swallow that trigger.
+  Future<SyncResult> syncOfflineReports({bool retryIfBusy = true}) {
+    if (_disposed) return Future.value(const SyncResult());
+    final active = _inFlight;
+    if (active != null) {
+      if (retryIfBusy) _syncRequested = true;
+      return active;
+    }
+    return _inFlight = _drainSyncRequests();
+  }
+
+  Future<SyncResult> _drainSyncRequests() async {
+    var uploaded = 0;
+    SyncResult result;
+    do {
+      _syncRequested = false;
+      try {
+        result = await _runSync();
+      } catch (error) {
+        debugPrint("[OfflineService] Could not process the queue: $error");
+        result = const SyncResult(
+          lastError: "Could not process saved reports.",
+        );
+      }
+      uploaded += result.uploaded;
+    } while (_syncRequested && !_disposed);
+
+    _inFlight = null;
+    return SyncResult(
+      uploaded: uploaded,
+      failed: result.failed,
+      remaining: result.remaining,
+      lastError: result.lastError,
+      offline: result.offline,
+    );
   }
 
   Future<SyncResult> _runSync() async {
-    final connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult == ConnectivityResult.none) {
-      return const SyncResult(offline: true);
-    }
-
+    final queuedReports = await getQueuedReports();
+    if (_disposed || queuedReports.isEmpty) return const SyncResult();
     final token = await _storage.readToken();
-    if (token == null || token.isEmpty) return const SyncResult();
+    if (token == null || token.isEmpty) {
+      return const SyncResult(lastError: "Sign in to upload saved reports.");
+    }
     final userId = (await _storage.readUserJson())?["id"]?.toString();
 
     var uploaded = 0;
+    var networkUnavailable = false;
     String? lastError;
     try {
       await _purgeOrphanedImages();
 
-      for (final queued in await getQueuedReports()) {
+      for (final queued in queuedReports) {
         if (queued.failed) continue;
         if (queued.userId != null && queued.userId != userId) continue;
 
         var current = queued;
         try {
+          ReportRecord? remote;
           // 1. Make sure the report exists on the server.
           if (current.remoteReportId == null) {
-            final existing = current.maybeCreated
+            remote = current.maybeCreated
                 ? await _findExistingReport(current)
                 : null;
             final id =
-                existing?.id ??
+                remote?.id ??
                 (await _reportService.createReportFromData(current.data)).id;
+            if (id.isEmpty) {
+              throw ApiException(
+                "The server did not return a report ID.",
+                statusCode: 502,
+              );
+            }
             current = current.copyWith(remoteReportId: id, maybeCreated: false);
             await _save(current);
+          } else {
+            remote = await _reportService.getReportById(
+              current.remoteReportId!,
+            );
+          }
+
+          if (remote != null) {
+            // A photo can reach the server before the connection drops and
+            // prevents us from recording the successful response locally.
+            final stored = min(
+              _reportPhotoCount(remote),
+              current.imagePaths.length,
+            );
+            if (stored != current.uploadedCount) {
+              current = current.copyWith(uploadedCount: stored);
+              await _save(current);
+            }
           }
 
           // 2. Upload images one at a time, saving progress after each so a
@@ -375,6 +439,7 @@ class OfflineService {
               reportId: current.remoteReportId!,
               imagePaths: [path],
             );
+            remote = null;
             current = current.copyWith(
               uploadedCount: current.uploadedCount + 1,
             );
@@ -382,12 +447,10 @@ class OfflineService {
           }
 
           // 3. Confirm with the server before clearing the local copy.
-          final remote = await _reportService.getReportById(
+          remote ??= await _reportService.getReportById(
             current.remoteReportId!,
           );
-          final storedImages = remote.images
-              .where((image) => image.type != "CLEANUP")
-              .length;
+          final storedImages = _reportPhotoCount(remote);
           if (storedImages < current.imagePaths.length) {
             current = current.copyWith(
               uploadedCount: storedImages,
@@ -404,6 +467,7 @@ class OfflineService {
           debugPrint("[OfflineService] Failed to sync ${current.id}: $e");
           lastError = e.message;
           final offline = e.isTimeoutOrNetworkError || e.statusCode == 401;
+          networkUnavailable = e.isTimeoutOrNetworkError;
           final attempts = offline ? current.attempts : current.attempts + 1;
           final giveUp = !_isTransient(e) || attempts >= _maxAttempts;
           await _save(
@@ -433,7 +497,7 @@ class OfflineService {
         }
       }
     } finally {
-      if (uploaded > 0) onSynced?.call();
+      if (uploaded > 0 && !_disposed) onSynced?.call();
     }
 
     final summary = await queueSummary();
@@ -442,8 +506,12 @@ class OfflineService {
       failed: summary.failed,
       remaining: summary.pending,
       lastError: lastError ?? summary.lastError,
+      offline: networkUnavailable,
     );
   }
+
+  int _reportPhotoCount(ReportRecord report) =>
+      report.images.where((image) => image.type != "CLEANUP").length;
 
   Future<QueueSummary> queueSummary() async {
     final reports = await getQueuedReports();
@@ -456,18 +524,35 @@ class OfflineService {
   }
 
   void startSyncListener() {
-    _connectivitySub?.cancel();
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((result) {
-      if (result != ConnectivityResult.none) {
-        syncOfflineReports();
-      }
-    });
+    if (_connectivitySub != null || _disposed) return;
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () => unawaited(syncOfflineReports()),
+    );
+    _connectivitySub = Connectivity().onConnectivityChanged.listen(
+      (result) {
+        if (result != ConnectivityResult.none) {
+          unawaited(syncOfflineReports());
+        }
+      },
+      onError: (Object error) {
+        debugPrint("[OfflineService] Connectivity listener failed: $error");
+      },
+    );
     // Reports can also fail while online (e.g. a server error), which no
     // connectivity change would retry, so keep trying periodically.
-    _retryTimer?.cancel();
-    _retryTimer = Timer.periodic(_retryInterval, (_) => syncOfflineReports());
+    _retryTimer = Timer.periodic(
+      _retryInterval,
+      (_) => unawaited(syncOfflineReports(retryIfBusy: false)),
+    );
     // Flush anything queued before the app was last closed.
-    syncOfflineReports();
+    unawaited(syncOfflineReports());
+  }
+
+  void dispose() {
+    _disposed = true;
+    _lifecycleListener?.dispose();
+    _retryTimer?.cancel();
+    unawaited(_connectivitySub?.cancel());
   }
 }
 
@@ -480,16 +565,22 @@ final queueSummaryProvider = StreamProvider.autoDispose<QueueSummary>((
 ) async* {
   final service = ref.watch(offlineServiceProvider);
   final box = await Hive.openBox<String>(OfflineService.boxName);
-  yield await service.queueSummary();
-  await for (final _ in box.watch()) {
-    yield await service.queueSummary();
-  }
+  yield* Stream<void>.multi((events) {
+    final subscription = box.watch().listen(
+      (_) => events.add(null),
+      onError: events.addError,
+    );
+    events.onCancel = subscription.cancel;
+    events.add(null);
+  }).asyncMap((_) => service.queueSummary());
 });
 
 final offlineServiceProvider = Provider<OfflineService>((ref) {
-  return OfflineService(
+  final service = OfflineService(
     ref.watch(reportServiceProvider),
     ref.watch(sessionStorageProvider),
     onSynced: () => ref.read(reportsSyncedProvider.notifier).state++,
   );
+  ref.onDispose(service.dispose);
+  return service;
 });
