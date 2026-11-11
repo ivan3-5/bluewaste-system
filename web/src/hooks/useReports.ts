@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { MAX_REPORT_PHOTOS } from "@/lib/report-photos";
 import {
   Report,
+  ReportImage,
   PaginatedResponse,
   MapReport,
   HeatmapPoint,
@@ -198,21 +200,39 @@ export function useUploadReportImages() {
       reportId,
       files,
       type,
+      onUploaded,
     }: {
       reportId: string;
       files: File[];
-      type?: string;
+      type: "REPORT" | "CLEANUP";
+      onUploaded?: (file: File) => void;
     }) => {
-      const formData = new FormData();
-      files.forEach((file) => formData.append("images", file));
-      if (type) formData.append("type", type);
-      const { data } = await api.post(`/reports/${reportId}/images`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      return data;
+      if (files.length > MAX_REPORT_PHOTOS) {
+        throw new Error(`You can attach up to ${MAX_REPORT_PHOTOS} photos.`);
+      }
+      // Separate requests keep the payload small and save the primary photo first.
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("images", file);
+        formData.append("type", type);
+        const { data } = await api.post<ReportImage[]>(
+          `/reports/${reportId}/images`, formData,
+          { headers: { "Content-Type": "multipart/form-data" } },
+        );
+        queryClient.setQueryData<Report>(["report", reportId], (report) => {
+          if (!report) return report;
+          const images = report.images ?? [];
+          const added = data.filter((image) => !images.some(({ id }) => id === image.id));
+          return { ...report, images: [...images, ...added] };
+        });
+        onUploaded?.(file);
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["report"] });
+    onSettled: (_data, _error, { reportId, type }) => {
+      void queryClient.invalidateQueries({ queryKey: ["report", reportId] });
+      if (type === "REPORT") {
+        void queryClient.invalidateQueries({ queryKey: ["my-reports"] });
+      }
     },
   });
 }

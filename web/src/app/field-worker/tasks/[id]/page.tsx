@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -21,6 +21,10 @@ import {
   ReportImage,
 } from "@/types";
 import { formatDateTime } from "@/lib/utils";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { CLEANUP_PHOTO_ACCEPT, MAX_REPORT_PHOTOS, selectReportPhotos } from "@/lib/report-photos";
+import { ReportPhotoThumbnails } from "@/components/reports/ReportPhotoThumbnails";
+import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
   MapPin,
@@ -82,6 +86,9 @@ export default function TaskDetailPage() {
 
   const [statusNotes, setStatusNotes] = useState("");
   const [cleanupPhotos, setCleanupPhotos] = useState<File[]>([]);
+  const [photoError, setPhotoError] = useState("");
+  const cameraInput = useRef<HTMLInputElement>(null);
+  const galleryInput = useRef<HTMLInputElement>(null);
   const [showHistory, setShowHistory] = useState(true);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,22 +103,28 @@ export default function TaskDetailPage() {
   const hasCleanupProof =
     cleanupPhotos.length > 0 || existingCleanupImages.length > 0;
 
-  const addPhotos = useCallback((files: FileList | File[]) => {
-    const newFiles = Array.from(files).filter(
-      (f) => f.type.startsWith("image/") && f.size <= 10 * 1024 * 1024,
-    );
-    setCleanupPhotos((prev) => {
-      const combined = [...prev, ...newFiles];
-      return combined.slice(0, 5);
-    });
-  }, []);
+  const photoCount = cleanupPhotos.length + existingCleanupImages.length;
+  const remainingPhotoSlots = Math.max(0, MAX_REPORT_PHOTOS - photoCount);
 
-  const removePhoto = (index: number) => {
-    setCleanupPhotos((prev) => prev.filter((_, i) => i !== index));
+  const addPhotos = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!files.length || isSubmitting) return;
+
+    const selection = selectReportPhotos(files, remainingPhotoSlots, CLEANUP_PHOTO_ACCEPT);
+    setPhotoError(selection.error);
+    setCleanupPhotos((current) => [...current, ...selection.photos].slice(
+      0, Math.max(0, MAX_REPORT_PHOTOS - existingCleanupImages.length),
+    ));
   };
 
-  const handleStatusUpdate = async (newStatus: ReportStatus) => {
-    if (!report) return;
+  const removePhoto = (index: number) => {
+    setCleanupPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
+    setPhotoError("");
+  };
+
+  const handleTaskAction = async (newStatus?: ReportStatus) => {
+    if (!report || isSubmitting) return;
 
     // Guard: Prevent marking as cleaned if there are no cleanup proof photos
     if (newStatus === "CLEANED" && !hasCleanupProof) {
@@ -128,17 +141,30 @@ export default function TaskDetailPage() {
       return;
     }
 
+    const shouldUpload = newStatus === undefined || newStatus === "CLEANED";
+    if (shouldUpload && cleanupPhotos.length > 0 && photoCount > MAX_REPORT_PHOTOS) {
+      setPhotoError(`Keep up to ${MAX_REPORT_PHOTOS} cleanup photos, including photos already uploaded.`);
+      return;
+    }
+
     setIsSubmitting(true);
     setSuccess("");
+    setPhotoError("");
 
     try {
-      // Upload cleanup photos if marking as cleaned
-      if (newStatus === "CLEANED" && cleanupPhotos.length > 0) {
+      if (shouldUpload && cleanupPhotos.length > 0) {
         await uploadImages.mutateAsync({
           reportId: report.id,
           files: cleanupPhotos,
           type: "CLEANUP",
+          onUploaded: () => setCleanupPhotos((current) => current.slice(1)),
         });
+      }
+
+      if (!newStatus) {
+        setSuccess("Cleanup photos uploaded.");
+        setActivePhotoTab("cleanup");
+        return;
       }
 
       await updateStatus.mutateAsync({
@@ -168,10 +194,7 @@ export default function TaskDetailPage() {
       pushToast({
         id: `task-status-err-${report.id}-${Date.now()}`,
         title: "Update Failed",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to update task status.",
+        message: getApiErrorMessage(error, "Failed to save the cleanup update. Please try again."),
         type: "STATUS_CHANGE",
         variant: "error",
         isRead: true,
@@ -236,7 +259,7 @@ export default function TaskDetailPage() {
           {/* Quick Start Button in Top Bar if ready to start */}
           {nextStatuses.includes("IN_PROGRESS") && (
             <button
-              onClick={() => handleStatusUpdate("IN_PROGRESS")}
+              onClick={() => void handleTaskAction("IN_PROGRESS")}
               disabled={isSubmitting}
               className="inline-flex items-center gap-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:shadow disabled:opacity-50"
             >
@@ -517,63 +540,31 @@ export default function TaskDetailPage() {
                       )}
                     </Label>
                     <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      {cleanupPhotos.length}/5 photos
+                      {photoCount}/{MAX_REPORT_PHOTOS} photos
                     </span>
                   </div>
 
-                  {cleanupPhotos.length < 5 && (
-                    <label className={`group flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition ${
-                      !hasCleanupProof
-                        ? "border-amber-300 dark:border-amber-700/70 bg-amber-50/30 dark:bg-amber-950/20 hover:border-amber-400 dark:hover:border-amber-600"
-                        : "border-slate-300 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40 hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50/30 dark:hover:bg-slate-800/70"
-                    }`}>
-                      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
-                        <Camera className="h-4 w-4" />
-                        <span className="text-xs font-bold">
-                          {!hasCleanupProof ? "Upload required cleanup proof" : "Add more cleanup photos"}
-                        </span>
-                      </div>
-                      <span className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
-                        PNG, JPG up to 10MB each
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files) addPhotos(e.target.files);
-                        }}
-                      />
-                    </label>
-                  )}
-
-                  {/* Photo Thumbnails */}
-                  {cleanupPhotos.length > 0 && (
-                    <div className="grid grid-cols-4 gap-2">
-                      {cleanupPhotos.map((file, i) => (
-                        <div
-                          key={i}
-                          className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
-                        >
-                          <Image
-                            src={URL.createObjectURL(file)}
-                            alt={`Cleanup photo ${i + 1}`}
-                            fill
-                            unoptimized
-                            className="object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removePhoto(i)}
-                            title="Remove photo"
-                            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-sm transition hover:bg-red-700"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {existingCleanupImages.length} uploaded · JPG, PNG, WEBP or GIF · 4 MB each
+                  </p>
+                  {remainingPhotoSlots > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" size="sm" disabled={isSubmitting} onClick={() => cameraInput.current?.click()}>
+                        <Camera className="mr-1.5 h-4 w-4" /> Take Photo
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" disabled={isSubmitting} onClick={() => galleryInput.current?.click()}>
+                        <ImageIcon className="mr-1.5 h-4 w-4" /> Choose Photos
+                      </Button>
+                      <input ref={cameraInput} type="file" accept="image/*" capture="environment" title="Capture cleanup photo" className="hidden" onChange={addPhotos} />
+                      <input ref={galleryInput} type="file" accept={CLEANUP_PHOTO_ACCEPT} multiple title="Choose cleanup photos" className="hidden" onChange={addPhotos} />
                     </div>
+                  )}
+                  <ReportPhotoThumbnails files={cleanupPhotos} onRemove={isSubmitting ? undefined : removePhoto} />
+                  {photoError && <p role="alert" className="text-xs text-red-700 dark:text-red-400">{photoError}</p>}
+                  {cleanupPhotos.length > 0 && (
+                    <Button type="button" variant="outline" size="sm" disabled={isSubmitting} onClick={() => void handleTaskAction()}>
+                      <Upload className="mr-1.5 h-4 w-4" /> Upload Photos
+                    </Button>
                   )}
                 </div>
               )}
@@ -610,7 +601,7 @@ export default function TaskDetailPage() {
                   return (
                     <div key={nextStatus} className="space-y-1.5">
                       <button
-                        onClick={() => handleStatusUpdate(nextStatus)}
+                        onClick={() => void handleTaskAction(nextStatus)}
                         disabled={isActionDisabled}
                         title={
                           isCleanAction && !hasCleanupProof

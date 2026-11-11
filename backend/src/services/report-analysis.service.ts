@@ -208,7 +208,7 @@ export class ReportAnalysisService {
   static async analyzeReport(reportId: string) {
     const report = await prisma.report.findUnique({
       where: { id: reportId },
-      include: { images: { orderBy: { createdAt: "asc" }, take: 1 } },
+      include: { images: { where: { type: "REPORT" }, orderBy: { createdAt: "asc" }, take: 1 } },
     });
 
     if (!report) throw new Error("Report not found");

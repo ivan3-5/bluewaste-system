@@ -6,6 +6,8 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { MAX_REPORT_PHOTOS, REPORT_PHOTO_ACCEPT, selectReportPhotos } from "@/lib/report-photos";
+import { ReportPhotoThumbnails, usePhotoUrl } from "@/components/reports/ReportPhotoThumbnails";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -45,8 +47,6 @@ interface GeminiAnalysisResult {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 const CATEGORY_LABELS: Record<string, string> = {
   plastic_bottle: "Plastic Bottle",
@@ -93,8 +93,11 @@ export default function ReportWastePage() {
   const uploadImages = useUploadReportImages();
   const [outsideZone, setOutsideZone] = useState(false);
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const imageFile = photos[0] ?? null;
+  const previewUrl = usePhotoUrl(imageFile);
+  const [savedReport, setSavedReport] = useState<GeminiAnalysisResult | null>(null);
+  const [uploadedCount, setUploadedCount] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<GeminiAnalysisResult | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(4);
@@ -137,40 +140,38 @@ export default function ReportWastePage() {
     }
   }, [isLoading, user, router]);
 
-  useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
-
   if (!isLoading && !user) {
     return null;
   }
 
-  const onFileSelect = (file: File | null) => {
-    if (!file) return;
+  const handleFileInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!files.length || isAnalyzing || savedReport) return;
 
-    if (!ALLOWED_TYPES.has(file.type)) {
-      setError("Unsupported image type. Use JPG, PNG, or WEBP.");
-      return;
-    }
-
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      setError("Image must be 10MB or smaller.");
-      return;
-    }
-
-    setError("");
-    setResult(null);
-    setImageFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    const selection = selectReportPhotos(files, MAX_REPORT_PHOTOS - photos.length);
+    setError(selection.error);
+    setPhotos((current) => [...current, ...selection.photos].slice(0, MAX_REPORT_PHOTOS));
   };
 
-  const handleFileInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    onFileSelect(file);
+  const finishPhotoUpload = async (report: GeminiAnalysisResult) => {
+    await uploadImages.mutateAsync({
+      reportId: report.reportId,
+      files: photos.slice(uploadedCount),
+      type: "REPORT",
+      onUploaded: () => setUploadedCount((count) => count + 1),
+    });
+    setCountdownSeconds(4);
+    setResult(report);
+  };
+
+  const startNewReport = () => {
+    setResult(null);
+    setSavedReport(null);
+    setUploadedCount(0);
+    setPhotos([]);
+    setError("");
+    setDescription("");
   };
 
   const handleGetLocation = () => {
@@ -194,6 +195,21 @@ export default function ReportWastePage() {
   };
 
   const handleAnalyzeAndSubmit = async () => {
+    if (isAnalyzing || result) return;
+
+    if (savedReport) {
+      setIsAnalyzing(true);
+      setError("");
+      try {
+        await finishPhotoUpload(savedReport);
+      } catch (error) {
+        setError(getApiErrorMessage(error, "Failed to upload photos. Please try again."));
+      } finally {
+        setIsAnalyzing(false);
+      }
+      return;
+    }
+
     if (!imageFile) {
       setError("Please upload an image first.");
       return;
@@ -276,14 +292,9 @@ export default function ReportWastePage() {
         aiReason: data.reason,
       });
 
-      await uploadImages.mutateAsync({
-        reportId: createdReport.id,
-        files: [imageFile],
-        type: "REPORT",
-      });
-
-      setCountdownSeconds(4);
-      setResult({ ...data, reportId: createdReport.id } as GeminiAnalysisResult);
+      const report = { ...data, reportId: createdReport.id } as GeminiAnalysisResult;
+      setSavedReport(report);
+      await finishPhotoUpload(report);
     } catch (err) {
       const message = getApiErrorMessage(err, "Failed to analyze image");
       setError(message);
@@ -300,7 +311,7 @@ export default function ReportWastePage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Waste Analysis</h1>
             <p className="text-sm text-gray-600">
-              Upload a photo — the system will detect, classify, and prepare your waste report automatically.
+              Attach up to five photos. The first photo is used for waste analysis.
             </p>
           </div>
           <Link href="/my-reports">
@@ -313,22 +324,23 @@ export default function ReportWastePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <ImagePlus className="h-5 w-5 text-blue-600" />
-              Upload Waste Image
+              Waste Photos ({photos.length}/{MAX_REPORT_PHOTOS})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="waste-image">Choose Image</Label>
+                <Label htmlFor="waste-image">Choose Photos</Label>
                 <Input
                   id="waste-image"
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept={REPORT_PHOTO_ACCEPT}
+                  multiple
                   onChange={handleFileInput}
-                  disabled={isAnalyzing}
+                  disabled={isAnalyzing || !!savedReport || photos.length >= MAX_REPORT_PHOTOS}
                 />
                 <p className="text-xs text-gray-500">
-                  Accepted: JPG, PNG, WEBP (max 10MB)
+JPG, PNG or WEBP · 4 MB each
                 </p>
               </div>
 
@@ -340,10 +352,10 @@ export default function ReportWastePage() {
                   accept="image/*"
                   capture="environment"
                   onChange={handleFileInput}
-                  disabled={isAnalyzing}
+                  disabled={isAnalyzing || !!savedReport || photos.length >= MAX_REPORT_PHOTOS}
                 />
                 <p className="text-xs text-gray-500">
-                  Mobile-friendly camera capture input
+                  Take one photo at a time
                 </p>
               </div>
             </div>
@@ -357,7 +369,7 @@ export default function ReportWastePage() {
                   variant="outline"
                   size="sm"
                   onClick={handleGetLocation}
-                  disabled={isAnalyzing}
+                  disabled={isAnalyzing || !!savedReport}
                 >
                   <LocateFixed className="mr-1 h-4 w-4" />
                   Use Current Location
@@ -368,7 +380,7 @@ export default function ReportWastePage() {
                 placeholder="e.g. Near public market"
                 value={address}
                 onChange={(event) => setAddress(event.target.value)}
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || !!savedReport}
               />
               <div className="text-xs text-gray-500">
                 {locationStatus}
@@ -395,7 +407,7 @@ export default function ReportWastePage() {
                 placeholder="Describe what you see..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || !!savedReport}
               />
             </div>
 
@@ -413,7 +425,7 @@ export default function ReportWastePage() {
                   id="submit-anonymously-quick"
                   checked={isAnonymous}
                   onChange={(e) => setIsAnonymous(e.target.checked)}
-                  disabled={isAnalyzing}
+                  disabled={isAnalyzing || !!savedReport}
                   className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                 />
               </div>
@@ -446,6 +458,20 @@ export default function ReportWastePage() {
               </div>
             )}
 
+            <ReportPhotoThumbnails
+              files={photos}
+              showPrimary
+              onRemove={isAnalyzing || savedReport ? undefined : (index) => {
+                setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
+                setError("");
+              }}
+            />
+            {savedReport && !result && (
+              <p role="status" className="text-sm text-gray-600">
+                Report saved. {uploadedCount} of {photos.length} photos uploaded.
+              </p>
+            )}
+
             {/* Error */}
             {error && (
               <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>
@@ -456,15 +482,17 @@ export default function ReportWastePage() {
               id="analyze-submit-btn"
               onClick={handleAnalyzeAndSubmit}
               disabled={
-                !imageFile || isAnalyzing || !zonesLoaded || outsideZone || latitude === null
+                isAnalyzing || !!result || (!savedReport && (!imageFile || !zonesLoaded || outsideZone || latitude === null))
               }
               className="w-full"
             >
               {isAnalyzing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing image…
+                  {savedReport ? "Uploading photos…" : "Analyzing image…"}
                 </>
+              ) : savedReport && !result ? (
+                "Retry Photo Upload"
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
@@ -476,7 +504,7 @@ export default function ReportWastePage() {
         </Card>
 
         {/* Loading State */}
-        {isAnalyzing && (
+        {isAnalyzing && !savedReport && (
           <Card className="border-violet-100 shadow-md">
             <CardContent className="flex flex-col items-center gap-4 py-10">
               <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-violet-100">
@@ -504,7 +532,7 @@ export default function ReportWastePage() {
                 Report Submitted Successfully!
               </h2>
               <p className="mt-1 text-sm text-gray-600">
-                Your photo was analyzed and submitted. Report ID:{" "}
+                Your photos were submitted. Report ID:{" "}
                 <span className="font-mono font-semibold">{result.reportId}</span>
               </p>
               <div className="my-4 rounded-xl bg-white/80 p-3 text-xs font-medium text-gray-700 shadow-sm border border-emerald-100">
@@ -524,13 +552,7 @@ export default function ReportWastePage() {
                 <Button
                   variant="outline"
                   className="bg-white"
-                  onClick={() => {
-                    setResult(null);
-                    setImageFile(null);
-                    setPreviewUrl(null);
-                    setError("");
-                    setDescription("");
-                  }}
+                  onClick={startNewReport}
                 >
                   Submit Another Report
                 </Button>
@@ -664,13 +686,7 @@ export default function ReportWastePage() {
                 id="submit-another-btn"
                 variant="outline"
                 className="w-full"
-                onClick={() => {
-                  setResult(null);
-                  setImageFile(null);
-                  setPreviewUrl(null);
-                  setError("");
-                  setDescription("");
-                }}
+                onClick={startNewReport}
               >
                 Submit Another Report
               </Button>

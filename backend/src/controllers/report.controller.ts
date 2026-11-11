@@ -2,9 +2,9 @@ import { Response } from "express";
 import { ReportCrudService } from "../services/report-crud.service";
 import { ReportGeoService } from "../services/report-geo.service";
 import { ReportSpamService } from "../services/report-spam.service";
-import { ReportImageService } from "../services/report-image.service";
+import { REPORT_PHOTO_LIMIT_MESSAGE, ReportImageService } from "../services/report-image.service";
 import { AuthRequest } from "../middleware/auth";
-import { handleControllerError, QueryFilters } from "../utils/http";
+import { handleControllerError, QueryFilters, sendError } from "../utils/http";
 
 export class ReportController {
   static async create(req: AuthRequest, res: Response) {
@@ -159,6 +159,9 @@ export class ReportController {
       const images = await ReportImageService.addImagesToReport(id, files, req.user, req.body.type);
       res.status(201).json(images);
     } catch (error) {
+      if (error instanceof Error && error.message === REPORT_PHOTO_LIMIT_MESSAGE) {
+        return sendError(res, 409, error.message, "REPORT_PHOTO_LIMIT");
+      }
       handleControllerError(res, error, "Failed to upload images", "IMAGE_UPLOAD_FAILED");
     }
   }

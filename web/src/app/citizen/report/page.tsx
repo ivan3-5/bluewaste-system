@@ -14,6 +14,8 @@ import {
   WasteType,
 } from "@/types";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { MAX_REPORT_PHOTOS, REPORT_PHOTO_ACCEPT, selectReportPhotos } from "@/lib/report-photos";
+import { ReportPhotoThumbnails, usePhotoUrl } from "@/components/reports/ReportPhotoThumbnails";
 import { formatAnalysisDetails } from "@/lib/utils";
 import { DetectionBox, inferWasteCategory } from "@/lib/waste-classification";
 import DetectionImageOverlay from "@/components/ai/DetectionImageOverlay";
@@ -37,9 +39,6 @@ const LocationPickerMap = dynamic(
   () => import("@/components/map/LocationPicker"),
   { ssr: false },
 );
-
-const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
 
 type AnalyzeWasteResult = {
   model: string;
@@ -282,8 +281,12 @@ export default function SubmitReportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const imageFile = photos[0] ?? null;
+  const imagePreview = usePhotoUrl(imageFile);
+  const analysisRequest = useRef(0);
+  const [savedReportId, setSavedReportId] = useState<string | null>(null);
+  const [uploadedCount, setUploadedCount] = useState(0);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
     null,
   );
@@ -355,14 +358,6 @@ export default function SubmitReportPage() {
     ],
   );
 
-  useEffect(() => {
-    return () => {
-      if (imagePreview) {
-        URL.revokeObjectURL(imagePreview);
-      }
-    };
-  }, [imagePreview]);
-
   // Auto-run analysis when a new image is selected and user is authenticated.
   // Small delay gives the browser time to create the preview and for
   // `requestCurrentLocation()` to start fetching coordinates.
@@ -370,7 +365,7 @@ export default function SubmitReportPage() {
     if (!imageFile) return;
     if (!token) return;
     if (analysisResult) return; // already analyzed
-    if (isAnalyzing) return; // already running
+    if (isAnalyzing || analysisError || savedReportId) return;
 
     const timer = setTimeout(() => {
       // Fire and forget — handleAnalyzeWaste manages its own state and errors
@@ -381,7 +376,7 @@ export default function SubmitReportPage() {
     // Intentionally exclude handleAnalyzeWaste from deps to avoid re-creating
     // the timeout when the function identity changes; rely on state deps above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFile, token, analysisResult, isAnalyzing]);
+  }, [imageFile, token, analysisResult, isAnalyzing, analysisError, savedReportId]);
 
   const requestCurrentLocation = () => {
     setIsLocating(true);
@@ -421,37 +416,36 @@ export default function SubmitReportPage() {
     );
   };
 
-  const selectImage = (file: File | null) => {
-    if (!file) return;
-
-    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-      setFileError("Only JPG, PNG, and WEBP images are allowed.");
-      return;
-    }
-
-    if (file.size > MAX_IMAGE_SIZE_BYTES) {
-      setFileError("Image must be 8MB or smaller.");
-      return;
-    }
-
-    setFileError("");
-    setSubmitError("");
+  const resetPrimaryAnalysis = () => {
+    analysisRequest.current++;
+    setIsAnalyzing(false);
     setAnalysisError("");
     setDecisionMessage("");
     setAnalysisResult(null);
-
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview);
-    }
-
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
-    requestCurrentLocation();
+    setSelectedCategory("");
   };
 
   const handleFileInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    selectImage(event.target.files?.[0] ?? null);
+    const files = Array.from(event.target.files ?? []);
     event.target.value = "";
+    if (!files.length || isSubmitting || savedReportId) return;
+
+    const selection = selectReportPhotos(files, MAX_REPORT_PHOTOS - photos.length);
+    setFileError(selection.error);
+    if (!selection.photos.length) return;
+
+    setPhotos((current) => [...current, ...selection.photos].slice(0, MAX_REPORT_PHOTOS));
+    setSubmitError("");
+    if (!imageFile) {
+      resetPrimaryAnalysis();
+      if (!location) requestCurrentLocation();
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
+    setFileError("");
+    if (index === 0) resetPrimaryAnalysis();
   };
 
   const openCameraPicker = () => {
@@ -550,12 +544,14 @@ export default function SubmitReportPage() {
   };
 
   const handleAnalyzeWaste = async () => {
+    const request = ++analysisRequest.current;
     setIsAnalyzing(true);
     setAnalysisError("");
     setDecisionMessage("");
 
     try {
       const result = await analyzeWasteImage();
+      if (request !== analysisRequest.current) return;
 
       setAnalysisResult(result);
       setSelectedCategory(mapAnalysisToBucket(result));
@@ -571,17 +567,43 @@ export default function SubmitReportPage() {
         setDecisionMessage(`Waste detected${countLabel}. Ready to submit.`);
       }
     } catch (error) {
+      if (request !== analysisRequest.current) return;
       setAnalysisResult(null);
       setAnalysisError(
         error instanceof Error ? error.message : "Failed to analyze image.",
       );
     } finally {
-      setIsAnalyzing(false);
+      if (request === analysisRequest.current) setIsAnalyzing(false);
+    }
+  };
+
+  const finishPhotoUpload = async (reportId: string) => {
+    await uploadImages.mutateAsync({
+      reportId,
+      files: photos.slice(uploadedCount),
+      type: "REPORT",
+      onUploaded: () => setUploadedCount((count) => count + 1),
+    });
+    setIsSubmittedSuccess(true);
+    setCountdownSeconds(3);
+  };
+
+  const retryPhotoUpload = async () => {
+    if (!savedReportId || isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await finishPhotoUpload(savedReportId);
+    } catch (error) {
+      setSubmitError(getApiErrorMessage(error, "Failed to upload photos. Please try again."));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting || savedReportId) return;
 
     if (!token) {
       setSubmitError("You need to log in before submitting a report.");
@@ -674,14 +696,8 @@ export default function SubmitReportPage() {
         ),
       });
 
-      await uploadImages.mutateAsync({
-        reportId: report.id,
-        files: [imageFile],
-        type: "REPORT",
-      });
-
-      setIsSubmittedSuccess(true);
-      setCountdownSeconds(3);
+      setSavedReportId(report.id);
+      await finishPhotoUpload(report.id);
     } catch (error: any) {
       if (error?.response?.status === 401) {
         setSubmitError("Session expired. Please log in and try again.");
@@ -696,6 +712,22 @@ export default function SubmitReportPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (savedReportId && !isSubmittedSuccess) {
+    return (
+      <div className="mx-auto mt-8 w-full max-w-lg space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-bold">Upload Report Photos</h2>
+        <p role="status" className="text-sm text-gray-600">
+          Report saved. {uploadedCount} of {photos.length} photos uploaded.
+        </p>
+        <ReportPhotoThumbnails files={photos.slice(uploadedCount)} />
+        {submitError && <p role="alert" className="text-sm text-red-700">{submitError}</p>}
+        <Button onClick={() => void retryPhotoUpload()} disabled={isSubmitting}>
+          {isSubmitting ? "Uploading photos…" : "Retry Photo Upload"}
+        </Button>
+      </div>
+    );
+  }
 
   if (isSubmittedSuccess) {
     return (
@@ -732,8 +764,10 @@ export default function SubmitReportPage() {
               onClick={() => {
                 setIsSubmittedSuccess(false);
                 setCountdownSeconds(3);
-                setImageFile(null);
-                setImagePreview(null);
+                setPhotos([]);
+                setSavedReportId(null);
+                setUploadedCount(0);
+                resetPrimaryAnalysis();
                 setLocationConfirmed(false);
                 setDescription("");
                 setSelectedCategory("");
@@ -806,8 +840,9 @@ export default function SubmitReportPage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
-        title="Upload waste image"
+        accept={REPORT_PHOTO_ACCEPT}
+        multiple
+        title="Upload waste photos"
         className="hidden"
         onChange={handleFileInput}
       />
@@ -815,7 +850,7 @@ export default function SubmitReportPage() {
         ref={cameraInputRef}
         type="file"
         accept="image/*"
-        title="Capture waste image"
+        title="Capture waste photo"
         className="hidden"
         onChange={handleFileInput}
       />
@@ -832,7 +867,7 @@ export default function SubmitReportPage() {
                 Add a waste photo
               </p>
               <p className="mt-1 text-xs text-gray-500">
-                JPG, PNG or WEBP · max 8 MB
+                Up to 5 photos · JPG, PNG or WEBP · 4 MB each
               </p>
             </div>
             <div className="flex flex-col gap-2">
@@ -871,25 +906,29 @@ export default function SubmitReportPage() {
                   <div className="flex items-center gap-2">
                     <Camera className="h-4 w-4 text-blue-600" />
                     <span className="text-sm font-semibold text-gray-900">
-                      Waste Photo
+                      Waste Photos ({photos.length}/{MAX_REPORT_PHOTOS})
                     </span>
                   </div>
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={openCameraPicker}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors"
-                    >
-                      <Camera className="h-3 w-3" /> Retake
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors"
-                    >
-                      <Upload className="h-3 w-3" /> Replace
-                    </button>
-                  </div>
+                  {photos.length < MAX_REPORT_PHOTOS && (
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={openCameraPicker}
+                        disabled={isSubmitting}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+                      >
+                        <Camera className="h-3 w-3" /> Take Photo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isSubmitting}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+                      >
+                        <Upload className="h-3 w-3" /> Add Photos
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {imagePreview && (
                   <DetectionImageOverlay
@@ -899,6 +938,15 @@ export default function SubmitReportPage() {
                     imageClassName="w-full h-auto max-h-80 object-contain bg-gray-50"
                   />
                 )}
+                <div className="space-y-2 border-t p-3">
+                  <p className="text-xs text-gray-600">The first photo is used for waste analysis.</p>
+                  <ReportPhotoThumbnails
+                    files={photos}
+                    showPrimary
+                    onRemove={isSubmitting ? undefined : removePhoto}
+                  />
+                  {fileError && <p role="alert" className="text-xs text-red-700">{fileError}</p>}
+                </div>
               </div>
 
               {/* AI Analysis card */}
@@ -1199,10 +1247,10 @@ export default function SubmitReportPage() {
                       </label>
                     </div>
 
-                    {(fileError || submitError) && (
+                    {submitError && (
                       <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
                         <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        <span>{fileError || submitError}</span>
+                        <span>{submitError}</span>
                       </div>
                     )}
 
