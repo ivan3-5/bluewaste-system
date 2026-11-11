@@ -26,14 +26,6 @@ function getAutoDeleteAt(spamMarkedAt?: string | null) {
   return new Date(base.getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000);
 }
 
-/** Returns a formatted confidence string (e.g. "12.5%") or "—" if unknown. */
-function formatConfidence(value?: number | null): string {
-  if (value === null || value === undefined) return "—";
-  // analysisConfidence is stored as 0.0–1.0 fraction
-  const pct = value <= 1 ? value * 100 : value;
-  return `${pct.toFixed(1)}%`;
-}
-
 /** Determines whether spam originated from the citizen (client-side YOLO)
  *  or was auto-flagged by the backend after image upload. */
 function getSpamSource(report: {
@@ -91,7 +83,7 @@ export default function SpamReportsPage() {
         title="Spam Reports"
         description={
           <>
-            Reports flagged as having no waste detected or confidence below 30%;
+            Reports flagged as having no waste detected;
             excluded from the main reports list.
             {pagination && (
               <>
@@ -111,7 +103,6 @@ export default function SpamReportsPage() {
                 <th className={TH_CLASS}>Image</th>
                 <th className={TH_CLASS}>Report</th>
                 <th className={TH_CLASS}>Source</th>
-                <th className={TH_CLASS}>Confidence</th>
                 <th className={TH_CLASS}>Reason</th>
                 <th className={TH_CLASS}>Marked Spam</th>
                 <th className={TH_CLASS}>Auto Delete</th>
@@ -122,7 +113,7 @@ export default function SpamReportsPage() {
               {records.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                   >
                     No spam reports
@@ -166,9 +157,6 @@ export default function SpamReportsPage() {
                         >
                           {source.label}
                         </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300">
-                        {formatConfidence(report.analysisConfidence)}
                       </td>
                       <td className="max-w-[260px] px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
                         {report.spamReason ||

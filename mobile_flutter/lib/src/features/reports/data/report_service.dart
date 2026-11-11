@@ -81,7 +81,6 @@ class ReportService {
       spamReason: data["spamReason"] as String?,
       severity: data["severity"] as String?,
       analysisStatus: data["analysisStatus"] as String?,
-      analysisConfidence: (data["analysisConfidence"] as num?)?.toDouble(),
       analysisWasteCount: data["analysisWasteCount"] as int?,
       aiModel: data["aiModel"] as String?,
       aiCategories: (data["aiCategories"] as List<dynamic>?)
@@ -167,7 +166,6 @@ class ReportService {
     String? spamReason,
     String? severity,
     String? analysisStatus,
-    double? analysisConfidence,
     int? analysisWasteCount,
     String? aiModel,
     List<String>? aiCategories,
@@ -189,8 +187,6 @@ class ReportService {
           if (isSpamFlagged && spamReason != null) "spamReason": spamReason,
           if (severity != null) "severity": severity,
           if (analysisStatus != null) "analysisStatus": analysisStatus,
-          if (analysisConfidence != null)
-            "analysisConfidence": analysisConfidence,
           if (analysisWasteCount != null)
             "analysisWasteCount": analysisWasteCount,
           if (aiModel != null) "aiModel": aiModel,

@@ -85,7 +85,7 @@ class ReportRecord {
     required this.images,
     this.address,
     this.severity,
-    this.analysisConfidence,
+    this.analysisWasteCount,
     this.aiReason,
   });
 
@@ -103,8 +103,8 @@ class ReportRecord {
   final List<ReportImage> images;
   /// Severity level from the hybrid pipeline (CRITICAL / HIGH / MODERATE / SPAM).
   final String? severity;
-  /// Top confidence score from Cloud Vision (0.0 – 1.0).
-  final double? analysisConfidence;
+  /// Total number of waste items detected by the analysis.
+  final int? analysisWasteCount;
   /// AI Analysis details reason string from Gemini/Vision AI
   final String? aiReason;
 
@@ -163,7 +163,7 @@ class ReportRecord {
       updatedAt: parseDate(json["updatedAt"]),
       images: imageList,
       severity: json["severity"]?.toString(),
-      analysisConfidence: (json["analysisConfidence"] as num?)?.toDouble(),
+      analysisWasteCount: (json["analysisWasteCount"] as num?)?.toInt(),
       aiReason: json["aiReason"]?.toString() ??
           json["analysisDetails"]?.toString() ??
           json["spamReason"]?.toString(),

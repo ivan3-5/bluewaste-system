@@ -26,7 +26,7 @@ describe("background report analysis", () => {
       .mockResolvedValueOnce(new Response("image", { headers: { "content-type": "image/png" } }))
       .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
       .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([{
-        has_waste: true, severity: "HIGH", confidence: 0.8, labels: [{ label: "plastic" }],
+        has_waste: true, waste_count: 4, labels: [{ label: "plastic", count: 4 }],
       }])}\n\n`));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -37,12 +37,15 @@ describe("background report analysis", () => {
     expect(prismaMock.report.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         aiModel: "yolo", aiCategories: ["plastic"], analysisStatus: "DIRTY",
+        analysisWasteCount: 4, severity: "HIGH", analysisConfidence: null,
         aiReason: "Detected categories: plastic.",
       }),
     }));
   });
 
-  it("marks YOLO results under 30% confidence as spam", async () => {
+  it.each([
+    [1, "MODERATE"], [2, "MODERATE"], [3, "HIGH"], [6, "HIGH"], [7, "CRITICAL"], [12, "CRITICAL"],
+  ])("derives YOLO severity from %i detected items", async (count, severity) => {
     prismaMock.report.findUnique.mockResolvedValue({
       id: "report-1", images: [{ imageUrl: "https://example.com/image.png" }],
       analyzedAt: null, severity: null, reporterId: null,
@@ -52,7 +55,27 @@ describe("background report analysis", () => {
       .mockResolvedValueOnce(new Response("image", { headers: { "content-type": "image/png" } }))
       .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
       .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([{
-        has_waste: true, severity: "MODERATE", confidence: 0.29, labels: [{ label: "plastic" }],
+        has_waste: true, severity: "SPAM", waste_count: count, labels: [{ label: "plastic", count }],
+      }])}\n\n`)));
+
+    await ReportAnalysisService.analyzeReport("report-1");
+
+    expect(prismaMock.report.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ isSpam: false, severity, analysisWasteCount: count }),
+    }));
+  });
+
+  it("marks a YOLO result with no detected items as spam", async () => {
+    prismaMock.report.findUnique.mockResolvedValue({
+      id: "report-1", images: [{ imageUrl: "https://example.com/image.png" }],
+      analyzedAt: null, severity: null, reporterId: null,
+    } as never);
+    prismaMock.$transaction.mockResolvedValue([{ id: "report-1" }] as never);
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response("image", { headers: { "content-type": "image/png" } }))
+      .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
+      .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([{
+        has_waste: false, severity: "SPAM", waste_count: 0, labels: [],
       }])}\n\n`)));
 
     await ReportAnalysisService.analyzeReport("report-1");
@@ -86,8 +109,8 @@ describe("background report analysis", () => {
       .mockResolvedValueOnce(new Response("image", { headers: { "content-type": "image/png" } }))
       .mockResolvedValueOnce(Response.json({
         provider: "gemini", model: "gemini-test", hasWaste: true,
-        categories: ["plastic_bottle"], severity: "High", confidence: 0.9,
-        reason: "A plastic bottle is visible.",
+        categories: ["plastic_bottle"], wasteCount: 3, severity: "Low",
+        reason: "Plastic bottles are visible.",
       }));
     vi.stubGlobal("fetch", fetchMock);
     await ReportAnalysisService.analyzeReport("report-1");
@@ -95,7 +118,8 @@ describe("background report analysis", () => {
     expect(prismaMock.report.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         aiModel: "gemini-test", aiCategories: ["plastic_bottle"],
-        aiReason: "A plastic bottle is visible.", analysisConfidence: 0.9,
+        aiReason: "Plastic bottles are visible.", analysisConfidence: null,
+        analysisWasteCount: 3, severity: "HIGH",
       }),
     }));
   });

@@ -155,15 +155,6 @@ export default function MyWasteReportsPage() {
 
                     <div>
                       <p className="text-xs uppercase tracking-wide text-gray-500">
-                        Top confidence
-                      </p>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {(report.confidence * 100).toFixed(1)}%
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-gray-500">
                         Analyzed At
                       </p>
                       <p className="text-sm text-gray-700">

@@ -13,7 +13,7 @@ Determine if visible waste exists.
 
 If no waste exists, return:
 
-{"hasWaste": false, "categories": [], "severity": "None", "confidence": 0, "reason": "No visible waste detected."}
+{"hasWaste": false, "categories": [], "wasteCount": 0, "reason": "No visible waste detected."}
 
 If waste exists:
 
@@ -32,16 +32,12 @@ Allowed categories:
 * diaper
 * cigarette_butt
 
-Estimate severity:
+Count the total number of individual waste items visible in the image (wasteCount).
+Count every distinct item, not just the number of categories. Do not estimate severity.
 
-Low
-Medium
-High
-Critical
+Return exactly this shape:
 
-Estimate confidence between 0 and 1.
-
-Explain the reasoning in one concise sentence.
+{"hasWaste": true, "categories": ["plastic_bottle"], "wasteCount": 3, "reason": "One concise sentence."}
 
 Return ONLY valid JSON.
 

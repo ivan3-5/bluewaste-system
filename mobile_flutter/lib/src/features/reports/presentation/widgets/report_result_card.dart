@@ -8,7 +8,7 @@ import "../../data/detect_service.dart";
 /// Shows:
 ///   • Waste detected / No waste badge
 ///   • Severity badge (color-coded)
-///   • Confidence percentage + bar
+///   • Number of waste items detected
 ///   • Detected waste labels
 ///   • "Submit Another Report" dismiss button
 class ReportResultCard extends StatelessWidget {
@@ -39,7 +39,6 @@ class ReportResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _severityColor();
-    final confidencePct = (result.confidence * 100).clamp(0.0, 100.0);
 
     return Card(
       elevation: 3,
@@ -103,34 +102,24 @@ class ReportResultCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
 
-            // ─ Confidence bar ──────────────────────────────────────────────
+            // ─ Waste item count ────────────────────────────────────────────
             Row(
               children: [
                 Text(
-                  "Confidence",
+                  "Waste items detected",
                   style: Theme.of(
                     context,
                   ).textTheme.labelMedium?.copyWith(color: Colors.grey[600]),
                 ),
                 const Spacer(),
                 Text(
-                  "${confidencePct.toStringAsFixed(1)}%",
+                  "${result.wasteCount}",
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: color,
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: confidencePct / 100,
-                minHeight: 8,
-                backgroundColor: color.withValues(alpha: 0.15),
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-              ),
             ),
             const SizedBox(height: 6),
 
@@ -156,12 +145,9 @@ class ReportResultCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: result.labels.map((lbl) {
-                  final pct = (lbl.confidence * 100);
                   return Chip(
                     label: Text(
-                      result.model == "yolo-tflite"
-                          ? "${lbl.label}  ${pct.toStringAsFixed(0)}%"
-                          : lbl.label,
+                      lbl.count > 1 ? "${lbl.label} ×${lbl.count}" : lbl.label,
                       style: const TextStyle(fontSize: 11),
                     ),
                     backgroundColor: AppColors.primary.withValues(alpha: 0.1),

@@ -27,7 +27,6 @@ export interface Report {
   spamReason?: string | null;
   analysisStatus?: "DIRTY" | "CLEAN" | null;
   analysisWasteCount?: number | null;
-  analysisConfidence?: number | null;
   analyzedAt?: string | null;
   severity?: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
   reporterId?: string;
@@ -104,7 +103,6 @@ export interface WasteReport {
   dominantWaste?: WasteType | null;
   totalItems: number;
   severity: WasteSeverityLegacy;
-  confidence: number;
   labels: string[];
   latitude?: number | null;
   longitude?: number | null;

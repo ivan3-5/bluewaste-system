@@ -21,8 +21,8 @@ import { normalizeYoloResult } from "../src/lib/ai/yolo";
 const yoloPayload = {
   has_waste: true,
   severity: "HIGH",
-  confidence: 0.8,
-  labels: [{ label: "plastic", confidence: 0.8 }, { label: "glass", confidence: 0.7 }],
+  waste_count: 4,
+  labels: [{ label: "plastic", count: 3 }, { label: "glass", count: 1 }],
   message: "Waste detected.",
 };
 
@@ -68,7 +68,7 @@ describe("web image analysis", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       hasWaste: true, categories: ["plastic", "glass"], severity: "High",
-      confidence: 0.8, reason: "Waste detected.", model: "yolo",
+      wasteCount: 4, reason: "Waste detected.", model: "yolo",
     });
     expect(mocks.gemini).not.toHaveBeenCalled();
     expect(fetchMock.mock.calls[0][0]).toBe("https://example.hf.space/gradio_api/call/analyze");
@@ -82,7 +82,7 @@ describe("web image analysis", () => {
     vi.stubEnv("USE_GEMINI", "true");
     vi.stubEnv("GEMINI_API_KEY", "test-key");
     mocks.gemini.mockResolvedValue({
-      result: { hasWaste: true, categories: ["plastic_bottle"], severity: "High", confidence: 0.9, reason: "A bottle is visible." },
+      result: { hasWaste: true, categories: ["plastic_bottle"], wasteCount: 3, severity: "High", reason: "A bottle is visible." },
       modelName: "gemini-test", latencyMs: 1,
     });
     const fetchMock = vi.fn();
@@ -91,7 +91,7 @@ describe("web image analysis", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       hasWaste: true, categories: ["plastic_bottle"], severity: "High",
-      confidence: 0.9, reason: "A bottle is visible.", model: "gemini-test",
+      wasteCount: 3, reason: "A bottle is visible.", model: "gemini-test",
     });
     expect(mocks.gemini).toHaveBeenCalledOnce();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -118,7 +118,7 @@ describe("web image analysis", () => {
   it("only requests cached results for the selected provider", async () => {
     mocks.query.mockResolvedValue([{
       id: "report-1", hasWaste: true, categories: ["plastic"],
-      severity: "MODERATE", confidence: 0.6, aiReason: "Detected plastic.",
+      severity: "MODERATE", wasteCount: 1, aiReason: "Detected plastic.",
       aiModel: "yolo", status: "PENDING",
     }]);
     const fetchMock = vi.fn();
@@ -135,38 +135,54 @@ describe("web image analysis", () => {
     vi.stubEnv("USE_GEMINI", "false");
     vi.stubEnv("YOLO_API_URL", "https://example.com/analyze");
     const fetchMock = vi.fn().mockResolvedValueOnce(Response.json({
-      has_waste: false, severity: "SPAM", confidence: 0, labels: [], message: "No waste detected.",
+      has_waste: false, severity: "SPAM", waste_count: 0, labels: [], message: "No waste detected.",
     }));
     vi.stubGlobal("fetch", fetchMock);
     const response = await POST(request());
     expect(await response.json()).toMatchObject({
-      hasWaste: false, categories: [], severity: "None", confidence: 0,
+      hasWaste: false, categories: [], severity: "None", wasteCount: 0,
       reason: "No waste detected.", model: "yolo",
     });
     expect(fetchMock.mock.calls[0][1].body).toBeInstanceOf(FormData);
   });
 
-  it("marks YOLO results under 30% confidence as spam in both endpoints", async () => {
-    const lowPayload = { ...yoloPayload, severity: "MODERATE", confidence: 0.29 };
-    const stubLow = () => vi.stubGlobal("fetch", vi.fn()
-      .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
-      .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([lowPayload])}\n\n`)));
+  it.each([
+    [1, "Medium", "MODERATE"], [2, "Medium", "MODERATE"], [3, "High", "HIGH"],
+    [6, "High", "HIGH"], [7, "Critical", "CRITICAL"], [15, "Critical", "CRITICAL"],
+  ])("derives severity from %i detected YOLO items, ignoring the reported severity", (count, label) => {
+    const result = normalizeYoloResult({
+      has_waste: true, severity: "SPAM", waste_count: count, labels: [{ label: "plastic", count }],
+    });
+    expect(result).toMatchObject({ hasWaste: true, severity: label, wasteCount: count });
+  });
 
-    stubLow();
+  it("treats a YOLO result with no detected items as spam in both endpoints", async () => {
+    const emptyPayload = { has_waste: true, severity: "HIGH", waste_count: 0, labels: [] };
+    const stubEmpty = () => vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
+      .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([emptyPayload])}\n\n`)));
+
+    stubEmpty();
     const response = await POST(request());
     expect(await response.json()).toMatchObject({
-      hasWaste: false, severity: "None", status: "REJECTED",
+      hasWaste: false, severity: "None", wasteCount: 0, status: "REJECTED",
       message: expect.stringContaining("Spam"),
     });
 
-    stubLow();
+    stubEmpty();
     const legacy = await legacyPOST(legacyRequest());
     expect(await legacy.json()).toMatchObject({ has_waste: false, status: "CLEAN", severity: "SPAM" });
   });
 
-  it("keeps YOLO results at exactly 30% confidence as waste", () => {
-    expect(normalizeYoloResult({ ...yoloPayload, severity: "MODERATE", confidence: 0.3 }))
-      .toMatchObject({ hasWaste: true, severity: "Medium" });
+  it("derives Gemini severity from the counted items, not the model's own severity", async () => {
+    vi.stubEnv("USE_GEMINI", "true");
+    vi.stubEnv("GEMINI_API_KEY", "test-key");
+    mocks.gemini.mockResolvedValue({
+      result: { hasWaste: true, categories: ["can"], wasteCount: 8, severity: "Low", reason: "Many cans." },
+      modelName: "gemini-test", latencyMs: 1,
+    });
+    const response = await POST(request());
+    expect(await response.json()).toMatchObject({ severity: "Critical", wasteCount: 8 });
   });
 
   it("uses the Gradio protocol in the legacy endpoint", async () => {
@@ -184,14 +200,14 @@ describe("web image analysis", () => {
     vi.stubEnv("USE_GEMINI", "true");
     vi.stubEnv("GEMINI_API_KEY", "test-key");
     mocks.gemini.mockResolvedValue({
-      result: { hasWaste: true, categories: ["plastic_bottle"], severity: "High", confidence: 0.9, reason: "A bottle." },
+      result: { hasWaste: true, categories: ["plastic_bottle"], wasteCount: 3, severity: "High", reason: "A bottle." },
       modelName: "gemini-test", latencyMs: 1,
     });
     const response = await legacyPOST(legacyRequest());
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       provider: "gemini", aiModel: "gemini-test", has_waste: true,
-      labels: ["plastic_bottle"], confidence: 0.9,
+      labels: ["plastic_bottle"], waste_count: 3, severity: "HIGH",
       detectedObject: "plastic_bottle", wasteCategory: "PLASTIC_WASTE",
     });
     expect(mocks.gemini).toHaveBeenCalledOnce();
@@ -201,7 +217,7 @@ describe("web image analysis", () => {
     vi.stubEnv("USE_GEMINI", "true");
     vi.stubEnv("GEMINI_API_KEY", "test-key");
     mocks.gemini.mockResolvedValue({
-      result: { hasWaste: true, categories: ["plastic_bottle"], severity: "High", confidence: 0.9, reason: "A bottle." },
+      result: { hasWaste: true, categories: ["plastic_bottle"], wasteCount: 3, severity: "High", reason: "A bottle." },
       modelName: "gemini-test", latencyMs: 1,
     });
     const fetchMock = vi.fn()

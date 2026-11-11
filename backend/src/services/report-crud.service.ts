@@ -3,6 +3,7 @@ import { ReportStatus, WasteCategory, Prisma, Role, NotificationType, Severity, 
 import { getPaginationParams, buildPaginatedResponse } from "../utils/pagination";
 import { NotificationService } from "./notification.service";
 import { GeoCache } from "../utils/geo-cache";
+import { severityFromWasteCount } from "../utils/severity";
 import { ReportSpamService } from "./report-spam.service";
 import { ReportDedupService } from "./report-dedup.service";
 
@@ -91,10 +92,11 @@ export class ReportCrudService {
         ? "No visible waste or pollution detected in the submitted image."
         : null;
     const isSpam = clientSpamFlagged || data.category === "no_waste";
-    const yoloConfidenceFraction =
-      typeof data.yoloConfidence === "number" && data.yoloConfidence >= 0
-        ? data.yoloConfidence / 100.0
-        : null;
+    // Severity is derived from the number of detected waste items when the client reports it.
+    const resolvedSeverity =
+      typeof data.analysisWasteCount === "number" && data.analysisWasteCount >= 0 && !isSpam
+        ? severityFromWasteCount(data.analysisWasteCount)
+        : data.severity;
 
     const report = await prisma.$transaction(async (tx) => {
       const resolvedDescription =
@@ -137,12 +139,8 @@ export class ReportCrudService {
           isSpam,
           spamMarkedAt: isSpam ? new Date() : null,
           spamReason: resolvedSpamReason,
-          analysisConfidence:
-            typeof data.analysisConfidence === "number" && data.analysisConfidence >= 0
-              ? data.analysisConfidence
-              : yoloConfidenceFraction,
-          ...((data.severity != null || data.aiModel != null || data.aiCategories != null) && {
-            ...(data.severity != null && { severity: data.severity as Severity }),
+          ...((resolvedSeverity != null || data.aiModel != null || data.aiCategories != null) && {
+            ...(resolvedSeverity != null && { severity: resolvedSeverity as Severity }),
             analysisStatus: (data.analysisStatus as AnalysisStatus) ?? null,
             analysisWasteCount: data.analysisWasteCount ?? null,
             analyzedAt: new Date(),

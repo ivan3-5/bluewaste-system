@@ -18,7 +18,7 @@ type DashboardReportRow = {
   latitude: number;
   longitude: number;
   address: string | null;
-  analysisConfidence: number | null;
+  analysisWasteCount: number | null;
   analysisStatus: string | null;
   severity: string | null;
   reportedAt: Date;
@@ -116,7 +116,7 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
     category: mapDashboardCategory(
       row.analysisStatus,
     ) as AdminReport["category"],
-    confidence: Number(row.analysisConfidence ?? 0),
+    wasteCount: row.analysisWasteCount ?? null,
     latitude: Number(row.latitude),
     longitude: Number(row.longitude),
     locationName: row.address?.trim() || row.title || "Unknown location",
@@ -154,7 +154,7 @@ export async function getDashboardReports(limit: number) {
       r.latitude,
       r.longitude,
       r.address,
-      r."analysisConfidence",
+      r."analysisWasteCount",
       r."analysisStatus",
       r.severity,
       r."createdAt" AS "reportedAt",
@@ -250,7 +250,7 @@ export async function getDashboardReportById(id: string) {
       r.latitude,
       r.longitude,
       r.address,
-      r."analysisConfidence",
+      r."analysisWasteCount",
       r."analysisStatus",
       r.severity,
       r."createdAt" AS "reportedAt",

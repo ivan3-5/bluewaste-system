@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import type { GeminiWasteResult } from "@/lib/ai/validator";
+import { severityFromWasteCount } from "@/lib/severity";
 import { randomUUID } from "crypto";
 
 export interface CreateAiReportParams {
@@ -23,22 +24,6 @@ export interface CreateAiReportResult {
 }
 
 /**
- * Maps Gemini AI severity (Low/Medium/High/Critical/None)
- * to the DB Severity enum (CRITICAL/HIGH/MODERATE/SPAM).
- */
-function mapSeverityToDb(aiSeverity: string, hasWaste: boolean): string {
-  if (!hasWaste) return "SPAM";
-  const map: Record<string, string> = {
-    Critical: "CRITICAL",
-    High: "HIGH",
-    Medium: "MODERATE",
-    Low: "MODERATE",
-    None: "SPAM",
-  };
-  return map[aiSeverity] ?? "MODERATE";
-}
-
-/**
  * Dispatches notifications to all active LGU_ADMIN users when a new waste report is analyzed.
  * Catches errors cleanly without blocking report creation.
  */
@@ -55,7 +40,7 @@ async function notifyLguAdmins(
     for (const admin of admins) {
       const notifId = randomUUID();
       const title = "New Auto-Analyzed Waste Report";
-      const message = `A new waste report has been submitted and analyzed. Severity: ${aiResult.severity}. Categories: ${aiResult.categories.join(", ") || "None"}.`;
+      const message = `A new waste report has been submitted and analyzed. Severity: ${aiResult.severity} (${aiResult.wasteCount} item(s) detected). Categories: ${aiResult.categories.join(", ") || "None"}.`;
 
       await tx.$executeRaw`
         INSERT INTO "Notification" (id, "userId", title, message, type, "reportId", "isRead", "createdAt")
@@ -84,7 +69,7 @@ export async function persistAiReportAndNotify(
   params: CreateAiReportParams,
 ): Promise<CreateAiReportResult> {
   const isSpam = !params.aiResult.hasWaste;
-  const dbSeverity = mapSeverityToDb(params.aiResult.severity, params.aiResult.hasWaste);
+  const dbSeverity = severityFromWasteCount(params.aiResult.wasteCount);
   const analysisStatus = params.aiResult.hasWaste ? "DIRTY" : "CLEAN";
   const reportStatus: "PENDING" | "REJECTED" = isSpam ? "REJECTED" : "PENDING";
   const reportId = randomUUID();
@@ -95,7 +80,7 @@ export async function persistAiReportAndNotify(
       INSERT INTO "Report" (
         id, title, description, category, status, latitude, longitude, address,
         "isAnonymous", "isDeleted", "isSpam", "spamMarkedAt", "spamReason",
-        "analysisStatus", "analysisConfidence",
+        "analysisStatus", "analysisWasteCount",
         "aiCategories", "aiReason", "aiModel", "aiImageHash",
         "aiProcessingMs", "aiGeminiMs",
         "analyzedAt", severity, "reporterId",
@@ -116,7 +101,7 @@ export async function persistAiReportAndNotify(
         ${isSpam ? new Date() : null},
         ${isSpam ? "No waste detected during photo analysis" : null},
         ${analysisStatus}::"AnalysisStatus",
-        ${params.aiResult.confidence},
+        ${params.aiResult.wasteCount},
         ${params.aiResult.categories},
         ${params.aiResult.reason},
         ${params.modelName},

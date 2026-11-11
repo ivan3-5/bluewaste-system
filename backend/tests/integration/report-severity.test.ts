@@ -12,20 +12,22 @@ vi.mock("../../src/utils/geo-cache", () => ({
   GeoCache: { invalidateAll: vi.fn() },
 }));
 
-describe("report confidence persistence", () => {
-  it("persists an explicit zero rather than discarding it", async () => {
+describe("report severity from waste count", () => {
+  it.each([
+    [1, "MODERATE"], [3, "HIGH"], [7, "CRITICAL"],
+  ])("derives severity from %i detected items and drops confidence", async (count, severity) => {
     prismaMock.$transaction.mockImplementation(async (transaction) => {
       if (typeof transaction !== "function") throw new Error("Expected an interactive transaction");
       return transaction(prismaMock);
     });
     prismaMock.report.create.mockResolvedValue({ id: "report-1", reporterId: null } as never);
     await ReportCrudService.create({
-      title: "Test", description: "Test description", category: "no_waste",
+      title: "Test", description: "Test description", category: "with_waste",
       latitude: 1, longitude: 2, address: "Test address",
-      analysisConfidence: 0, yoloConfidence: 80, severity: "SPAM",
+      analysisWasteCount: count, analysisConfidence: 0.95, severity: "CRITICAL",
     });
-    expect(prismaMock.report.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ analysisConfidence: 0 }),
-    }));
+    const data = prismaMock.report.create.mock.calls[0][0].data as Record<string, unknown>;
+    expect(data).toMatchObject({ severity, analysisWasteCount: count });
+    expect(data).not.toHaveProperty("analysisConfidence");
   });
 });

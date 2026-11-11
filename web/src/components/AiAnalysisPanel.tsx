@@ -14,7 +14,7 @@ export interface AiAnalysisPanelProps {
   hasWaste?: boolean | null;
   aiCategories?: string[] | null;
   severity?: DbSeverity;
-  confidence?: number | null;
+  wasteCount?: number | null;
   aiReason?: string | null;
   aiModel?: string | null;
   aiProcessingMs?: number | null;
@@ -55,26 +55,12 @@ const CATEGORY_COLORS: Record<string, string> = {
   cigarette_butt: "bg-orange-100 dark:bg-orange-950/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-500/30",
 };
 
-function ConfidenceBar({ value }: { value: number }) {
-  const pct = Math.round(value * 100);
-  const color = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500";
-
-  return (
-    <div className="mt-1 flex items-center gap-3">
-      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="w-10 text-right text-sm font-semibold text-slate-800 dark:text-slate-200">{pct}%</span>
-    </div>
-  );
-}
-
 export function AiAnalysisPanel({
   reportId,
   hasWaste,
   aiCategories,
   severity,
-  confidence,
+  wasteCount,
   aiReason,
   aiModel,
   aiProcessingMs,
@@ -104,7 +90,7 @@ export function AiAnalysisPanel({
 
   const severityConfig = severity ? SEVERITY_CONFIG[severity] : null;
   const categories = Array.isArray(aiCategories) ? aiCategories : [];
-  const conf = typeof confidence === "number" ? confidence : null;
+  const items = typeof wasteCount === "number" ? wasteCount : null;
 
   return (
     <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
@@ -142,7 +128,7 @@ export function AiAnalysisPanel({
       </div>
 
       <div className="mt-3 space-y-3">
-        {/* Severity + Confidence + Latency Strip */}
+        {/* Severity + Waste Count + Latency Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {/* Severity */}
           <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-2.5">
@@ -162,14 +148,14 @@ export function AiAnalysisPanel({
             </div>
           </div>
 
-          {/* Confidence */}
+          {/* Waste items detected */}
           <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-2.5">
             <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Confidence
+              Waste Items Detected
             </span>
             <div className="mt-1">
-              {conf !== null ? (
-                <ConfidenceBar value={conf} />
+              {items !== null ? (
+                <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{items}</span>
               ) : (
                 <span className="text-xs text-slate-400">—</span>
               )}

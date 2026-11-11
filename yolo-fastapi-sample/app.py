@@ -35,12 +35,22 @@ DETECT_MODEL_PATH = os.getenv("DETECT_MODEL_PATH", "weights/best.pt")
 
 # ── Analysis thresholds ───────────────────────────────────────────────────────
 ANALYZE_YOLO_MIN_CONF      = float(os.getenv("ANALYZE_YOLO_MIN_CONF", "0.15"))
-CUSTOM_CONF_THRESHOLD      = float(os.getenv("CUSTOM_CONF",           "0.20"))
-DETECT_CONF_THRESHOLD      = float(os.getenv("DETECT_CONF",           "0.25"))
-SEVERITY_CRITICAL          = 0.90
-SEVERITY_HIGH              = 0.70
-SEVERITY_MODERATE          = 0.30   # also the spam threshold: below this → SPAM
-SPAM_CONF_THRESHOLD        = SEVERITY_MODERATE
+# Minimum detection confidence for an object to be counted as waste. This is an
+# internal filter only; confidence is not part of the severity score or response.
+CUSTOM_CONF_THRESHOLD      = float(os.getenv("CUSTOM_CONF",           "0.30"))
+DETECT_CONF_THRESHOLD      = float(os.getenv("DETECT_CONF",           "0.30"))
+
+# Severity is based on the total number of waste items detected in the photo.
+SEVERITY_CRITICAL_COUNT    = 7
+SEVERITY_HIGH_COUNT        = 3
+
+
+def severity_from_count(waste_count: int) -> str:
+    """0 → SPAM (no waste), 1-2 → MODERATE, 3-6 → HIGH, 7+ → CRITICAL."""
+    if waste_count >= SEVERITY_CRITICAL_COUNT: return "CRITICAL"
+    if waste_count >= SEVERITY_HIGH_COUNT:     return "HIGH"
+    if waste_count >= 1:                       return "MODERATE"
+    return "SPAM"
 
 # ── COCO /predict thresholds (Layer-1 model reused for /predict) ──────────────
 WASTE_CONFIDENCE_THRESHOLD         = 0.20
@@ -193,7 +203,7 @@ def _analyze_gpu(image: Image.Image) -> dict:
 
     if not layer1_passed:
         return {
-            "severity": "SPAM", "has_waste": False, "confidence": 0.0,
+            "severity": "SPAM", "has_waste": False, "waste_count": 0, "count": 0,
             "labels": [], "all_labels": [], "layer1_passed": False,
             "spam_reason": "No objects detected in the image. Photo may be blurry, empty, or too dark.",
             "message": "No objects detected — image flagged as spam.",
@@ -203,43 +213,45 @@ def _analyze_gpu(image: Image.Image) -> dict:
     custom = _get_custom_model()
     c_res  = custom.predict(source=frame, conf=CUSTOM_CONF_THRESHOLD, iou=0.45, verbose=False)
 
-    labels: list[dict] = []
-    seen: set[str] = set()
+    # Every detected object counts toward the total; labels are aggregated per class.
+    class_counts: dict[str, int] = {}
+    names = c_res[0].names
     for box in c_res[0].boxes:
         cls_idx = int(box.cls.item())
-        names   = c_res[0].names
         cname   = names[cls_idx] if isinstance(names, list) else names.get(cls_idx, str(cls_idx))
-        conf    = float(box.conf.item())
-        if cname not in seen:
-            seen.add(cname)
-            labels.append({"label": cname.lower(), "confidence": round(conf, 4)})
+        key = cname.lower()
+        class_counts[key] = class_counts.get(key, 0) + 1
 
-    labels = sorted(labels, key=lambda l: l["confidence"], reverse=True)
+    waste_count = sum(class_counts.values())
+    labels = [
+        {"label": name, "count": count}
+        for name, count in sorted(class_counts.items(), key=lambda kv: kv[1], reverse=True)
+    ]
 
-    if not labels:
+    if waste_count == 0:
         return {
-            "severity": "SPAM", "has_waste": False, "confidence": 0.0,
+            "severity": "SPAM", "has_waste": False, "waste_count": 0, "count": 0,
             "labels": [], "all_labels": [], "layer1_passed": True,
             "spam_reason": "No waste-related objects were detected by the waste model.",
             "message": "No waste labels detected — image flagged as spam.",
         }
 
-    top_conf = labels[0]["confidence"]
-    if   top_conf >= SEVERITY_CRITICAL: severity, msg = "CRITICAL", "Critical waste detected — immediate cleanup required! 🔴"
-    elif top_conf >= SEVERITY_HIGH:     severity, msg = "HIGH",     "High-severity waste detected — schedule cleanup within 24 hours. 🟠"
-    elif top_conf >= SEVERITY_MODERATE: severity, msg = "MODERATE", "Moderate waste detected — queued for cleanup. 🟡"
-    else:                               severity, msg = "SPAM",     "Low confidence (< 30%) — report flagged as spam. ⚪"
-
-    is_spam = severity == "SPAM"
+    severity = severity_from_count(waste_count)
+    messages = {
+        "CRITICAL": "Critical waste level — immediate cleanup required! 🔴",
+        "HIGH":     "High waste level — schedule cleanup within 24 hours. 🟠",
+        "MODERATE": "Moderate waste level — queued for cleanup. 🟡",
+    }
     return {
-        "severity":     severity,
-        "has_waste":    not is_spam,
-        "confidence":   round(top_conf, 4),
-        "labels":       labels,
-        "all_labels":   labels,
+        "severity":      severity,
+        "has_waste":     True,
+        "waste_count":   waste_count,
+        "count":         waste_count,
+        "labels":        labels,
+        "all_labels":    labels,
         "layer1_passed": True,
-        "spam_reason":  "Waste detected but confidence is below 30%." if is_spam else None,
-        "message":      msg,
+        "spam_reason":   None,
+        "message":       f"{waste_count} waste item(s) detected. {messages[severity]}",
     }
 
 
@@ -266,7 +278,7 @@ def _predict_gpu(image: Image.Image, include_annotated: bool = False) -> dict:
                 merged.append(cand)
         detections = sorted(merged, key=lambda d: d["confidence"], reverse=True)
 
-    top_conf  = max((d["confidence"] for d in detections), default=None)
+    top_conf  = max((d["confidence"] for d in detections), default=None)  # internal: retake hint only
     waste_cnt = len(detections)
     status    = "DIRTY" if waste_cnt >= DIRTY_MIN_WASTE_COUNT else "CLEAN"
     labels    = list(dict.fromkeys(d["class"].lower() for d in detections))
@@ -280,7 +292,7 @@ def _predict_gpu(image: Image.Image, include_annotated: bool = False) -> dict:
         "count":      len(detections),
         "waste_count": waste_cnt,
         "status":     status,
-        "top_confidence": top_conf,
+        "severity":   severity_from_count(waste_cnt),
         "annotated_image_base64": annotated_b64,
         "annotated_image_mime": "image/jpeg" if annotated_b64 else None,
         "decision": {
@@ -293,21 +305,17 @@ def _predict_gpu(image: Image.Image, include_annotated: bool = False) -> dict:
 
 @spaces.GPU
 def _detect_gpu(image: Image.Image) -> dict:
-    """Simplified waste detection (best.pt). Returns has_waste + confidence %."""
+    """Simplified waste detection (best.pt). Returns has_waste + waste_count."""
     frame = _pil_to_bgr(image)
     custom = _get_custom_model()
     results = custom.predict(source=frame, conf=DETECT_CONF_THRESHOLD, iou=0.45, verbose=False)
-    top_conf = 0.0
-    if results and len(results) > 0:
-        for box in results[0].boxes:
-            c = float(box.conf.item())
-            if c > top_conf:
-                top_conf = c
-    has_waste = top_conf >= SPAM_CONF_THRESHOLD
+    waste_count = len(results[0].boxes) if results else 0
+    has_waste = waste_count > 0
     return {
-        "has_waste":  has_waste,
-        "message":    "Waste detected!" if has_waste else "No waste detected (confidence below 30% — flagged as spam).",
-        "confidence": round(top_conf * 100.0, 2),
+        "has_waste":   has_waste,
+        "waste_count": waste_count,
+        "severity":    severity_from_count(waste_count),
+        "message":     f"{waste_count} waste item(s) detected." if has_waste else "No waste detected.",
     }
 
 
@@ -347,8 +355,8 @@ with gr.Blocks(title="BlueWaste YOLO Analyzer", theme=gr.themes.Soft()) as demo:
     | 1 | `yolov8n.pt` (COCO) | Spam filter — is there any object? |
     | 2 | `weights/best.pt` (custom) | Waste classification |
 
-    **Severity scoring** — based on top detection confidence from `best.pt`:
-    `≥ 90%` → CRITICAL 🔴 · `≥ 70%` → HIGH 🟠 · `≥ 30%` → MODERATE 🟡 · `< 30%` → SPAM ⚪
+    **Severity scoring** — based on the total number of waste items detected by `best.pt`:
+    `≥ 7` → CRITICAL 🔴 · `3–6` → HIGH 🟠 · `1–2` → MODERATE 🟡 · `0` → SPAM ⚪
     """)
 
     with gr.Tabs():

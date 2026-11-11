@@ -66,11 +66,9 @@ const Map<int, String> _cocoIdToWasteCategory = {
   28: "other",           // suitcase
 };
 
-// Minimum confidence to consider a detection valid (0-1).
-const double _confThreshold = 0.20;
-
-// Detections whose top confidence is below this are flagged as spam.
-const double _spamConfThreshold = 0.30;
+// Minimum confidence for an object to be counted as waste (0-1). This is an
+// internal filter only; severity is based on how many items are detected.
+const double _confThreshold = 0.30;
 
 // NMS IoU threshold.
 const double _nmsIouThreshold = 0.45;
@@ -349,7 +347,7 @@ class TFLiteService {
       return const DetectResult(
         hasWaste: false,
         message: "No objects detected in the photo.",
-        confidence: 0.0,
+        wasteCount: 0,
         severity: WasteSeverity.spam,
         layer1Passed: true,
         categories: [],
@@ -368,7 +366,7 @@ class TFLiteService {
       return const DetectResult(
         hasWaste: false,
         message: "No waste-related objects detected.",
-        confidence: 0.0,
+        wasteCount: 0,
         severity: WasteSeverity.spam,
         layer1Passed: true,
         categories: [],
@@ -378,12 +376,10 @@ class TFLiteService {
       );
     }
 
-    double maxConf = 0;
     final categorySet = <String>{};
-    final labelConfidenceMap = <String, double>{};
+    final labelCounts = <String, int>{};
 
     for (final b in wasteBoxes) {
-      if (b.confidence > maxConf) maxConf = b.confidence;
       final cat = _isCustomModel
           ? _customClassIdToWasteCategory[b.classId]
           : _cocoIdToWasteCategory[b.classId];
@@ -392,59 +388,46 @@ class TFLiteService {
         final labelText = _isCustomModel
             ? (_customClassIdToLabel[b.classId] ?? wasteCategoryLabels[cat] ?? cat.replaceAll("_", " "))
             : (wasteCategoryLabels[cat] ?? cat.replaceAll("_", " "));
-        if (!labelConfidenceMap.containsKey(labelText) || b.confidence > labelConfidenceMap[labelText]!) {
-          labelConfidenceMap[labelText] = b.confidence;
-        }
+        labelCounts[labelText] = (labelCounts[labelText] ?? 0) + 1;
       }
     }
 
+    // Severity is based on the total number of waste items detected.
+    final wasteCount = labelCounts.values.fold<int>(0, (sum, n) => sum + n);
     final categories = categorySet.toList();
-    final severity = _confidenceToSeverity(maxConf);
-    final isSpam = severity == WasteSeverity.spam;
-    final labels = labelConfidenceMap.entries
-        .map((e) => WasteLabel(label: e.key, confidence: e.value))
+    final severity = WasteSeverity.fromWasteCount(wasteCount);
+    final labels = labelCounts.entries
+        .map((e) => WasteLabel(label: e.key, count: e.value))
         .toList()
-      ..sort((a, b) => b.confidence.compareTo(a.confidence));
+      ..sort((a, b) => b.count.compareTo(a.count));
 
-    final message = isSpam
-        ? "Low confidence (${(maxConf * 100).toStringAsFixed(1)}%) — report flagged as spam."
-        : _buildMessage(List.from(categories), maxConf);
+    final message = _buildMessage(List.from(categories), wasteCount);
 
     return DetectResult(
-      hasWaste: !isSpam,
+      hasWaste: wasteCount > 0,
       message: message,
-      confidence: maxConf,
+      wasteCount: wasteCount,
       severity: severity,
       layer1Passed: true,
       categories: categories,
       labels: labels,
       allLabels: labels,
-      spamReason: isSpam
-          ? "Waste detected with confidence below 30%."
-          : null,
       reason: message,
     );
   }
 
-  WasteSeverity _confidenceToSeverity(double conf) {
-    if (conf >= 0.90) return WasteSeverity.critical;
-    if (conf >= 0.70) return WasteSeverity.high;
-    if (conf >= 0.50) return WasteSeverity.moderate;
-    if (conf >= _spamConfThreshold) return WasteSeverity.low;
-    return WasteSeverity.spam;
-  }
-
-  String _buildMessage(List<String> categories, double conf) {
+  String _buildMessage(List<String> categories, int wasteCount) {
+    final items = "$wasteCount item${wasteCount == 1 ? "" : "s"}";
     if (categories.isEmpty) {
-      return "Waste detected with ${(conf * 100).toStringAsFixed(1)}% confidence.";
+      return "Detected $items of waste.";
     }
     final readable =
         categories.map((c) => c.replaceAll("_", " ")).toSet().toList();
     if (readable.length == 1) {
-      return "Detected ${readable.first} waste — ${(conf * 100).toStringAsFixed(1)}% confidence.";
+      return "Detected $items of ${readable.first} waste.";
     }
     final last = readable.removeLast();
-    return "Detected ${readable.join(", ")} and $last waste — ${(conf * 100).toStringAsFixed(1)}% confidence.";
+    return "Detected $items of ${readable.join(", ")} and $last waste.";
   }
 
   void dispose() {

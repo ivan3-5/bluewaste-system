@@ -47,7 +47,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
   // ── AI analysis state ───────────────────────────────────────────────────
   bool _isDetecting = false;
-  double? _detectedConfidence; // null = not yet run; 0.0 = no waste
+  int? _detectedWasteCount; // null = not yet run; 0 = no waste
   bool _isSpamFlagged = false;
   bool _detectionFailed = false; // true = server unreachable
   DetectResult? _detectResult; // full pipeline result (set after detect runs)
@@ -61,12 +61,12 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   bool get _hasLocation => _latitude != null && _longitude != null;
 
   /// Detection must have run successfully before submission is allowed.
-  bool get _detectionReady => _detectedConfidence != null && !_detectionFailed;
+  bool get _detectionReady => _detectedWasteCount != null && !_detectionFailed;
   // ── helpers ───────────────────────────────────────────────────────────────
 
   /// Resets all detection state to pristine (call when image is removed).
   void _resetDetection() {
-    _detectedConfidence = null;
+    _detectedWasteCount = null;
     _isSpamFlagged = false;
     _detectionFailed = false;
     _detectResult = null;
@@ -95,7 +95,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     setState(() {
       _isDetecting = true;
       _detectionFailed = false;
-      _detectedConfidence = null;
+      _detectedWasteCount = null;
       _isSpamFlagged = false;
     });
 
@@ -141,7 +141,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         : "no_waste";
     setState(() {
       _isDetecting = false;
-      _detectedConfidence = detectedResult.confidence;
+      _detectedWasteCount = detectedResult.wasteCount;
       _detectResult = detectedResult;
       _category = detectedCategory;
       _isSpamFlagged = false; // may be updated by dialog below
@@ -446,10 +446,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           "analysisStatus": isDirectSpamSubmit
               ? "CLEAN"
               : (_detectResult?.hasWaste == true ? "DIRTY" : "CLEAN"),
-          "analysisConfidence": _detectResult?.confidence,
           "analysisWasteCount":
               (_detectResult?.hasWaste == true && !isDirectSpamSubmit)
-              ? (_detectResult?.labels.length ?? 1)
+              ? (_detectResult?.wasteCount ?? 1)
               : 0,
           "aiModel": _detectResult?.model,
           "aiCategories": _detectResult?.categories.isNotEmpty == true
@@ -1024,10 +1023,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   },
                 ),
               ),
-              if (_detectedConfidence != null) ...[
+              if (_detectedWasteCount != null) ...[
                 const SizedBox(height: AppSpacing.sm),
-                ConfidenceBadge(
-                  confidence: _detectedConfidence!,
+                DetectionBadge(
+                  wasteCount: _detectedWasteCount!,
                   hasWaste: _detectResult?.hasWaste == true,
                   isSpamFlagged: _isSpamFlagged,
                 ),
