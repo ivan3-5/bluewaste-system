@@ -394,6 +394,8 @@ export async function getDashboardStats() {
       COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
       COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount"
     FROM "Report" r
+    WHERE r."isDeleted" = false
+      AND r."isSpam" = false
   `;
 
   const stats = rows[0];
@@ -420,6 +422,8 @@ export async function getDashboardTrend(days = 30) {
         DATE_TRUNC('day', r."createdAt")::date AS day,
         COUNT(*)::bigint AS count
       FROM "Report" r
+      WHERE r."isDeleted" = false
+        AND r."isSpam" = false
       GROUP BY 1
     )
     SELECT
@@ -458,6 +462,8 @@ export async function getDashboardMonthlyTrend(
           COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount",
           COUNT(*)::bigint AS "totalCount"
         FROM "Report" r
+        WHERE r."isDeleted" = false
+          AND r."isSpam" = false
         GROUP BY 1
       )
       SELECT
@@ -492,6 +498,8 @@ export async function getDashboardMonthlyTrend(
           COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount",
           COUNT(*)::bigint AS "totalCount"
         FROM "Report" r
+        WHERE r."isDeleted" = false
+          AND r."isSpam" = false
         GROUP BY 1
       )
       SELECT
@@ -536,6 +544,8 @@ export async function getDashboardCategoryDistribution() {
         END AS bucket,
         COUNT(*)::bigint AS count
       FROM "Report" r
+      WHERE r."isDeleted" = false
+        AND r."isSpam" = false
       GROUP BY 1
     )
     SELECT
@@ -583,31 +593,62 @@ async function notifyReporterStatusChange(
 
 async function tryAutoCompleteCleanupSchedule(
   tx: PrismaTransactionClient,
-  cleanupScheduleId: string,
+  cleanupScheduleId?: string | null,
 ) {
-  const totals = await tx.$queryRaw<
-    { total: bigint; cleaned: bigint }[]
-  >`
-    SELECT
-      COUNT(*) AS total,
-      COUNT(*) FILTER (WHERE status = 'CLEANED') AS cleaned
-    FROM "Report"
-    WHERE "cleanupScheduleId" = ${cleanupScheduleId}
-      AND "isDeleted" = false
-  `;
-
-  const total = Number(totals?.[0]?.total ?? 0);
-  const cleaned = Number(totals?.[0]?.cleaned ?? 0);
-
-  if (total > 0 && cleaned === total) {
-    await tx.$executeRaw`
-      UPDATE "CleanupSchedule"
-      SET status = 'COMPLETED'::"CleanupScheduleStatus",
-          "verifiedAt" = NOW()
-      WHERE id = ${cleanupScheduleId}
-        AND status != 'COMPLETED'
+  if (cleanupScheduleId) {
+    const totals = await tx.$queryRaw<
+      { total: bigint; cleaned: bigint }[]
+    >`
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE status = 'CLEANED') AS cleaned
+      FROM "Report"
+      WHERE "cleanupScheduleId" = ${cleanupScheduleId}
+        AND "isDeleted" = false
     `;
+
+    const total = Number(totals?.[0]?.total ?? 0);
+    const cleaned = Number(totals?.[0]?.cleaned ?? 0);
+
+    if (total > 0 && cleaned === total) {
+      await tx.$executeRaw`
+        UPDATE "CleanupSchedule"
+        SET status = 'COMPLETED'::"CleanupScheduleStatus",
+            "updatedAt" = NOW(),
+            "verifiedAt" = COALESCE("verifiedAt", NOW()),
+            notes = CASE
+              WHEN notes IS NULL OR notes = '' THEN 'Automatically completed: all associated waste reports have been cleaned.'
+              ELSE notes
+            END
+        WHERE id = ${cleanupScheduleId}
+          AND status != 'COMPLETED'
+      `;
+    }
   }
+
+  // Universal reconciliation: Auto-complete any UPCOMING or ONGOING schedule whose active reports are all CLEANED
+  await tx.$executeRaw`
+    UPDATE "CleanupSchedule" cs
+    SET status = 'COMPLETED'::"CleanupScheduleStatus",
+        "updatedAt" = NOW(),
+        "verifiedAt" = COALESCE("verifiedAt", NOW()),
+        notes = CASE 
+          WHEN notes IS NULL OR notes = '' THEN 'Automatically completed: all associated waste reports have been cleaned.'
+          ELSE notes
+        END
+    WHERE cs.status IN ('UPCOMING', 'ONGOING')
+      AND EXISTS (
+        SELECT 1 FROM "Report" r
+        WHERE r."cleanupScheduleId" = cs.id
+          AND r."isDeleted" = false
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM "Report" r
+        WHERE r."cleanupScheduleId" = cs.id
+          AND r."isDeleted" = false
+          AND r.status != 'CLEANED'
+      )
+  `;
 }
 
 export async function updateDashboardReportStatus(
@@ -615,11 +656,11 @@ export async function updateDashboardReportStatus(
   status: AdminReport["status"],
 ) {
   await prisma.$transaction(async (tx) => {
-    // Read reporter id, title, and cleanupScheduleId first (avoid Prisma model mismatches)
+    // Read reporter id, title, cleanupScheduleId, and incidentId first
     const rows = await tx.$queryRaw<
-      { reporterId: string | null; title: string; cleanupScheduleId: string | null }[]
+      { reporterId: string | null; title: string; cleanupScheduleId: string | null; incidentId: string | null }[]
     >`
-      SELECT r."reporterId", r.title, r."cleanupScheduleId"
+      SELECT r."reporterId", r.title, r."cleanupScheduleId", r."incidentId"
       FROM "Report" r
       WHERE r.id = ${id}
       LIMIT 1
@@ -628,6 +669,7 @@ export async function updateDashboardReportStatus(
     const reporterId = rows?.[0]?.reporterId ?? null;
     const title = rows?.[0]?.title ?? "";
     const cleanupScheduleId = rows?.[0]?.cleanupScheduleId ?? null;
+    const incidentId = rows?.[0]?.incidentId ?? null;
 
     // Update status (cast to DB enum)
     await tx.$executeRaw`
@@ -636,13 +678,24 @@ export async function updateDashboardReportStatus(
       WHERE id = ${id}
     `;
 
+    // If report belongs to an incident, propagate to active sibling reports
+    if (incidentId) {
+      await tx.$executeRaw`
+        UPDATE "Report"
+        SET status = ${status}::"ReportStatus"
+        WHERE "incidentId" = ${incidentId}
+          AND id != ${id}
+          AND "isDeleted" = false
+      `;
+    }
+
     // Create a notification for the reporter if they exist
     if (reporterId) {
       await notifyReporterStatusChange(tx, reporterId, title, id, status);
     }
 
-    // Auto-complete the linked CleanupSchedule if ALL its reports are now CLEANED
-    if (status === "CLEANED" && cleanupScheduleId) {
+    // Auto-complete any linked CleanupSchedule if ALL its reports are now CLEANED
+    if (status === "CLEANED") {
       await tryAutoCompleteCleanupSchedule(tx, cleanupScheduleId);
     }
   });

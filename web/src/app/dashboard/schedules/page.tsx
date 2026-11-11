@@ -66,6 +66,14 @@ export default function SchedulesPage() {
     refetchIntervalInBackground: true,
   });
 
+  const activeSchedule = useMemo(() => {
+    if (!selectedSchedule) return null;
+    return (
+      schedulesData?.find((s) => s.id === selectedSchedule.id) ||
+      selectedSchedule
+    );
+  }, [selectedSchedule, schedulesData]);
+
   const { data: workers = [] } = useQuery({
     queryKey: ["workers"],
     queryFn: async () => {
@@ -614,11 +622,11 @@ export default function SchedulesPage() {
       )}
 
       {/* ── Schedule Detail Mission Briefing Modal ────────────────── */}
-      {selectedSchedule && (
+      {activeSchedule && (
         <ScheduleDetail
           isOpen={isDetailOpen}
           onClose={() => setIsDetailOpen(false)}
-          schedule={selectedSchedule}
+          schedule={activeSchedule}
           onEdit={handleEdit}
           onRefresh={handleRefresh}
           onDelete={async (id) => {
