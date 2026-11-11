@@ -63,6 +63,10 @@ export function handleControllerError(
   if (message === "Report is marked as spam") return sendError(res, 400, message, "REPORT_SPAM");
   if (message === "One or more worker IDs are invalid") return sendError(res, 400, message, "INVALID_WORKER_IDS");
   if (message === "Cannot create schedule for a past date") return sendError(res, 400, message, "SCHEDULE_VALIDATION_FAILED");
+  if (message === "One or more selected waste reports do not exist or were deleted" ||
+      message.startsWith("Cannot schedule report(s) that are already completed or rejected:")) {
+    return sendError(res, 409, message, "REPORT_UNAVAILABLE_FOR_SCHEDULE");
+  }
   if (
     message.startsWith("Cannot create schedule:") ||
     message.startsWith("Cannot update schedule:") ||

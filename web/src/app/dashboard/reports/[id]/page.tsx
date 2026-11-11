@@ -408,7 +408,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
                     </Link>
                   ) : report.status === "VERIFIED" ? (
                     <Link
-                      href="/dashboard/schedules"
+                      href={`/dashboard/schedules?reportId=${encodeURIComponent(report.id)}`}
                       className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
                     >
                       + Assign Team

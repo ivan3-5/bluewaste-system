@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { formatScheduleDateTime, parseScheduleDateTime } from "@/lib/schedule-date";
 import { CleanupScheduleStatus, User, Report } from "@/types";
 import { getReverseGeocodedLocation } from "@/lib/utils";
 import {
@@ -33,12 +35,15 @@ import {
   Layers,
 } from "lucide-react";
 
+export type ScheduleWorkerOption = Pick<User, "id" | "firstName" | "lastName" | "email">;
+
 interface ScheduleFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => Promise<void>;
   initialData?: any;
-  workers: User[];
+  initialReportId?: string;
+  workers: ScheduleWorkerOption[];
   isEditing?: boolean;
 }
 
@@ -117,6 +122,7 @@ export function ScheduleForm({
   onClose,
   onSubmit,
   initialData,
+  initialReportId,
   workers,
   isEditing = false,
 }: ScheduleFormProps) {
@@ -153,6 +159,26 @@ export function ScheduleForm({
     enabled: isOpen,
   });
 
+  const reportInList = eligibleReports.find((report) => report.id === initialReportId);
+  const initialReportQuery = useQuery({
+    queryKey: ["report", initialReportId, "schedule-selection"],
+    queryFn: async () => {
+      const { data } = await api.get<Report & { locationName?: string }>(
+        `/reports/${encodeURIComponent(initialReportId!)}`,
+      );
+      return {
+        ...data,
+        title: data.title ?? "Waste report",
+        address: data.address ?? data.locationName,
+      };
+    },
+    enabled: isOpen && !isEditing && Boolean(initialReportId) && !reportInList,
+  });
+  const reportFromLink = reportInList ?? initialReportQuery.data;
+  const initialReport = reportFromLink?.status === "VERIFIED" &&
+    !reportFromLink.cleanupScheduleId && !reportFromLink.isSpam
+    ? reportFromLink : undefined;
+
   const { data: allSchedules = [] } = useQuery({
     queryKey: ["schedules", "conflict-check"],
     queryFn: async () => {
@@ -167,7 +193,7 @@ export function ScheduleForm({
     const targetDateStr = formData.scheduledAt.slice(0, 10);
     return allSchedules.find((s: any) => {
       if (s.status === "CANCELLED" || s.status === "COMPLETED") return false;
-      return s.scheduledAt && s.scheduledAt.slice(0, 10) === targetDateStr;
+      return s.scheduledAt && formatScheduleDateTime(s.scheduledAt).slice(0, 10) === targetDateStr;
     });
   }, [formData.scheduledAt, allSchedules, isEditing]);
 
@@ -181,8 +207,10 @@ export function ScheduleForm({
       );
       return [...currentReports, ...unassigned];
     }
-    return eligibleReports.filter((r) => !r.cleanupScheduleId);
-  }, [isEditing, initialData?.reports, eligibleReports]);
+    return initialReport && !reportInList
+      ? [initialReport, ...eligibleReports]
+      : eligibleReports;
+  }, [isEditing, initialData?.reports, eligibleReports, initialReport, reportInList]);
 
   const selectedCitizenCount = useMemo(() => {
     const selected = displayedReports.filter((r: any) =>
@@ -254,14 +282,6 @@ export function ScheduleForm({
   useEffect(() => {
     setErrorMessage(null);
     if (initialData && isOpen) {
-      const getLocalDatetimeStr = (dateString?: string) => {
-        if (!dateString) return "";
-        const d = new Date(dateString);
-        if (isNaN(d.getTime())) return "";
-        const tzOffset = d.getTimezoneOffset() * 60000;
-        return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
-      };
-
       const initialBarangay = initialData.barangay || "";
       const rawInitialLoc =
         initialData.reports?.[0]?.address ||
@@ -278,7 +298,7 @@ export function ScheduleForm({
         barangay: initialBarangay,
         latitude: initialData.latitude || 7.3032,
         longitude: initialData.longitude || 125.6811,
-        scheduledAt: getLocalDatetimeStr(initialData.scheduledAt),
+        scheduledAt: formatScheduleDateTime(initialData.scheduledAt),
         workerIds: initialData.workers
           ? initialData.workers.map((w: any) => w.workerId)
           : [],
@@ -305,6 +325,24 @@ export function ScheduleForm({
     }
   }, [initialData, isOpen, isEditing]);
 
+  useEffect(() => {
+    if (!isOpen || isEditing || !initialReport) return;
+    const address = initialReport.address?.trim();
+    const location = address && !address.toLowerCase().startsWith("waste report") ? address : "";
+    setFormData((previous) => {
+      if (previous.reportIds.length > 0) return previous;
+      return {
+        ...previous,
+        reportIds: [initialReport.id],
+        latitude: initialReport.latitude,
+        longitude: initialReport.longitude,
+        locationName: previous.locationName || location,
+        barangay: previous.barangay || detectBarangayFromLocation(location),
+        title: previous.title || (location ? `Coastal Cleanup - ${location.split(",")[0]}`.slice(0, 200) : "Coastal Cleanup"),
+      };
+    });
+  }, [isOpen, isEditing, initialReport]);
+
   // Handle Location Name changes: Automatically fills in Target Barangay / Coastal Area
   const handleLocationNameChange = (newLocationName: string) => {
     const autoBarangay = detectBarangayFromLocation(newLocationName);
@@ -318,7 +356,7 @@ export function ScheduleForm({
       const addr = (r.address || "").toLowerCase();
       const resolved = resolveLocationForReport(r).toLowerCase();
       const title = !r.title?.toLowerCase().startsWith("waste report") ? r.title.toLowerCase() : "";
-      return (addr && addr.includes(search)) || (resolved && resolved.includes(search)) || (title && title.includes(search));
+      return Boolean(search) && [addr, resolved, title].some((value) => value === search);
     });
 
     setFormData((prev) => {
@@ -448,18 +486,30 @@ export function ScheduleForm({
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!formData.title.trim()) {
-      setErrorMessage("Please provide a title for the cleanup schedule.");
+    if (loading) return;
+    const title = formData.title.trim();
+    const description = formData.description.trim();
+    const barangay = formData.barangay.trim() || formData.locationName.trim();
+    const scheduledAt = parseScheduleDateTime(formData.scheduledAt);
+
+    if (title.length < 3 || title.length > 200) {
+      setErrorMessage("Enter an operation title between 3 and 200 characters.");
       setActiveTab("details");
       return;
     }
-    if (!formData.locationName?.trim() && !formData.barangay?.trim()) {
-      setErrorMessage("Please specify the coastal location.");
+    if (!barangay || barangay.length > 300) {
+      setErrorMessage("Enter a coastal location of up to 300 characters.");
       setActiveTab("details");
       return;
     }
-    if (!formData.scheduledAt) {
-      setErrorMessage("Please set a valid date and time for the schedule.");
+    if (!Number.isFinite(scheduledAt.getTime()) ||
+        (!isEditing && formData.scheduledAt < formatScheduleDateTime(new Date()))) {
+      setErrorMessage("Choose a valid deployment date and time in Panabo.");
+      setActiveTab("details");
+      return;
+    }
+    if (description.length < 10 || description.length > 2000) {
+      setErrorMessage("Enter an operational briefing between 10 and 2,000 characters.");
       setActiveTab("details");
       return;
     }
@@ -483,17 +533,18 @@ export function ScheduleForm({
 
     try {
       setLoading(true);
-      const payload: any = { ...formData };
-      payload.barangay =
-        formData.barangay?.trim() ||
-        formData.locationName?.trim() ||
-        detectBarangayFromLocation(formData.locationName) ||
-        "Panabo Coastal Area";
-      if (payload.scheduledAt) {
-        payload.scheduledAt = new Date(payload.scheduledAt).toISOString();
-      }
-
-      delete payload.locationName; // Clean extra helper field before sending to API
+      const payload = {
+        title,
+        description,
+        barangay,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        scheduledAt: scheduledAt.toISOString(),
+        workerIds: formData.workerIds,
+        reportIds: formData.reportIds,
+        status: formData.status,
+        equipment: formData.equipment,
+      };
 
       if (payload.reportIds && payload.reportIds.length > 0) {
         const selectedReports = displayedReports.filter((r: any) =>
@@ -510,12 +561,6 @@ export function ScheduleForm({
           );
           payload.latitude = sumLat / selectedReports.length;
           payload.longitude = sumLng / selectedReports.length;
-
-          if (!payload.barangay && selectedReports[0].address) {
-            payload.barangay = detectBarangayFromLocation(
-              selectedReports[0].address,
-            );
-          }
         }
       }
 
@@ -523,17 +568,13 @@ export function ScheduleForm({
       onClose();
     } catch (error: any) {
       console.error("Form submission error", error);
-      if (error.response?.data?.details) {
+      if (Array.isArray(error.response?.data?.details) && error.response.data.details.length) {
         const messages = error.response.data.details
           .map((d: any) => `${d.field}: ${d.message}`)
           .join(" • ");
         setErrorMessage(`Validation error: ${messages}`);
-      } else if (error.response?.data?.message) {
-        setErrorMessage(error.response.data.message);
       } else {
-        setErrorMessage(
-          "An error occurred while saving the schedule. Please try again.",
-        );
+        setErrorMessage(getApiErrorMessage(error, "Could not save the schedule. Please try again."));
       }
     } finally {
       setLoading(false);
@@ -633,7 +674,7 @@ export function ScheduleForm({
             </div>
           )}
 
-          <form id="schedule-form" onSubmit={handleSubmit} className="space-y-6">
+          <form id="schedule-form" noValidate onSubmit={handleSubmit} className="space-y-6">
             {/* TAB 1: DETAILS */}
             {activeTab === "details" && (
               <div className="space-y-5 animate-in fade-in duration-200">
@@ -716,6 +757,14 @@ export function ScheduleForm({
                         Protected: Reports already assigned to another cleanup schedule cannot be re-selected.
                       </span>
                     </div>
+
+                    {initialReportId && !initialReport && (
+                      <p role="status" className="text-xs text-slate-600 dark:text-slate-300">
+                        {initialReportQuery.isLoading
+                          ? "Loading the selected report…"
+                          : "The selected report could not be loaded or is no longer available for scheduling."}
+                      </p>
+                    )}
 
                     {formData.reportIds.length > 1 && (
                       <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-800/60 text-[11px] font-semibold text-indigo-900 dark:text-indigo-200">
@@ -813,24 +862,19 @@ export function ScheduleForm({
                     </div>
                   </div>
 
-                  {/* Deployment Date & Time */}
+                  {/* Deployment Date & Time (Panabo) */}
                   <div className="space-y-1.5 md:col-span-2">
                     <Label
                       htmlFor="scheduledAt"
                       className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
                     >
-                      Deployment Date & Time *
+                      Deployment Date & Time (Panabo) *
                     </Label>
                     <Input
                       id="scheduledAt"
                       type="datetime-local"
                       required
-                      min={new Date(
-                        new Date().getTime() -
-                           new Date().getTimezoneOffset() * 60000,
-                      )
-                        .toISOString()
-                        .slice(0, 16)}
+                      min={isEditing ? undefined : formatScheduleDateTime(new Date())}
                       value={formData.scheduledAt}
                       onChange={(e) =>
                         setFormData((prev) => ({
@@ -1136,20 +1180,7 @@ export function ScheduleForm({
             <Button
               form="schedule-form"
               type="submit"
-              disabled={
-                loading ||
-                formData.equipment.length === 0 ||
-                formData.workerIds.length === 0
-              }
-              title={
-                formData.equipment.length === 0 && formData.workerIds.length === 0
-                  ? "Please select equipment and assign workers before creating schedule"
-                  : formData.equipment.length === 0
-                  ? "Please select at least one equipment item"
-                  : formData.workerIds.length === 0
-                  ? "Please assign at least one worker"
-                  : undefined
-              }
+              disabled={loading}
               className="rounded-xl h-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-indigo-500/20 text-white font-bold text-xs transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none disabled:hover:from-blue-600 disabled:hover:to-indigo-600"
             >
               {loading ? (
