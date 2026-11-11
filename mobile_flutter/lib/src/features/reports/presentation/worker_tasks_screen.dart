@@ -10,6 +10,9 @@ import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../data/report_service.dart";
+import "../data/offline_service.dart";
+import "../../schedules/presentation/schedule_providers.dart";
+import "widgets/pending_reports_banner.dart";
 import "../data/detect_service.dart";
 import "../domain/report_models.dart";
 import "worker_home_screen.dart";
@@ -35,6 +38,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
 
   List<ReportRecord> _tasks = const [];
   bool _loading = true;
+  int _tasksRequest = 0;
   String _activeFilter = "all";
   Timer? _timer;
   final Set<String> _uploadingTaskIds = {};
@@ -83,12 +87,13 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
       .join(";");
 
   Future<void> _loadTasks() async {
+    final request = ++_tasksRequest;
     try {
       final result = await ref
           .read(reportServiceProvider)
           .getAssignedReports(page: 1, limit: 100);
 
-      if (!mounted) return;
+      if (!mounted || request != _tasksRequest) return;
 
       final newTasks = result.data;
       if (!_loading && _signature(newTasks) == _signature(_tasks)) return;
@@ -98,7 +103,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
         _loading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || request != _tasksRequest) return;
       setState(() => _loading = false);
     }
   }
@@ -148,6 +153,8 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
           ),
         ),
       );
+      ref.invalidate(mySchedulesProvider);
+      ref.invalidate(scheduleDetailProvider);
       await _refreshAll();
     } catch (error) {
       if (!mounted) return;
@@ -396,6 +403,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
 
   /// Lets the worker attach 1–5 cleanup photos in total per task.
   Future<void> _uploadCleanupPhotos(String reportId, int existingCount) async {
+    if (_uploadingTaskIds.contains(reportId)) return;
     final remaining = _maxCleanupPhotos - existingCount;
     if (remaining <= 0) {
       _showSnack(
@@ -405,44 +413,37 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
       return;
     }
 
-    final source = await _chooseSource();
-    if (source == null || !mounted) return;
-
-    List<XFile> photos;
-    if (source == ImageSource.camera) {
-      final photo = await _picker.pickImage(source: source, imageQuality: 75);
-      photos = photo == null ? const [] : [photo];
-    } else if (remaining == 1) {
-      final photo = await _picker.pickImage(source: source, imageQuality: 75);
-      photos = photo == null ? const [] : [photo];
-    } else {
-      photos = await _picker.pickMultiImage(imageQuality: 75, limit: remaining);
-    }
-    if (photos.isEmpty || !mounted) return;
-
-    final overLimit = photos.length > remaining;
-    if (overLimit) photos = photos.sublist(0, remaining);
-
     setState(() => _uploadingTaskIds.add(reportId));
     try {
-      await ref.read(reportServiceProvider).uploadReportImages(
-            reportId: reportId,
-            images: photos,
-            type: "CLEANUP",
-          );
-      if (!mounted) return;
-      await _refreshAll();
-      if (!mounted) return;
+      final source = await _chooseSource();
+      if (source == null || !mounted) return;
 
-      final count = photos.length;
-      HapticFeedback.mediumImpact();
-      _showSnack(
-        overLimit
-            ? "Uploaded $count photos (limit is $_maxCleanupPhotos per task)."
-            : count == 1
-                ? "Cleanup proof photo uploaded successfully! Ready to complete."
-                : "$count cleanup proof photos uploaded! Ready to complete.",
+      final List<XFile> photos;
+      if (source == ImageSource.camera || remaining == 1) {
+        final photo = await _picker.pickImage(source: source, imageQuality: 75);
+        photos = photo == null ? const [] : [photo];
+      } else {
+        photos = await _picker.pickMultiImage(imageQuality: 75, limit: remaining);
+      }
+      if (photos.isEmpty || !mounted) return;
+
+      final service = ref.read(offlineServiceProvider);
+      final id = await service.queueCleanupPhotos(
+        reportId,
+        photos.take(remaining).map((photo) => photo.path).toList(),
       );
+      await service.syncOfflineReports();
+      final queued = (await service.getQueuedReports()).where((entry) => entry.id == id).firstOrNull;
+      if (!mounted) return;
+      if (queued == null) {
+        HapticFeedback.mediumImpact();
+        _showSnack("Cleanup photos uploaded. You can now mark the task as cleaned.");
+      } else if (queued.failed) {
+        _showSnack(queued.lastError ?? "Could not upload cleanup photos. Tap Retry to try again.", error: true);
+      } else {
+        _showSnack("Cleanup photos saved on this phone. They will upload when the server is reachable.");
+      }
+      await _refreshAll();
     } catch (error) {
       if (!mounted) return;
       _showSnack(error.toString(), error: true);
@@ -505,6 +506,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen<int>(workerTasksRefreshProvider, (_, __) => _loadTasks());
+    ref.listen<int>(reportsSyncedProvider, (_, __) => _refreshAll());
 
     if (_loading) {
       return const _TasksSkeletonLoader();
@@ -526,6 +528,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
           constraints: const BoxConstraints(maxWidth: 680),
           child: Column(
             children: [
+              const PendingReportsBanner(cleanupPhotos: true),
               // ── Filter Segment Bar & Quick Stats ──
               Container(
                 color: AppColors.card,

@@ -53,6 +53,7 @@ export class ScheduleController {
         status,
         req.user!.id,
         notes,
+        req.user!.role === "FIELD_WORKER",
       );
       res.json(schedule);
     } catch (error) {

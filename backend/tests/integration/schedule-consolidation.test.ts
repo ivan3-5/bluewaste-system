@@ -274,15 +274,15 @@ describe("Schedule Consolidation Service", () => {
       };
       prismaMock.cleanupSchedule.findUnique.mockResolvedValue(existing as never);
       prismaMock.cleanupSchedule.update.mockResolvedValue({ ...existing, status: CleanupScheduleStatus.ONGOING } as never);
-      prismaMock.report.findMany.mockResolvedValue([{ id: report1.id }, { id: report2.id }] as never);
-      prismaMock.report.updateMany.mockResolvedValue({ count: 2 });
+      prismaMock.report.updateManyAndReturn.mockResolvedValue([{ id: report1.id }, { id: report2.id }] as never);
       prismaMock.statusHistory.createMany.mockResolvedValue({ count: 2 });
 
       await ScheduleService.updateStatus("sched-1", "ONGOING", "worker-1");
 
-      expect(prismaMock.report.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: [report1.id, report2.id] } },
+      expect(prismaMock.report.updateManyAndReturn).toHaveBeenCalledWith({
+        where: { cleanupScheduleId: "sched-1", isDeleted: false, status: ReportStatus.CLEANUP_SCHEDULED },
         data: { status: ReportStatus.IN_PROGRESS },
+        select: { id: true },
       });
     });
 
@@ -351,7 +351,7 @@ describe("Schedule Consolidation Service", () => {
 
       expect(prismaMock.cleanupSchedule.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: "sched-1" },
+          where: expect.objectContaining({ id: "sched-1", status: { in: ["UPCOMING", "ONGOING"] } }),
           data: expect.objectContaining({
             status: "COMPLETED",
           }),

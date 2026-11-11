@@ -13,6 +13,7 @@ import "../../reports/presentation/worker_home_screen.dart";
 import "../../reports/presentation/worker_route_screen.dart";
 import "../../reports/presentation/worker_tasks_screen.dart";
 import "../../schedules/presentation/schedules_screen.dart";
+import "../../schedules/presentation/schedule_providers.dart";
 
 class WorkerShellScreen extends ConsumerStatefulWidget {
   const WorkerShellScreen({super.key});
@@ -34,6 +35,8 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
       ref.invalidate(workerAssignedReportsProvider);
     } else if (value == 1) {
       ref.read(workerTasksRefreshProvider.notifier).state++;
+    } else if (value == 3) {
+      ref.invalidate(mySchedulesProvider);
     }
   }
 

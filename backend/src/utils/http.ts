@@ -1,4 +1,5 @@
 import { Response } from "express";
+import { logger } from "./logger";
 
 export function sendError(
   res: Response,
@@ -26,8 +27,6 @@ export function handleControllerError(
   defaultCode = "INTERNAL_ERROR",
 ) {
   const message = error instanceof Error ? error.message : typeof error === "string" ? error : defaultMessage;
-  const fs = require('fs');
-  fs.appendFileSync('controller-error.log', message + '\n');
 
   // 404 Not Found mappings
   if (message === "Report not found") return sendError(res, 404, message, "REPORT_NOT_FOUND");
@@ -55,6 +54,10 @@ export function handleControllerError(
   if (message === "Email already registered" || message === "Email already in use") {
     return sendError(res, 409, message, "EMAIL_TAKEN");
   }
+  if (message.startsWith("Cannot mark cleanup schedule as completed:") ||
+      message === "This schedule status has changed. Refresh and try again.") {
+    return sendError(res, 409, message, "SCHEDULE_STATUS_CONFLICT");
+  }
 
   // 400 Bad Request mappings
   if (message === "Report is marked as spam") return sendError(res, 400, message, "REPORT_SPAM");
@@ -77,5 +80,6 @@ export function handleControllerError(
     return sendError(res, 400, message, "VALIDATION_ERROR");
   }
 
+  logger.error({ err: error, code: defaultCode }, defaultMessage);
   return sendError(res, 500, defaultMessage, defaultCode);
 }

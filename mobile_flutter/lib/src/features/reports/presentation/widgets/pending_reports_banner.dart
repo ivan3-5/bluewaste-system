@@ -7,7 +7,9 @@ import "../../data/offline_service.dart";
 
 /// Shown while reports saved offline are waiting to upload.
 class PendingReportsBanner extends ConsumerStatefulWidget {
-  const PendingReportsBanner({super.key});
+  const PendingReportsBanner({super.key, this.cleanupPhotos = false});
+
+  final bool cleanupPhotos;
 
   @override
   ConsumerState<PendingReportsBanner> createState() =>
@@ -35,14 +37,16 @@ class _PendingReportsBannerState extends ConsumerState<PendingReportsBanner> {
       final result = await action();
       if (result.offline) {
         _toast(
-          "Couldn't reach the server. Saved reports will retry automatically.",
+          "Couldn't reach the server. Saved uploads will retry automatically.",
           error: true,
         );
       } else if (result.uploaded > 0 && result.remaining + result.failed == 0) {
         _toast(
-          result.uploaded == 1
-              ? "Report uploaded and confirmed on the server."
-              : "${result.uploaded} reports uploaded and confirmed on the server.",
+          widget.cleanupPhotos
+              ? "Cleanup photos uploaded."
+              : result.uploaded == 1
+                  ? "Report uploaded and confirmed on the server."
+                  : "${result.uploaded} reports uploaded and confirmed on the server.",
         );
       } else if (result.uploaded > 0) {
         _toast(
@@ -50,7 +54,7 @@ class _PendingReportsBannerState extends ConsumerState<PendingReportsBanner> {
         );
       } else if (result.failed > 0) {
         _toast(
-          result.lastError ?? "Some reports could not be uploaded.",
+          result.lastError ?? "Some uploads could not be completed.",
           error: true,
         );
       } else if (result.lastError != null) {
@@ -60,7 +64,7 @@ class _PendingReportsBannerState extends ConsumerState<PendingReportsBanner> {
         );
       }
     } catch (_) {
-      _toast("Couldn't sync saved reports. Please try again.", error: true);
+      _toast("Couldn't sync saved uploads. Please try again.", error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -70,9 +74,11 @@ class _PendingReportsBannerState extends ConsumerState<PendingReportsBanner> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Discard failed reports?"),
-        content: const Text(
-          "These reports and their photos will be deleted from this phone and will not be uploaded.",
+        title: Text(widget.cleanupPhotos ? "Discard pending cleanup photos?" : "Discard failed reports?"),
+        content: Text(
+          widget.cleanupPhotos
+              ? "Saved cleanup photos will be removed from this phone. Photos already uploaded stay on the task."
+              : "These reports and their photos will be deleted from this phone and will not be uploaded.",
         ),
         actions: [
           TextButton(
@@ -89,7 +95,7 @@ class _PendingReportsBannerState extends ConsumerState<PendingReportsBanner> {
         ],
       ),
     );
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       await ref.read(offlineServiceProvider).discardFailed();
     }
   }
@@ -103,7 +109,9 @@ class _PendingReportsBannerState extends ConsumerState<PendingReportsBanner> {
     final theme = Theme.of(context);
     final hasFailed = summary.failed > 0;
     final accent = hasFailed ? AppColors.destructive : AppColors.warning;
-    final title = hasFailed
+    final title = widget.cleanupPhotos
+        ? (hasFailed ? "Cleanup photo upload failed" : "Cleanup photos waiting to upload")
+        : hasFailed
         ? (summary.failed == 1
               ? "1 report couldn't upload"
               : "${summary.failed} reports couldn't upload")

@@ -11,13 +11,9 @@ import '../../../core/ui/app_components.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/schedule_service.dart';
 import '../domain/schedule_models.dart';
-import 'schedules_screen.dart';
-
-final scheduleDetailProvider =
-    FutureProvider.family.autoDispose<CleanupSchedule, String>((ref, id) async {
-  final service = ref.watch(scheduleServiceProvider);
-  return service.getScheduleById(id);
-});
+import '../../reports/presentation/worker_home_screen.dart';
+import '../../reports/presentation/worker_tasks_screen.dart';
+import 'schedule_providers.dart';
 
 class ScheduleDetailScreen extends ConsumerStatefulWidget {
   final String scheduleId;
@@ -80,17 +76,16 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
   }
 
   Future<void> _updateStatus(BuildContext context, String status) async {
-    final user = ref.read(currentUserProvider).value;
-    final isWorker = user?.role == 'FIELD_WORKER';
+    if (_isUpdating) return;
 
     String? notes;
     if (status == 'COMPLETED') {
+      var completionNotes = '';
       notes = await showModalBottomSheet<String>(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (dialogCtx) {
-          final controller = TextEditingController();
           return Container(
             padding: EdgeInsets.fromLTRB(
               AppSpacing.md,
@@ -141,7 +136,8 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: controller,
+                  onChanged: (text) => completionNotes = text,
+                  maxLength: 500,
                   maxLines: 4,
                   autofocus: true,
                   decoration: InputDecoration(
@@ -189,7 +185,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                     Expanded(
                       flex: 2,
                       child: ElevatedButton.icon(
-                        onPressed: () => Navigator.pop(dialogCtx, controller.text),
+                        onPressed: () => Navigator.pop(dialogCtx, completionNotes.trim()),
                         icon: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
                         label: const Text(
                           "Confirm Complete",
@@ -215,29 +211,28 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           );
         },
       );
-      if (notes == null) return;
+      if (!mounted || notes == null) return;
     }
 
     setState(() => _isUpdating = true);
     try {
       final service = ref.read(scheduleServiceProvider);
-      await service.updateScheduleStatus(widget.scheduleId, status, notes: notes);
+      final updated = await service.updateScheduleStatus(widget.scheduleId, status, notes: notes);
+      if (!mounted || !context.mounted) return;
 
       ref.invalidate(scheduleDetailProvider(widget.scheduleId));
-      if (isWorker) {
-        ref.invalidate(mySchedulesProvider);
-      } else {
-        ref.invalidate(upcomingSchedulesProvider);
-      }
+      ref.invalidate(mySchedulesProvider);
+      ref.invalidate(upcomingSchedulesProvider);
+      ref.invalidate(workerAssignedReportsProvider);
+      ref.read(workerTasksRefreshProvider.notifier).state++;
 
-      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
               const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
               const SizedBox(width: 8),
-              Text("Schedule status updated to ${_statusLabel(CleanupScheduleStatus.values.firstWhere((e) => e.name.toUpperCase() == status.toUpperCase(), orElse: () => CleanupScheduleStatus.completed))}"),
+              Flexible(child: Text("Schedule status updated to ${_statusLabel(updated.status)}.")),
             ],
           ),
           backgroundColor: status == 'COMPLETED' ? const Color(0xFF10B981) : AppColors.primary,
@@ -246,7 +241,8 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
         ),
       );
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted || !context.mounted) return;
+      ref.invalidate(scheduleDetailProvider(widget.scheduleId));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error updating status: $e'),
@@ -263,7 +259,14 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scheduleAsync = ref.watch(scheduleDetailProvider(widget.scheduleId));
+    final user = ref.watch(currentUserProvider).value;
+    final isWorker = user?.role == 'FIELD_WORKER';
+    final scheduleAsync = isWorker
+        ? ref.watch(scheduleDetailProvider(widget.scheduleId)).whenData<ScheduleDetails?>((value) => value)
+        : ref.watch(upcomingSchedulesProvider).whenData<ScheduleDetails?>((schedules) {
+            final schedule = schedules.where((entry) => entry.id == widget.scheduleId).firstOrNull;
+            return schedule == null ? null : (schedule: schedule, uncleanedReports: 0);
+          });
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -284,13 +287,25 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppColors.foreground),
             tooltip: "Refresh details",
-            onPressed: () => ref.invalidate(scheduleDetailProvider(widget.scheduleId)),
+            onPressed: () {
+              if (isWorker) {
+                ref.invalidate(scheduleDetailProvider(widget.scheduleId));
+              } else {
+                ref.invalidate(upcomingSchedulesProvider);
+              }
+            },
           ),
           const SizedBox(width: 8),
         ],
       ),
       body: scheduleAsync.when(
-        data: (schedule) => _buildBody(context, schedule),
+        data: (details) => details == null
+            ? const Center(child: Text("This cleanup schedule is no longer listed."))
+            : _buildBody(
+                context,
+                details.schedule,
+                uncleanedReports: details.uncleanedReports,
+              ),
         loading: () => widget.initialSchedule != null
             ? _buildBody(context, widget.initialSchedule!)
             : const Center(
@@ -313,12 +328,17 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     );
   }
 
-  Widget _buildBody(BuildContext context, CleanupSchedule schedule) {
+  Widget _buildBody(
+    BuildContext context,
+    CleanupSchedule schedule, {
+    int? uncleanedReports,
+  }) {
     final user = ref.watch(currentUserProvider).value;
-    final isWorker = user?.role == 'FIELD_WORKER';
+    final isWorker = user?.role == 'FIELD_WORKER' &&
+        schedule.workers.any((worker) => worker.workerId == user?.id);
     final statusColor = _statusColor(schedule.status);
     final statusLabel = _statusLabel(schedule.status);
-    final hasActions = isWorker &&
+    final hasActions = isWorker && uncleanedReports != null &&
         (schedule.status == CleanupScheduleStatus.upcoming ||
             schedule.status == CleanupScheduleStatus.ongoing);
 
@@ -375,7 +395,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
         ),
 
         // ── Sticky Worker Action Bar ──
-        if (hasActions) _buildBottomBar(context, schedule),
+        if (hasActions) _buildBottomBar(context, schedule, uncleanedReports),
       ],
     );
   }
@@ -934,7 +954,11 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     );
   }
 
-  Widget _buildBottomBar(BuildContext context, CleanupSchedule schedule) {
+  Widget _buildBottomBar(
+    BuildContext context,
+    CleanupSchedule schedule,
+    int uncleanedReports,
+  ) {
     final isUpcoming = schedule.status == CleanupScheduleStatus.upcoming;
     final isOngoing = schedule.status == CleanupScheduleStatus.ongoing;
 
@@ -953,9 +977,17 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          width: double.infinity,
-          height: 52,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isOngoing && uncleanedReports > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Text("Mark the remaining $uncleanedReports linked task(s) as cleaned before completing this schedule."),
+              ),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
           child: isUpcoming
               ? ElevatedButton.icon(
                   onPressed: _isUpdating ? null : () => _updateStatus(context, 'ONGOING'),
@@ -982,7 +1014,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                 )
               : isOngoing
                   ? ElevatedButton.icon(
-                      onPressed: _isUpdating ? null : () => _updateStatus(context, 'COMPLETED'),
+                      onPressed: _isUpdating || uncleanedReports > 0 ? null : () => _updateStatus(context, 'COMPLETED'),
                       icon: _isUpdating
                           ? const SizedBox(
                               width: 20,
@@ -1005,6 +1037,8 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                       ),
                     )
                   : const SizedBox.shrink(),
+            ),
+          ],
         ),
       ),
     );

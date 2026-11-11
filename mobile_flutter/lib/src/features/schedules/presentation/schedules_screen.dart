@@ -5,19 +5,9 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/ui/app_components.dart';
 import '../../auth/presentation/auth_controller.dart';
-import '../data/schedule_service.dart';
+import 'schedule_providers.dart';
 import '../domain/schedule_models.dart';
 import 'schedule_detail_screen.dart';
-
-final upcomingSchedulesProvider = FutureProvider.autoDispose<List<CleanupSchedule>>((ref) async {
-  final service = ref.watch(scheduleServiceProvider);
-  return service.getUpcomingSchedules();
-});
-
-final mySchedulesProvider = FutureProvider.autoDispose<List<CleanupSchedule>>((ref) async {
-  final service = ref.watch(scheduleServiceProvider);
-  return service.getMySchedules(limit: 100);
-});
 
 class SchedulesScreen extends ConsumerStatefulWidget {
   const SchedulesScreen({super.key, this.showAppBar = false});
@@ -28,26 +18,41 @@ class SchedulesScreen extends ConsumerStatefulWidget {
   ConsumerState<SchedulesScreen> createState() => _SchedulesScreenState();
 }
 
-class _SchedulesScreenState extends ConsumerState<SchedulesScreen> {
+class _SchedulesScreenState extends ConsumerState<SchedulesScreen> with WidgetsBindingObserver {
   Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Auto refresh every 30 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      final user = ref.read(currentUserProvider).value;
-      if (user?.role == 'FIELD_WORKER') {
-        ref.invalidate(mySchedulesProvider);
-      } else {
-        ref.invalidate(upcomingSchedulesProvider);
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(_refresh());
       }
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_refresh());
+  }
+
+  Future<void> _refresh() async {
+    final isWorker = ref.read(currentUserProvider).value?.role == 'FIELD_WORKER';
+    final provider = isWorker ? mySchedulesProvider : upcomingSchedulesProvider;
+    try {
+      ref.invalidate(provider);
+      await ref.read(provider.future);
+    } catch (_) {
+      // The provider exposes the failure to the list and pull-to-refresh remains available.
+    }
+  }
+
+  @override
   void dispose() {
     _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -61,13 +66,7 @@ class _SchedulesScreenState extends ConsumerState<SchedulesScreen> {
         : ref.watch(upcomingSchedulesProvider);
 
     final content = RefreshIndicator(
-      onRefresh: () async {
-        if (isWorker) {
-          ref.invalidate(mySchedulesProvider);
-        } else {
-          ref.invalidate(upcomingSchedulesProvider);
-        }
-      },
+      onRefresh: _refresh,
       child: schedulesAsync.when(
         data: (schedules) {
           if (schedules.isEmpty) {

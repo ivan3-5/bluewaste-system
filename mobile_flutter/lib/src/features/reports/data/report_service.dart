@@ -2,12 +2,11 @@ import "package:dio/dio.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:image_picker/image_picker.dart";
 
-import "package:connectivity_plus/connectivity_plus.dart";
-
 import "../../../core/network/api_exception.dart";
 import "../../../core/providers.dart";
 import "../domain/report_models.dart";
 import "offline_service.dart";
+import "photo_upload.dart";
 
 class ReportService {
   ReportService(this._dio);
@@ -93,10 +92,14 @@ class ReportService {
   Future<void> uploadQueuedImages({
     required String reportId,
     required List<String> imagePaths,
+    String type = "REPORT",
+    String? clientUploadId,
   }) {
     return uploadReportImages(
       reportId: reportId,
       images: imagePaths.map(XFile.new).toList(),
+      type: type,
+      clientUploadId: clientUploadId,
     );
   }
 
@@ -132,12 +135,6 @@ class ReportService {
   }) async {
     final imagePaths = images.map((e) => e.path).toList();
 
-    final connectivity = await Connectivity().checkConnectivity();
-    if (connectivity == ConnectivityResult.none) {
-      await offlineService.queueReport(data: data, imagePaths: imagePaths);
-      return null;
-    }
-
     ReportRecord? created;
     var uploaded = 0;
     try {
@@ -150,7 +147,8 @@ class ReportService {
       return created;
     } on ApiException catch (e) {
       final reportExists = created != null;
-      if (e.isTimeoutOrNetworkError || reportExists) {
+      if (e.isTimeoutOrNetworkError || (e.statusCode ?? 0) >= 500 ||
+          e.statusCode == 408 || e.statusCode == 429 || reportExists) {
         // Keep the server-side id and progress so the retry only finishes
         // what is missing instead of creating a duplicate report.
         await offlineService.queueReport(
@@ -208,7 +206,11 @@ class ReportService {
         },
       );
 
-      return ReportRecord.fromJson(response.data ?? <String, dynamic>{});
+      final report = ReportRecord.fromJson(response.data ?? <String, dynamic>{});
+      if (report.id.isEmpty) {
+        throw ApiException("The server did not return a report ID.", statusCode: 502);
+      }
+      return report;
     } on DioException catch (error) {
       throw ApiException.fromDioError(error);
     }
@@ -218,25 +220,21 @@ class ReportService {
     required String reportId,
     required List<XFile> images,
     String type = "REPORT",
+    String? clientUploadId,
   }) async {
     if (images.isEmpty) {
       return;
     }
 
     try {
-      final parts = await Future.wait(
-        images.map(
-          (img) => MultipartFile.fromFile(img.path, filename: img.name),
-        ),
-      );
-
-      final formData = FormData.fromMap({"images": parts, "type": type});
-
-      await _dio.post<void>(
-        "/reports/$reportId/images",
-        data: formData,
-        options: Options(headers: {"Content-Type": "multipart/form-data"}),
-      );
+      for (var index = 0; index < images.length; index++) {
+        final formData = FormData.fromMap({
+          "images": await prepareUploadPhoto(images[index].path),
+          "type": type,
+          if (clientUploadId != null) "clientUploadId": "$clientUploadId-$index",
+        });
+        await _dio.post<void>("/reports/$reportId/images", data: formData);
+      }
     } on DioException catch (error) {
       throw ApiException.fromDioError(error);
     }

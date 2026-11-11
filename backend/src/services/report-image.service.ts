@@ -1,4 +1,5 @@
 import prisma from "../config/database";
+import { createHash } from "node:crypto";
 import { ImageType, Prisma } from "@prisma/client";
 import { CloudinaryService } from "./cloudinary.service";
 import { ReportAnalysisService } from "./report-analysis.service";
@@ -13,6 +14,7 @@ export class ReportImageService {
     files: Express.Multer.File[] | undefined,
     requester: { id?: string; role?: string } | undefined,
     typeParam?: string,
+    clientUploadId?: unknown,
   ) {
     if (!files || files.length === 0) {
       throw new Error("No files uploaded");
@@ -51,6 +53,15 @@ export class ReportImageService {
     }
 
     const where = { reportId, type };
+    const digest = files.length === 1 && typeof clientUploadId === "string" &&
+      /^[a-zA-Z0-9_-]{1,96}$/.test(clientUploadId)
+      ? createHash("sha256").update(JSON.stringify([reportId, type, requesterId, clientUploadId])).digest("hex")
+      : null;
+    const imageId = digest?.replace(/^(\w{8})(\w{4})(\w{4})(\w{4})(\w{12}).*$/, "$1-$2-$3-$4-$5");
+    if (imageId) {
+      const saved = await prisma.reportImage.findUnique({ where: { id: imageId } });
+      if (saved) return [saved];
+    }
     const existingCount = await prisma.reportImage.count({ where });
     if (existingCount + files.length > MAX_PHOTOS_PER_TYPE) {
       throw new Error(REPORT_PHOTO_LIMIT_MESSAGE);
@@ -65,19 +76,24 @@ export class ReportImageService {
     try {
       if (failedUpload) throw failedUpload.reason;
 
-      const { images, isFirstReportPhoto } = await prisma.$transaction(async (tx) => {
+      const { images, isFirstReportPhoto, duplicate } = await prisma.$transaction(async (tx) => {
         // Serialize attachment counts across simultaneous uploads to this report.
         await tx.$queryRaw`SELECT id FROM "Report" WHERE id = ${reportId} FOR UPDATE`;
+        if (imageId) {
+          const saved = await tx.reportImage.findUnique({ where: { id: imageId } });
+          if (saved) return { images: [saved], isFirstReportPhoto: false, duplicate: true };
+        }
         const count = await tx.reportImage.count({ where });
         if (count + uploaded.length > MAX_PHOTOS_PER_TYPE) {
           throw new Error(REPORT_PHOTO_LIMIT_MESSAGE);
         }
         const images = await Promise.all(uploaded.map(({ url, publicId }) =>
-          tx.reportImage.create({ data: { ...where, imageUrl: url, publicId } }),
+          tx.reportImage.create({ data: { ...where, id: imageId, imageUrl: url, publicId } }),
         ));
-        return { images, isFirstReportPhoto: type === ImageType.REPORT && count === 0 };
+        return { images, isFirstReportPhoto: type === ImageType.REPORT && count === 0, duplicate: false };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
 
+      if (duplicate) await this.removeUnlinkedPhotos(uploaded);
       if (isFirstReportPhoto) {
         ReportAnalysisService.analyzeReport(reportId).catch((err) => {
           logger.warn({ err, reportId }, "Auto analysis failed for report");
@@ -85,12 +101,16 @@ export class ReportImageService {
       }
       return images;
     } catch (error) {
-      await Promise.all(uploaded.map(({ publicId }) =>
-        CloudinaryService.deleteImage(publicId).catch((err) => {
-          logger.warn({ err, publicId }, "Could not remove an unlinked report photo");
-        }),
-      ));
+      await this.removeUnlinkedPhotos(uploaded);
       throw error;
     }
+  }
+
+  private static async removeUnlinkedPhotos(photos: { publicId: string }[]) {
+    await Promise.all(photos.map(({ publicId }) =>
+      CloudinaryService.deleteImage(publicId).catch((err) => {
+        logger.warn({ err, publicId }, "Could not remove an unlinked report photo");
+      }),
+    ));
   }
 }

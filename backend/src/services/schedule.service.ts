@@ -584,103 +584,94 @@ export class ScheduleService {
 
   static async updateStatus(
     id: string,
-    status: string,
+    status: CleanupScheduleStatus,
     userId: string,
     notes?: string,
+    isWorker = false,
   ) {
-    const existing = await prisma.cleanupSchedule.findUnique({
-      where: { id },
-      include: {
-        workers: { select: { workerId: true } },
-      },
-    });
-
-    if (!existing) {
-      throw new Error("Schedule not found");
-    }
-
-    const updateData: Prisma.CleanupScheduleUpdateInput = {
-      status: status as CleanupScheduleStatus,
-    };
-
-    if (notes !== undefined) {
-      updateData.notes = notes;
-    }
-
-    // If admin verifies as completed, record the verifier
-    if (status === "COMPLETED") {
-      const reports = await prisma.report.findMany({
-        where: { cleanupScheduleId: id, isDeleted: false },
-        select: { id: true, status: true },
+    const { schedule, workerIds, changed } = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "CleanupSchedule" WHERE id = ${id} FOR UPDATE`;
+      const existing = await tx.cleanupSchedule.findUnique({
+        where: { id },
+        include: { workers: { select: { workerId: true } } },
       });
+      if (!existing) throw new Error("Schedule not found");
 
-      if (reports.length > 0) {
-        const uncleanedReports = reports.filter(
-          (r) => r.status !== ReportStatus.CLEANED,
-        );
-        if (uncleanedReports.length > 0) {
+      const workerIds = existing.workers.map((worker) => worker.workerId);
+      if (isWorker && !workerIds.includes(userId)) {
+        throw new Error("Insufficient permissions.");
+      }
+      if (isWorker && status !== existing.status &&
+          !(existing.status === "UPCOMING" && status === "ONGOING") &&
+          !(existing.status === "ONGOING" && status === "COMPLETED")) {
+        throw new Error("This schedule status has changed. Refresh and try again.");
+      }
+      if (status === existing.status && notes === undefined) {
+        return {
+          schedule: await tx.cleanupSchedule.findUniqueOrThrow({ where: { id }, include: scheduleInclude }),
+          workerIds,
+          changed: false,
+        };
+      }
+
+      const updateData: Prisma.CleanupScheduleUpdateInput = {
+        status,
+        ...(notes !== undefined ? { notes } : {}),
+      };
+      if (status === "COMPLETED") {
+        const reports = await tx.report.findMany({
+          where: { cleanupScheduleId: id, isDeleted: false },
+          select: { status: true },
+        });
+        const uncleaned = reports.filter((report) => report.status !== ReportStatus.CLEANED).length;
+        if (uncleaned > 0) {
           throw new Error(
-            `Cannot mark cleanup schedule as completed: ${uncleanedReports.length} of ${reports.length} report location(s) are not yet cleaned. All associated locations must be cleaned first.`,
+            `Cannot mark cleanup schedule as completed: ${uncleaned} of ${reports.length} report location(s) are not yet cleaned. All associated locations must be cleaned first.`,
           );
+        }
+        if (existing.status !== "COMPLETED") {
+          updateData.verifiedBy = { connect: { id: userId } };
+          updateData.verifiedAt = new Date();
+        }
+      } else if (existing.status === "COMPLETED") {
+        updateData.verifiedBy = { disconnect: true };
+        updateData.verifiedAt = null;
+      }
+
+      if (status === "ONGOING" || status === "CANCELLED") {
+        const reportStatus = status === "ONGOING" ? ReportStatus.IN_PROGRESS : ReportStatus.VERIFIED;
+        const where: Prisma.ReportWhereInput = {
+          cleanupScheduleId: id,
+          ...(status === "ONGOING" ? { isDeleted: false, status: ReportStatus.CLEANUP_SCHEDULED } : {}),
+        };
+        const reports = await tx.report.updateManyAndReturn({
+          where,
+          data: { status: reportStatus, ...(status === "CANCELLED" ? { cleanupScheduleId: null } : {}) },
+          select: { id: true },
+        });
+        if (reports.length > 0) {
+          await tx.statusHistory.createMany({
+            data: reports.map(({ id: reportId }) => ({
+              reportId,
+              newStatus: reportStatus,
+              notes: status === "ONGOING"
+                ? `Cleanup operation started for schedule "${existing.title}".`
+                : `Cleanup schedule cancelled (${notes || "No reason specified"}). Report returned to verified pool.`,
+              changedById: userId,
+            })),
+          });
         }
       }
 
-      updateData.verifiedBy = { connect: { id: userId } };
-      updateData.verifiedAt = new Date();
-    }
-
-    const schedule = await prisma.cleanupSchedule.update({
-      where: { id },
-      data: updateData,
-      include: scheduleInclude,
+      const schedule = await tx.cleanupSchedule.update({
+        where: { id },
+        data: updateData,
+        include: scheduleInclude,
+      });
+      return { schedule, workerIds, changed: status !== existing.status };
     });
 
-    if (status === "ONGOING") {
-      const pendingReports = await prisma.report.findMany({
-        where: {
-          cleanupScheduleId: id,
-          status: ReportStatus.CLEANUP_SCHEDULED,
-          isDeleted: false,
-        },
-        select: { id: true },
-      });
-
-      if (pendingReports.length > 0) {
-        const reportIds = pendingReports.map((r) => r.id);
-        await prisma.report.updateMany({
-          where: { id: { in: reportIds } },
-          data: { status: ReportStatus.IN_PROGRESS },
-        });
-
-        const historyData = reportIds.map((reportId) => ({
-          reportId,
-          newStatus: ReportStatus.IN_PROGRESS,
-          notes: `Cleanup operation started for schedule "${existing.title}".`,
-          changedById: userId,
-        }));
-        await prisma.statusHistory.createMany({ data: historyData });
-      }
-    } else if (status === "CANCELLED") {
-      const reports = await prisma.report.findMany({
-        where: { cleanupScheduleId: id },
-      });
-
-      if (reports.length > 0) {
-        await prisma.report.updateMany({
-          where: { cleanupScheduleId: id },
-          data: { status: "VERIFIED", cleanupScheduleId: null },
-        });
-
-        const historyData = reports.map((r) => ({
-          reportId: r.id,
-          newStatus: "VERIFIED" as const,
-          notes: `Cleanup Schedule cancelled (${notes || "No reason specified"}). Report returned to verified pool.`,
-          changedById: userId,
-        }));
-        await prisma.statusHistory.createMany({ data: historyData });
-      }
-    }
-
+    if (!changed) return schedule;
     // Notify assigned workers about status change
     const statusLabels: Record<string, string> = {
       UPCOMING: "Upcoming",
@@ -690,13 +681,13 @@ export class ScheduleService {
     };
 
     await Promise.all(
-      existing.workers.map((w) =>
+      workerIds.map((workerId) =>
         NotificationService.create({
-          userId: w.workerId,
+          userId: workerId,
           title: "Cleanup Schedule Updated",
-          message: `"${existing.title}" status changed to ${statusLabels[status] || status}.`,
+          message: `"${schedule.title}" status changed to ${statusLabels[status] || status}.`,
           type: "CLEANUP_SCHEDULE",
-        }),
+        }).catch(() => {}),
       ),
     );
 
@@ -784,7 +775,14 @@ export class ScheduleService {
         }
 
         const updated = await prisma.cleanupSchedule.update({
-          where: { id: scheduleId },
+          where: {
+            id: scheduleId,
+            status: { in: ["UPCOMING", "ONGOING"] },
+            reports: {
+              some: { isDeleted: false },
+              none: { isDeleted: false, status: { not: ReportStatus.CLEANED } },
+            },
+          },
           data: updateData,
           include: scheduleInclude,
         });
@@ -814,7 +812,7 @@ export class ScheduleService {
         )
       ) {
         const updated = await prisma.cleanupSchedule.update({
-          where: { id: scheduleId },
+          where: { id: scheduleId, status: "UPCOMING" },
           data: { status: "ONGOING" },
           include: scheduleInclude,
         });
@@ -858,9 +856,17 @@ export class ScheduleService {
 
       if (toComplete.length === 0) return 0;
 
+      let completed = 0;
       for (const schedule of toComplete) {
-        await prisma.cleanupSchedule.update({
-          where: { id: schedule.id },
+        const update = await prisma.cleanupSchedule.updateMany({
+          where: {
+            id: schedule.id,
+            status: { in: ["UPCOMING", "ONGOING"] },
+            reports: {
+              some: { isDeleted: false },
+              none: { isDeleted: false, status: { not: ReportStatus.CLEANED } },
+            },
+          },
           data: {
             status: "COMPLETED",
             verifiedAt: schedule.verifiedAt ?? new Date(),
@@ -869,6 +875,8 @@ export class ScheduleService {
               "Automatically completed: all associated waste reports have been cleaned.",
           },
         });
+        if (update.count === 0) continue;
+        completed++;
 
         // Notify workers
         await Promise.all(
@@ -883,7 +891,7 @@ export class ScheduleService {
         );
       }
 
-      return toComplete.length;
+      return completed;
     } catch (error) {
       console.warn("Failed to reconcile cleanup schedules:", error);
       return 0;
@@ -953,8 +961,10 @@ export class ScheduleService {
     const now = new Date();
     const schedules = await prisma.cleanupSchedule.findMany({
       where: {
-        status: { in: ["UPCOMING", "ONGOING"] },
-        scheduledAt: { gte: now },
+        OR: [
+          { status: "UPCOMING", scheduledAt: { gte: now } },
+          { status: "ONGOING" },
+        ],
       },
       include: {
         createdBy: {
