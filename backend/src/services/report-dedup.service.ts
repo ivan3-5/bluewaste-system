@@ -2,6 +2,7 @@ import prisma from "../config/database";
 import { WasteCategory, ReportStatus, Severity, Prisma } from "@prisma/client";
 import { env } from "../config/env";
 import { GeoCache } from "../utils/geo-cache";
+import { ScheduleService } from "./schedule.service";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -416,6 +417,34 @@ export class ReportDedupService {
 
     // 3. Sync the WasteIncident aggregate status
     await this.syncIncidentStatus(incidentId);
+
+    // 4. If status changed to CLEANED, sync any affected CleanupSchedules
+    if (newStatus === ReportStatus.CLEANED) {
+      try {
+        const affectedReports = await prisma.report.findMany({
+          where: {
+            id: { in: [changedReportId, ...siblingIds] },
+            cleanupScheduleId: { not: null },
+            isDeleted: false,
+          },
+          select: { cleanupScheduleId: true },
+        });
+
+        const distinctScheduleIds = Array.from(
+          new Set(
+            affectedReports
+              .map((r) => r.cleanupScheduleId)
+              .filter((id): id is string => Boolean(id)),
+          ),
+        );
+
+        for (const scheduleId of distinctScheduleIds) {
+          await ScheduleService.syncScheduleStatus(scheduleId, changedById);
+        }
+      } catch (schedSyncError) {
+        console.warn("[dedup] Failed to sync cleanup schedules after propagation:", schedSyncError);
+      }
+    }
 
     await GeoCache.invalidateAll();
 

@@ -3,7 +3,7 @@
  * Used in the admin report detail page.
  */
 
-import { Brain, Clock, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Brain, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { formatAnalysisDetails } from "@/lib/utils";
 
 type AiSeverity = "Low" | "Medium" | "High" | "Critical" | "None";
@@ -128,8 +128,8 @@ export function AiAnalysisPanel({
       </div>
 
       <div className="mt-3 space-y-3">
-        {/* Severity + Waste Count + Latency Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {/* Severity and waste count */}
+        <div className="grid grid-cols-2 gap-2">
           {/* Severity */}
           <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-2.5">
             <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -159,17 +159,6 @@ export function AiAnalysisPanel({
               ) : (
                 <span className="text-xs text-slate-400">—</span>
               )}
-            </div>
-          </div>
-
-          {/* Latency */}
-          <div className="col-span-2 sm:col-span-1 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-2.5">
-            <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Processing Speed
-            </span>
-            <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
-              <Clock className="h-3.5 w-3.5 text-slate-400" />
-              <span>{aiGeminiMs ? `${aiGeminiMs}ms` : aiProcessingMs ? `${aiProcessingMs}ms` : "Fast"}</span>
             </div>
           </div>
         </div>

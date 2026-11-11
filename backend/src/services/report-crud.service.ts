@@ -7,6 +7,7 @@ import { severityFromWasteCount } from "../utils/severity";
 import { ReportSpamService } from "./report-spam.service";
 import { ReportDedupService } from "./report-dedup.service";
 import { ReportingZoneService, OUTSIDE_ZONE_MESSAGE } from "./reportingZone.service";
+import { ScheduleService } from "./schedule.service";
 
 type Viewer = {
   id: string;
@@ -375,61 +376,27 @@ export class ReportCrudService {
         reportId,
         NotificationType.STATUS_CHANGE,
       );
-
-      if (report.cleanupScheduleId) {
-        const scheduleId = report.cleanupScheduleId;
-        const [totalLinked, cleanedLinked] = await Promise.all([
-          prisma.report.count({
-            where: { cleanupScheduleId: scheduleId, isDeleted: false },
-          }),
-          prisma.report.count({
-            where: {
-              cleanupScheduleId: scheduleId,
-              isDeleted: false,
-              status: ReportStatus.CLEANED,
-            },
-          }),
-        ]);
-
-        if (totalLinked > 0 && cleanedLinked === totalLinked) {
-          await prisma.cleanupSchedule.update({
-            where: { id: scheduleId },
-            data: {
-              status: "COMPLETED",
-              verifiedAt: new Date(),
-              verifiedBy: { connect: { id: changedById } },
-            },
-          });
-
-          await prisma.statusHistory.create({
-            data: {
-              reportId,
-              newStatus: ReportStatus.CLEANED,
-              notes: `Cleanup Schedule auto-completed: all linked reports marked as cleaned.`,
-              changedById,
-            },
-          });
-        }
-      }
     }
 
     await GeoCache.invalidateAll();
 
     // ── Sync parent WasteIncident status ─────────────────────────────────────
+    let incidentId: string | null = null;
     try {
       const updatedReportFull = await prisma.report.findUnique({
         where: { id: reportId },
-        select: { incidentId: true },
+        select: { incidentId: true, cleanupScheduleId: true },
       });
-      if (updatedReportFull?.incidentId) {
-        await ReportDedupService.syncIncidentStatus(updatedReportFull.incidentId);
+      incidentId = updatedReportFull?.incidentId ?? null;
+      if (incidentId) {
+        await ReportDedupService.syncIncidentStatus(incidentId);
       }
     } catch (syncError) {
       console.warn("[dedup] Failed to sync incident status for report", reportId, syncError);
     }
 
     // ── Propagate status to all sibling reports in the same incident ─────────
-    // When an admin changes one report's status, all grouped reports follow.
+    // When a report status changes, all grouped reports follow.
     try {
       const { updatedCount } = await ReportDedupService.propagateStatusToSiblings(
         reportId,
@@ -441,6 +408,43 @@ export class ReportCrudService {
       }
     } catch (propagateError) {
       console.warn("[dedup] Failed to propagate status to siblings for report", reportId, propagateError);
+    }
+
+    // ── Automatic Cleanup Schedule Status Synchronization ───────────────────
+    if (status === ReportStatus.CLEANED) {
+      try {
+        const candidateReportIds = [reportId];
+        if (incidentId) {
+          const siblings = await prisma.report.findMany({
+            where: { incidentId, isDeleted: false },
+            select: { id: true },
+          });
+          candidateReportIds.push(...siblings.map((s) => s.id));
+        }
+
+        const affectedReports = await prisma.report.findMany({
+          where: {
+            id: { in: candidateReportIds },
+            cleanupScheduleId: { not: null },
+            isDeleted: false,
+          },
+          select: { cleanupScheduleId: true },
+        });
+
+        const distinctScheduleIds = Array.from(
+          new Set(
+            affectedReports
+              .map((r) => r.cleanupScheduleId)
+              .filter((id): id is string => Boolean(id)),
+          ),
+        );
+
+        for (const scheduleId of distinctScheduleIds) {
+          await ScheduleService.syncScheduleStatus(scheduleId, changedById);
+        }
+      } catch (schedSyncError) {
+        console.warn("Failed to sync cleanup schedule status:", schedSyncError);
+      }
     }
 
     return sanitizeReportForPrivacy(updatedReport);

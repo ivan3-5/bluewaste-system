@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
   const category = searchParams.get("category")?.trim();
   const status = searchParams.get("status")?.trim().toUpperCase();
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {
+    isDeleted: false,
+    isSpam: false,
+  };
   if (category && VALID_CATEGORIES.has(category)) {
     where.category = category;
   }

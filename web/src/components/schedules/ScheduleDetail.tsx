@@ -49,7 +49,7 @@ interface ScheduleDetailProps {
   onEdit: (schedule: CleanupSchedule) => void;
   onRefresh?: (schedule: CleanupSchedule) => void;
   onDelete: (id: string) => Promise<void>;
-  onVerify: (id: string, notes?: string) => Promise<void>;
+  onVerify?: (id: string, notes?: string) => Promise<void>;
   onWorkerUpdateStatus?: (
     id: string,
     status: CleanupScheduleStatus,
@@ -81,6 +81,21 @@ export function ScheduleDetail({
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [verifyNotes, setVerifyNotes] = useState("");
 
+  const isAllReportsCleaned = useMemo(() => {
+    const reports = schedule?.reports || [];
+    return (
+      reports.length > 0 &&
+      reports.every((r: any) => r.status === "CLEANED")
+    );
+  }, [schedule?.reports]);
+
+  const effectiveStatus: CleanupScheduleStatus =
+    isAllReportsCleaned &&
+    schedule &&
+    (schedule.status === "UPCOMING" || schedule.status === "ONGOING")
+      ? "COMPLETED"
+      : (schedule?.status ?? "UPCOMING");
+
   if (!schedule) return null;
 
   const handleCopyCoordinates = () => {
@@ -104,7 +119,9 @@ export function ScheduleDetail({
   const confirmVerify = async () => {
     try {
       setIsVerifying(true);
-      await onVerify(schedule.id, verifyNotes.trim() || undefined);
+      if (onVerify) {
+        await onVerify(schedule.id, verifyNotes.trim() || undefined);
+      }
       setShowVerifyModal(false);
       setVerifyNotes("");
       onClose();
@@ -197,19 +214,19 @@ export function ScheduleDetail({
                   <span
                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm"
                     style={{
-                      backgroundColor: `${SCHEDULE_STATUS_COLORS[schedule.status]}15`,
-                      color: SCHEDULE_STATUS_COLORS[schedule.status],
-                      border: `1px solid ${SCHEDULE_STATUS_COLORS[schedule.status]}35`,
+                      backgroundColor: `${SCHEDULE_STATUS_COLORS[effectiveStatus]}15`,
+                      color: SCHEDULE_STATUS_COLORS[effectiveStatus],
+                      border: `1px solid ${SCHEDULE_STATUS_COLORS[effectiveStatus]}35`,
                     }}
                   >
                     <span
                       className="w-1.5 h-1.5 rounded-full"
                       style={{
                         backgroundColor:
-                          SCHEDULE_STATUS_COLORS[schedule.status],
+                          SCHEDULE_STATUS_COLORS[effectiveStatus],
                       }}
                     />
-                    {SCHEDULE_STATUS_LABELS[schedule.status]}
+                    {SCHEDULE_STATUS_LABELS[effectiveStatus]}
                   </span>
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
                     <MapPin className="w-3.5 h-3.5 text-blue-500" />
@@ -560,43 +577,28 @@ export function ScheduleDetail({
           </div>
 
           {/* Action Footer */}
-          <div className="px-8 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-3">
+          <div className="px-8 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-900/90 flex flex-wrap items-center justify-end gap-3">
             {isAdmin && (
-              <>
-                <div>
-                  {schedule.status !== "COMPLETED" &&
-                    schedule.status !== "CANCELLED" && (
-                      <Button
-                        onClick={() => setShowVerifyModal(true)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold h-10 px-4 gap-1.5 shadow-sm shadow-emerald-500/20"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        Verify & Complete
-                      </Button>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => onEdit(schedule)}
-                    className="rounded-xl border-gray-200 dark:border-slate-700 dark:text-slate-200 h-10 px-4 text-xs font-bold gap-1.5 hover:bg-white dark:hover:bg-slate-800"
-                  >
-                    <Edit className="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" /> Edit Operation
-                  </Button>
-                  <Button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-10 px-4 text-xs font-bold gap-1.5 shadow-sm shadow-red-500/20"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                  </Button>
-                </div>
-              </>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => onEdit(schedule)}
+                  className="rounded-xl border-gray-200 dark:border-slate-700 dark:text-slate-200 h-10 px-4 text-xs font-bold gap-1.5 hover:bg-white dark:hover:bg-slate-800"
+                >
+                  <Edit className="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" /> Edit Operation
+                </Button>
+                <Button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-10 px-4 text-xs font-bold gap-1.5 shadow-sm shadow-red-500/20"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                </Button>
+              </div>
             )}
 
             {!isAdmin && onWorkerUpdateStatus && (
               <div className="w-full flex items-center gap-3">
-                {schedule.status === "UPCOMING" && (
+                {effectiveStatus === "UPCOMING" && (
                   <Button
                     onClick={() => handleWorkerUpdate("ONGOING")}
                     className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold h-10 w-full"
@@ -604,7 +606,7 @@ export function ScheduleDetail({
                     Start Cleanup Operation
                   </Button>
                 )}
-                {schedule.status === "ONGOING" && (
+                {effectiveStatus === "ONGOING" && (
                   <Button
                     onClick={() => handleWorkerUpdate("COMPLETED")}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold h-10 w-full gap-2"

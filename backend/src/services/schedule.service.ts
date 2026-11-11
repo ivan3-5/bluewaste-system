@@ -3,6 +3,7 @@ import {
   CleanupScheduleStatus,
   NotificationType,
   Prisma,
+  ReportStatus,
 } from "@prisma/client";
 import {
   getPaginationParams,
@@ -187,6 +188,8 @@ export class ScheduleService {
   }
 
   static async findById(id: string) {
+    await this.syncScheduleStatus(id);
+
     const schedule = await prisma.cleanupSchedule.findUnique({
       where: { id },
       include: scheduleInclude,
@@ -396,7 +399,7 @@ export class ScheduleService {
       await prisma.report.updateMany({
         where: {
           id: { in: data.reportIds },
-          status: { not: "CLEANUP_SCHEDULED" },
+          status: { in: ["VERIFIED", "PENDING"] },
         },
         data: { status: "CLEANUP_SCHEDULED" },
       });
@@ -415,7 +418,8 @@ export class ScheduleService {
       }
     }
 
-    return schedule;
+    const synced = await this.syncScheduleStatus(id, adminId);
+    return synced || schedule;
   }
 
   static async updateStatus(
@@ -550,6 +554,143 @@ export class ScheduleService {
     return { message: "Schedule deleted successfully" };
   }
 
+  /**
+   * Synchronizes the status of a specific cleanup schedule based on the status
+   * of all its associated active waste reports.
+   *
+   * - If ALL associated reports have a 'CLEANED' status (and there is at least 1 report),
+   *   the schedule status is automatically set to 'COMPLETED'.
+   * - If even one associated report is NOT cleaned, or if there are NO reports,
+   *   does not mark as completed.
+   * - Never auto-completes CANCELLED schedules.
+   */
+  static async syncScheduleStatus(scheduleId: string, verifierId?: string) {
+    try {
+      const schedule = await prisma.cleanupSchedule.findUnique({
+        where: { id: scheduleId },
+        include: {
+          reports: {
+            where: { isDeleted: false },
+            select: { id: true, status: true },
+          },
+          workers: { select: { workerId: true } },
+        },
+      });
+
+      if (!schedule) return null;
+      if (schedule.status === "COMPLETED" || schedule.status === "CANCELLED") {
+        return schedule;
+      }
+
+      const totalReports = schedule.reports.length;
+      const cleanedReports = schedule.reports.filter(
+        (r) => r.status === ReportStatus.CLEANED,
+      ).length;
+
+      // Must have at least 1 report, and ALL reports must be CLEANED
+      if (totalReports > 0 && cleanedReports === totalReports) {
+        const updateData: Prisma.CleanupScheduleUpdateInput = {
+          status: "COMPLETED",
+          verifiedAt: schedule.verifiedAt ?? new Date(),
+          notes: schedule.notes
+            ? schedule.notes
+            : "Automatically completed: all associated waste reports have been cleaned.",
+        };
+
+        if (verifierId) {
+          updateData.verifiedBy = { connect: { id: verifierId } };
+        }
+
+        const updated = await prisma.cleanupSchedule.update({
+          where: { id: scheduleId },
+          data: updateData,
+          include: scheduleInclude,
+        });
+
+        // Notify assigned workers about automatic completion
+        await Promise.all(
+          schedule.workers.map((w) =>
+            NotificationService.create({
+              userId: w.workerId,
+              title: "Cleanup Schedule Completed",
+              message: `"${schedule.title}" has been automatically marked as Completed because all associated waste reports are cleaned.`,
+              type: "CLEANUP_SCHEDULE",
+            }).catch(() => {}),
+          ),
+        );
+
+        return updated;
+      }
+
+      return schedule;
+    } catch (err) {
+      console.warn("Failed to sync cleanup schedule status:", scheduleId, err);
+      return null;
+    }
+  }
+
+  /**
+   * Reconciles all UPCOMING and ONGOING schedules where all associated waste reports
+   * are CLEANED. Updates their status to COMPLETED and persists in the database.
+   */
+  static async reconcileAllSchedules(): Promise<number> {
+    try {
+      const outOfSync = await prisma.cleanupSchedule.findMany({
+        where: {
+          status: { in: ["UPCOMING", "ONGOING"] },
+          reports: {
+            some: { isDeleted: false },
+          },
+        },
+        include: {
+          reports: {
+            where: { isDeleted: false },
+            select: { id: true, status: true },
+          },
+          workers: { select: { workerId: true } },
+        },
+      });
+
+      const toComplete = outOfSync.filter(
+        (s) =>
+          s.reports.length > 0 &&
+          s.reports.every((r) => r.status === ReportStatus.CLEANED),
+      );
+
+      if (toComplete.length === 0) return 0;
+
+      for (const schedule of toComplete) {
+        await prisma.cleanupSchedule.update({
+          where: { id: schedule.id },
+          data: {
+            status: "COMPLETED",
+            verifiedAt: schedule.verifiedAt ?? new Date(),
+            notes:
+              schedule.notes ||
+              "Automatically completed: all associated waste reports have been cleaned.",
+          },
+        });
+
+        // Notify workers
+        await Promise.all(
+          schedule.workers.map((w) =>
+            NotificationService.create({
+              userId: w.workerId,
+              title: "Cleanup Schedule Completed",
+              message: `"${schedule.title}" has been automatically marked as Completed because all associated waste reports are cleaned.`,
+              type: "CLEANUP_SCHEDULE",
+            }).catch(() => {}),
+          ),
+        );
+      }
+
+      return toComplete.length;
+    } catch (error) {
+      console.warn("Failed to reconcile cleanup schedules:", error);
+      return 0;
+    }
+  }
+
   static async getSchedules(filters: {
     page?: string;
     limit?: string;
@@ -559,6 +700,8 @@ export class ScheduleService {
     endDate?: string;
     search?: string;
   }) {
+    await this.reconcileAllSchedules();
+
     const pagination = getPaginationParams({
       page: filters.page,
       limit: filters.limit,
@@ -607,6 +750,7 @@ export class ScheduleService {
   }
 
   static async getUpcomingPublic() {
+    await this.reconcileAllSchedules();
     const now = new Date();
     const schedules = await prisma.cleanupSchedule.findMany({
       where: {
@@ -640,6 +784,8 @@ export class ScheduleService {
       status?: string;
     },
   ) {
+    await this.reconcileAllSchedules();
+
     const pagination = getPaginationParams({
       page: filters.page,
       limit: filters.limit,

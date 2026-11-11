@@ -12,7 +12,6 @@ import {
   Camera,
   CheckCircle2,
   Clock,
-  Compass,
   FileText,
   MapPin,
   ShieldCheck,
@@ -126,16 +125,6 @@ export default async function ReportDetailPage({ params }: PageProps) {
             </Link>
             <span className="text-slate-300 dark:text-slate-600">/</span>
             <span className="text-slate-700 dark:text-slate-200 font-medium">Report Details</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link
-              href="/dashboard/map"
-              className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-            >
-              <Compass className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-              <span>Waste Map</span>
-            </Link>
           </div>
         </div>
 
