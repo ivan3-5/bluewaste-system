@@ -2,13 +2,11 @@ import prisma from "../config/database";
 import { WasteCategory, AnalysisStatus, Severity } from "@prisma/client";
 import { NotificationService } from "./notification.service";
 import { env } from "../config/env";
-
-/** YOLO detections below this confidence (0–1) are treated as spam. */
-const YOLO_SPAM_CONFIDENCE_THRESHOLD = 0.3;
+import { severityFromWasteCount } from "../utils/severity";
 
 interface YoloLabel {
   label: string;
-  confidence?: number;
+  count?: number;
 }
 
 interface YoloApiResponse {
@@ -17,7 +15,8 @@ interface YoloApiResponse {
   error?: string;
   severity?: string;
   has_waste?: boolean;
-  confidence?: number;
+  waste_count?: number;
+  count?: number;
   layer1_passed?: boolean;
   spam_reason?: string;
   labels?: Array<YoloLabel | string>;
@@ -57,19 +56,6 @@ function formatAnalysisDetails(categories: string[] = [], defaultReason?: string
   return `Detected categories: ${cleanCategories.join(", ")}.`;
 }
 
-function toFiniteNumberOrNull(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string" && value.trim().length > 0) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return null;
-}
-
 function toSafeJson(text: string): unknown {
   if (!text) return null;
   try {
@@ -105,20 +91,19 @@ export class ReportAnalysisService {
     const data = result as Record<string, unknown>;
     if (data.provider !== "gemini") throw new Error("Web analysis is not configured to use Gemini");
     if (typeof data.hasWaste !== "boolean" ||
-        typeof data.confidence !== "number" || !Number.isFinite(data.confidence) ||
-        data.confidence < 0 || data.confidence > 1 ||
-        typeof data.severity !== "string" ||
-        !["LOW", "MEDIUM", "HIGH", "CRITICAL", "NONE"].includes(data.severity.toUpperCase()) ||
         !Array.isArray(data.categories) || !data.categories.every((category) => typeof category === "string") ||
         typeof data.reason !== "string" || typeof data.model !== "string" || !data.model.trim()) {
       throw new Error("Web analysis returned invalid Gemini fields");
     }
+    // Severity is derived from the total number of waste items Gemini counted.
+    const reportedCount = toNonNegativeInt(data.wasteCount, data.hasWaste ? 1 : 0);
+    const wasteCount = data.hasWaste ? Math.max(reportedCount, 1) : 0;
     return {
       status: data.hasWaste ? "DIRTY" as const : "CLEAN" as const,
-      wasteCount: data.hasWaste ? 1 : 0,
-      confidence: data.confidence,
+      wasteCount,
+      confidence: null as number | null,
       labels: data.hasWaste ? ["with_waste", ...data.categories] : ["no_waste"],
-      severity: data.severity,
+      severity: severityFromWasteCount(wasteCount) as string | null,
       spamReason: data.hasWaste ? null : data.reason,
       reason: data.reason,
       model: data.model,
@@ -174,48 +159,44 @@ export class ReportAnalysisService {
     }
     const yoloJson = raw as YoloApiResponse;
 
-    // ── 5. Parse response (same shape as original /analyze) ─────────────────
-    const confidence: number | null = toFiniteNumberOrNull(yoloJson?.confidence);
-    const isLowConfidence =
-      yoloJson?.has_waste === true &&
-      confidence !== null &&
-      confidence < YOLO_SPAM_CONFIDENCE_THRESHOLD;
-    const severity: string | null = isLowConfidence
-      ? "SPAM"
-      : typeof yoloJson?.severity === "string" ? yoloJson.severity : null;
-
-    const hasWaste: boolean = yoloJson?.has_waste === true && !isLowConfidence;
-    const layer1Passed: boolean = yoloJson?.layer1_passed !== false;
-    const spamReason: string | null =
-      typeof yoloJson?.spam_reason === "string"
-        ? yoloJson.spam_reason
-        : isLowConfidence ? "Waste detected but confidence is too low." : null;
-
+    // ── 5. Parse response ───────────────────────────────────────────────────
     const rawLabels = Array.isArray(yoloJson?.labels) ? yoloJson!.labels : [];
-    const labels: string[] = rawLabels
-      .map((l: YoloLabel | string) =>
+    const labels: string[] = [];
+    let labelItemTotal = 0;
+    for (const l of rawLabels as Array<YoloLabel | string>) {
+      const name =
         typeof l === "string"
           ? l.trim().toLowerCase()
           : typeof l?.label === "string"
             ? l.label.trim().toLowerCase()
-            : "",
-      )
-      .filter((l: string) => l.length > 0);
+            : "";
+      if (!name) continue;
+      labels.push(name);
+      labelItemTotal += typeof l === "object" ? Math.max(1, toNonNegativeInt(l.count, 1)) : 1;
+    }
 
-    const status: "DIRTY" | "CLEAN" =
-      hasWaste && severity !== "SPAM" ? "DIRTY" : "CLEAN";
+    // Severity is derived from the total number of waste items detected.
+    const reportedCount = toNonNegativeInt(yoloJson.waste_count ?? yoloJson.count, labelItemTotal);
+    const hasWaste: boolean = yoloJson.has_waste === true && (reportedCount > 0 || labels.length > 0);
+    const wasteCount = hasWaste ? Math.max(reportedCount, 1) : 0;
+    const severity = severityFromWasteCount(wasteCount);
+    const layer1Passed: boolean = yoloJson?.layer1_passed !== false;
+    const spamReason: string | null =
+      typeof yoloJson?.spam_reason === "string" ? yoloJson.spam_reason : null;
+
+    const status: "DIRTY" | "CLEAN" = hasWaste ? "DIRTY" : "CLEAN";
 
     return {
       status,
-      wasteCount: hasWaste ? 1 : 0,
-      count: hasWaste ? 1 : 0,
-      confidence,
+      wasteCount,
+      count: wasteCount,
+      confidence: null as number | null,
       labels: hasWaste ? ["with_waste", ...labels] : ["no_waste"],
       detections: [],
       inferenceMs: null,
       annotatedImageUrl: null,
       annotatedImagePublicId: null,
-      severity,
+      severity: severity as string | null,
       layer1Passed,
       spamReason,
       reason: typeof yoloJson.message === "string" ? yoloJson.message : null,
@@ -261,26 +242,10 @@ export class ReportAnalysisService {
 
     const newCategory: WasteCategory = hasWaste ? "with_waste" : "no_waste";
 
-    // Resolve severity from the /analyze response or fall back to confidence/status logic
-    const rawSeverity = analysis.severity;
-    const conf: number = typeof analysis.confidence === "number" ? analysis.confidence : 0;
-    let computedSeverity: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null = null;
-    if (rawSeverity) {
-      const upper = String(rawSeverity).toUpperCase();
-      if (["CRITICAL", "HIGH", "MODERATE", "SPAM"].includes(upper)) {
-        computedSeverity = upper as Severity;
-      } else if (upper === "MEDIUM" || upper === "LOW") {
-        computedSeverity = "MODERATE";
-      }
-    }
-    if (!computedSeverity && hasWaste) {
-      if (conf >= 0.9) computedSeverity = "CRITICAL";
-      else if (conf >= 0.7) computedSeverity = "HIGH";
-      else if (conf >= 0.5) computedSeverity = "MODERATE";
-    }
-    const resolvedSeverity = (
-      computedSeverity ?? report.severity ?? (hasWaste ? "MODERATE" : "SPAM")
-    ) as "CRITICAL" | "HIGH" | "MODERATE" | "SPAM";
+    // Severity is based on the total number of waste items detected.
+    const resolvedSeverity: Severity = hasWaste
+      ? severityFromWasteCount(Math.max(analysis.wasteCount ?? 0, 1))
+      : "SPAM";
 
     const shouldMarkSpam =
       resolvedSeverity === "SPAM" || newCategory === "no_waste";
@@ -306,7 +271,7 @@ export class ReportAnalysisService {
                 ? ("DIRTY" as AnalysisStatus)
                 : ("CLEAN" as AnalysisStatus),
             analysisWasteCount: analysis.wasteCount ?? null,
-            analysisConfidence: analysis.confidence ?? null,
+            analysisConfidence: null,
             analyzedAt: now,
             severity: resolvedSeverity,
             aiCategories: labels.filter((l: string) => l !== "with_waste" && l !== "no_waste"),

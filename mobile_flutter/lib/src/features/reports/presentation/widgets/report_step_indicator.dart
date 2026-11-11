@@ -109,16 +109,16 @@ class ReportStepChip extends StatelessWidget {
   }
 }
 
-/// Small badge shown below the selected photo preview with the AI analysis confidence.
-class ConfidenceBadge extends StatelessWidget {
-  const ConfidenceBadge({
+/// Small badge shown below the selected photo preview with the AI analysis result.
+class DetectionBadge extends StatelessWidget {
+  const DetectionBadge({
     super.key,
-    required this.confidence,
+    required this.wasteCount,
     required this.hasWaste,
     required this.isSpamFlagged,
   });
 
-  final double confidence;
+  final int wasteCount;
   final bool hasWaste;
   final bool isSpamFlagged;
 
@@ -128,22 +128,21 @@ class ConfidenceBadge extends StatelessWidget {
     final IconData icon;
     final String label;
 
-    final pct = confidence <= 1.0 ? confidence * 100 : confidence;
-
     if (!hasWaste) {
       color = isSpamFlagged ? AppColors.destructive : Colors.orange;
       icon = isSpamFlagged ? Icons.warning_amber_rounded : Icons.help_outline;
       label = isSpamFlagged
           ? "Spam flagged — no waste detected"
-          : "No waste detected (${pct.toStringAsFixed(1)}%)";
+          : "No waste detected";
     } else {
-      color = pct >= 75
-          ? const Color(0xFF2ECC71)
-          : pct >= 40
-              ? const Color(0xFFF39C12)
-              : Colors.orange;
+      color = wasteCount >= 7
+          ? AppColors.destructive
+          : wasteCount >= 3
+              ? const Color(0xFFE67E22)
+              : const Color(0xFFF39C12);
       icon = Icons.check_circle_outline;
-      label = "Waste detected — confidence ${pct.toStringAsFixed(1)}%";
+      label =
+          "Waste detected — $wasteCount item${wasteCount == 1 ? "" : "s"}";
     }
 
     return Container(

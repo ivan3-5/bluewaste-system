@@ -937,13 +937,12 @@ class _ReportDetailSheet extends StatelessWidget {
                             label: "Last updated",
                             value: detailFormat.format(report.updatedAt),
                           ),
-                          if (report.analysisConfidence != null) ...[
+                          if (report.analysisWasteCount != null) ...[
                             const Divider(height: AppSpacing.md),
                             _DetailRow(
-                              icon: Icons.psychology_outlined,
-                              label: "AI Confidence",
-                              value:
-                                  "${(report.analysisConfidence! * 100).toStringAsFixed(1)}%",
+                              icon: Icons.delete_outline,
+                              label: "Waste items detected",
+                              value: "${report.analysisWasteCount}",
                             ),
                           ],
                         ],

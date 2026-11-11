@@ -1,4 +1,5 @@
 import "server-only";
+import { aiSeverityFromWasteCount } from "@/lib/severity";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -19,8 +20,10 @@ export type AiSeverity = "Low" | "Medium" | "High" | "Critical" | "None";
 export interface GeminiWasteResult {
   hasWaste: boolean;
   categories: WasteCategory[];
+  /** Total number of individual waste items counted in the image. */
+  wasteCount: number;
+  /** Derived from wasteCount — never reported by the model. */
   severity: AiSeverity;
-  confidence: number;
   reason: string;
 }
 
@@ -37,14 +40,6 @@ const ALLOWED_CATEGORIES: ReadonlySet<string> = new Set<WasteCategory>([
   "battery",
   "diaper",
   "cigarette_butt",
-]);
-
-const ALLOWED_SEVERITIES: ReadonlySet<string> = new Set<AiSeverity>([
-  "Low",
-  "Medium",
-  "High",
-  "Critical",
-  "None",
 ]);
 
 // ── Validation result ─────────────────────────────────────────────────────────
@@ -111,34 +106,17 @@ export function validateGeminiResult(raw: unknown): ValidationResult {
     }
   }
 
-  // severity
-  if (typeof obj.severity !== "string" || !ALLOWED_SEVERITIES.has(obj.severity)) {
+  // wasteCount
+  if (
+    typeof obj.wasteCount !== "number" ||
+    !Number.isFinite(obj.wasteCount) ||
+    obj.wasteCount < 0
+  ) {
     return {
       valid: false,
       error: new ValidationError(
-        `Invalid severity: "${obj.severity}". Allowed: ${[...ALLOWED_SEVERITIES].join(", ")}`,
-        "severity",
-      ),
-    };
-  }
-
-  // confidence
-  if (typeof obj.confidence !== "number" || !Number.isFinite(obj.confidence)) {
-    return {
-      valid: false,
-      error: new ValidationError(
-        `confidence must be a finite number, got: ${typeof obj.confidence}`,
-        "confidence",
-      ),
-    };
-  }
-
-  if (obj.confidence < 0 || obj.confidence > 1) {
-    return {
-      valid: false,
-      error: new ValidationError(
-        `confidence must be between 0 and 1 inclusive, got: ${obj.confidence}`,
-        "confidence",
+        `wasteCount must be a non-negative number, got: ${String(obj.wasteCount)}`,
+        "wasteCount",
       ),
     };
   }
@@ -154,13 +132,17 @@ export function validateGeminiResult(raw: unknown): ValidationResult {
     };
   }
 
+  // hasWaste and wasteCount must agree: no waste → 0 items, waste → at least 1.
+  const hasWaste = obj.hasWaste as boolean;
+  const wasteCount = hasWaste ? Math.max(1, Math.trunc(obj.wasteCount)) : 0;
+
   return {
     valid: true,
     data: {
-      hasWaste: obj.hasWaste as boolean,
+      hasWaste,
       categories: obj.categories as WasteCategory[],
-      severity: obj.severity as AiSeverity,
-      confidence: obj.confidence as number,
+      wasteCount,
+      severity: aiSeverityFromWasteCount(wasteCount),
       reason: obj.reason as string,
     },
   };

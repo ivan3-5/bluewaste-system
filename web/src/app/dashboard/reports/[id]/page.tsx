@@ -315,7 +315,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
                     imageUrl: report.imageUrl,
                     images: report.images,
                     category: report.category,
-                    confidence: report.confidence,
+                    wasteCount: report.wasteCount,
                     latitude: report.latitude,
                     longitude: report.longitude,
                     locationName: displayLocationName,
@@ -346,7 +346,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
             severity={
               report.severity as "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null
             }
-            confidence={report.confidence}
+            wasteCount={report.wasteCount}
             aiReason={report.aiReason}
             aiModel={report.aiModel}
             aiProcessingMs={report.aiProcessingMs}

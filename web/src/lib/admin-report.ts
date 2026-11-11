@@ -9,7 +9,8 @@ export interface AdminReport {
   imageUrl: string;
   images: ReportImage[];
   category: AdminReportCategory;
-  confidence: number;
+  /** Total waste items detected by the analysis (drives severity). */
+  wasteCount?: number | null;
   latitude: number;
   longitude: number;
   locationName: string;

@@ -16,6 +16,15 @@ enum WasteSeverity {
   spam,
   unknown;
 
+  /// Severity from the total number of waste items detected:
+  /// 0 → spam, 1-2 → moderate, 3-6 → high, 7+ → critical.
+  static WasteSeverity fromWasteCount(int wasteCount) {
+    if (wasteCount >= 7) return WasteSeverity.critical;
+    if (wasteCount >= 3) return WasteSeverity.high;
+    if (wasteCount >= 1) return WasteSeverity.moderate;
+    return WasteSeverity.spam;
+  }
+
   /// Parse the server string value (case-insensitive).
   static WasteSeverity fromString(String? value) {
     switch (value?.toUpperCase()) {
@@ -89,15 +98,17 @@ enum WasteSeverity {
 
 // ── A single label item ─────────────────────────────────────────────────────
 class WasteLabel {
-  const WasteLabel({required this.label, required this.confidence});
+  const WasteLabel({required this.label, this.count = 1});
 
   final String label;
-  final double confidence; // 0.0 – 1.0
+
+  /// Number of items detected for this label.
+  final int count;
 
   factory WasteLabel.fromJson(Map<String, dynamic> json) {
     return WasteLabel(
       label: (json["label"] ?? "").toString(),
-      confidence: (json["confidence"] as num?)?.toDouble() ?? 0.0,
+      count: (json["count"] as num?)?.toInt() ?? 1,
     );
   }
 }
@@ -107,7 +118,7 @@ class DetectResult {
   const DetectResult({
     required this.hasWaste,
     required this.message,
-    required this.confidence,
+    required this.wasteCount,
     required this.severity,
     required this.layer1Passed,
     this.categories = const [],
@@ -127,10 +138,10 @@ class DetectResult {
   /// Human-readable result or reason string.
   final String message;
 
-  /// Overall AI confidence as a fraction (0.0 – 1.0).
-  final double confidence;
+  /// Total number of waste items detected in the photo.
+  final int wasteCount;
 
-  /// Severity level determined by on-device inference.
+  /// Severity level, derived from [wasteCount].
   final WasteSeverity severity;
 
   /// Whether inference passed the object-presence layer.
@@ -161,10 +172,6 @@ class DetectResult {
   final String? status;
   final String? model;
 
-  /// Confidence as a percentage string, e.g. "87.3%"
-  String get confidencePct =>
-      "${(confidence <= 1.0 ? confidence * 100 : confidence).toStringAsFixed(1)}%";
-
   factory DetectResult.fromJson(Map<String, dynamic> json) {
     final categoriesList = (json["categories"] is List)
         ? (json["categories"] as List)
@@ -178,8 +185,6 @@ class DetectResult {
               .toList(growable: false)
         : <String>[];
 
-    final confidenceVal = (json["confidence"] as num?)?.toDouble() ?? 0.0;
-
     List<WasteLabel> parseLabels(dynamic raw) {
       if (raw is List && raw.isNotEmpty && raw.first is Map) {
         return raw
@@ -188,23 +193,25 @@ class DetectResult {
             .toList(growable: false);
       }
       return categoriesList
-          .map(
-            (cat) => WasteLabel(
-              label: wasteCategoryLabels[cat] ?? cat,
-              confidence: confidenceVal,
-            ),
-          )
+          .map((cat) => WasteLabel(label: wasteCategoryLabels[cat] ?? cat))
           .toList(growable: false);
     }
 
     final reasonStr = (json["reason"] ?? json["message"] ?? "").toString();
     final hasWasteVal = json["hasWaste"] == true || json["has_waste"] == true;
+    final reportedCount =
+        (json["wasteCount"] ?? json["waste_count"] ?? json["count"]) as num?;
+    final wasteCountVal = hasWasteVal
+        ? (reportedCount?.toInt() ?? categoriesList.length)
+              .clamp(1, 1 << 30)
+              .toInt()
+        : 0;
 
     return DetectResult(
       hasWaste: hasWasteVal,
       message: reasonStr,
-      confidence: confidenceVal,
-      severity: WasteSeverity.fromString(json["severity"]?.toString()),
+      wasteCount: wasteCountVal,
+      severity: WasteSeverity.fromWasteCount(wasteCountVal),
       layer1Passed:
           json["layer1_passed"] != false && json["layer1Passed"] != false,
       categories: categoriesList,
@@ -226,7 +233,7 @@ class DetectResult {
     return const DetectResult(
       hasWaste: false,
       message: "Photo analysis service unreachable.",
-      confidence: 0.0,
+      wasteCount: 0,
       severity: WasteSeverity.unknown,
       layer1Passed: false,
     );
@@ -342,14 +349,9 @@ class DetectService {
           (data["model"] as String).trim().isEmpty) {
         throw DetectServerException("Analysis returned no model identifier.");
       }
-      final confidence = data["confidence"];
       final categories = data["categories"];
       if ((data["provider"] != "gemini" && data["provider"] != "yolo") ||
           data["hasWaste"] is! bool ||
-          confidence is! num ||
-          !confidence.isFinite ||
-          confidence < 0 ||
-          confidence > 1 ||
           categories is! List ||
           !categories.every((category) => category is String) ||
           WasteSeverity.fromString(data["severity"]?.toString()) ==

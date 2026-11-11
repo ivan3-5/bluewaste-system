@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useReportingZones, isPointInAnyZone } from "@/hooks/useReportingZones";
 import { useCreateReport, useUploadReportImages } from "@/hooks/useReports";
+import { severityFromWasteCount } from "@/lib/severity";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ interface GeminiAnalysisResult {
   hasWaste: boolean;
   categories: string[];
   severity: AiSeverity;
-  confidence: number;
+  wasteCount: number;
   reason: string;
   reportId: string;
   status: string;
@@ -86,7 +87,8 @@ const SEVERITY_CONFIG: Record<AiSeverity, { label: string; classes: string }> = 
 export default function ReportWastePage() {
   const router = useRouter();
   const { user, token, isLoading } = useAuth();
-  const { data: reportingZones = [] } = useReportingZones(true);
+  const { data: reportingZones = [], isSuccess: zonesLoaded } =
+    useReportingZones(true);
   const createReport = useCreateReport();
   const uploadImages = useUploadReportImages();
   const [outsideZone, setOutsideZone] = useState(false);
@@ -118,16 +120,16 @@ export default function ReportWastePage() {
 
   // Re-validate zone membership whenever location OR zones change
   useEffect(() => {
-    if (latitude === null || longitude === null || reportingZones.length === 0) {
+    if (latitude === null || longitude === null || !zonesLoaded) {
       setOutsideZone(false);
       return;
     }
     const inside = isPointInAnyZone(latitude, longitude, reportingZones);
     setOutsideZone(!inside);
     if (!inside) {
-      setLocationStatus("Location is outside the designated coastal zone.");
+      setLocationStatus("Location is outside the designated reporting zones.");
     }
-  }, [latitude, longitude, reportingZones]);
+  }, [latitude, longitude, reportingZones, zonesLoaded]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -209,10 +211,10 @@ export default function ReportWastePage() {
 
     // Hard zone guard
     if (
-      reportingZones.length > 0 &&
+      !zonesLoaded ||
       !isPointInAnyZone(latitude, longitude, reportingZones)
     ) {
-      setError("Reporting is only allowed within the designated coastal zone.");
+      setError("Reporting is only allowed within the designated reporting zones.");
       return;
     }
 
@@ -254,13 +256,9 @@ export default function ReportWastePage() {
         ? description.trim()
         : (address.trim().length > 0 ? address.trim() : (data.reason || `Waste report submitted via quick capture.`));
 
-      const severityMap: Record<string, "CRITICAL" | "HIGH" | "MODERATE" | "SPAM"> = {
-        Critical: "CRITICAL",
-        High: "HIGH",
-        Medium: "MODERATE",
-        Low: "MODERATE",
-        None: "SPAM",
-      };
+      const detectedWasteCount = data.hasWaste
+        ? Math.max(1, Number(data.wasteCount) || data.categories?.length || 1)
+        : 0;
 
       const createdReport = await createReport.mutateAsync({
         title: reportTitle,
@@ -270,10 +268,9 @@ export default function ReportWastePage() {
         longitude: longitude,
         address: address.trim().length > 0 ? address.trim() : undefined,
         isAnonymous: isAnonymous,
-        severity: data.hasWaste ? (severityMap[data.severity] ?? "MODERATE") : "SPAM",
+        severity: severityFromWasteCount(detectedWasteCount),
         analysisStatus: data.hasWaste ? "DIRTY" : "CLEAN",
-        analysisConfidence: data.confidence,
-        analysisWasteCount: data.hasWaste ? Math.max(1, data.categories?.length || 1) : 0,
+        analysisWasteCount: detectedWasteCount,
         aiModel: data.model,
         aiCategories: data.categories,
         aiReason: data.reason,
@@ -294,8 +291,6 @@ export default function ReportWastePage() {
       setIsAnalyzing(false);
     }
   };
-
-  const confidencePct = result ? Math.round(result.confidence * 100) : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-emerald-50 py-8 px-4">
@@ -385,7 +380,9 @@ export default function ReportWastePage() {
               </div>
               {outsideZone && (
                 <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
-                  Reporting is only allowed within the designated coastal zone.
+                  {reportingZones.length === 0
+                    ? "Reporting is unavailable: no reporting zones are active."
+                    : "Reporting is only allowed within the designated reporting zones."}
                 </p>
               )}
             </div>
@@ -458,7 +455,9 @@ export default function ReportWastePage() {
             <Button
               id="analyze-submit-btn"
               onClick={handleAnalyzeAndSubmit}
-              disabled={!imageFile || isAnalyzing || outsideZone || latitude === null}
+              disabled={
+                !imageFile || isAnalyzing || !zonesLoaded || outsideZone || latitude === null
+              }
               className="w-full"
             >
               {isAnalyzing ? (
@@ -617,28 +616,14 @@ export default function ReportWastePage() {
                       </span>
                   </div>
 
-                  {/* Confidence */}
+                  {/* Waste items detected */}
                   <div>
                     <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
-                      Confidence Score
+                      Waste Items Detected
                     </p>
-                    <div className="flex items-center gap-3">
-                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-200">
-                        <div
-                          className={`h-full rounded-full ${
-                            (confidencePct ?? 0) >= 80
-                              ? "bg-emerald-500"
-                              : (confidencePct ?? 0) >= 50
-                              ? "bg-amber-500"
-                              : "bg-red-500"
-                          }`}
-                          style={{ width: `${confidencePct}%` }}
-                        />
-                      </div>
-                      <span className="w-10 text-right text-sm font-semibold text-gray-900">
-                        {confidencePct}%
-                      </span>
-                    </div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {result.wasteCount}
+                    </p>
                   </div>
 
                   {/* AI Reason */}

@@ -40,14 +40,14 @@ A FastAPI service that analyzes waste images using a two-layer YOLOv8 pipeline.
 **Layer 2** — `weights/best.pt` (custom-trained): Classifies waste with 6 classes:
 `plastic`, `glass`, `metal`, `paper`, `organic`, `other`
 
-**Severity scoring** based on top detection confidence:
+**Severity scoring** based on the total number of waste items detected (`waste_count`):
 
-| Confidence | Severity |
+| Waste items detected | Severity |
 |---|---|
-| ≥ 90% | CRITICAL 🔴 |
-| ≥ 70% | HIGH 🟠 |
-| ≥ 30% | MODERATE 🟡 |
-| < 30% | SPAM ⚪ (`has_waste: false`) |
+| ≥ 7 | CRITICAL 🔴 |
+| 3 – 6 | HIGH 🟠 |
+| 1 – 2 | MODERATE 🟡 |
+| 0 | SPAM ⚪ (`has_waste: false`) |
 
 ## Usage
 

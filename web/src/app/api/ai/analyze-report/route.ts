@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { analyzeImageWithGemini, GeminiError } from "@/lib/ai/gemini";
 import { validateGeminiResult } from "@/lib/ai/validator";
 import { analyzeImageWithYolo, type YoloAnalysis } from "@/lib/ai/yolo";
+import { dbSeverityToAiLabel, type DbSeverity } from "@/lib/severity";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import prisma from "@/lib/prisma";
 
@@ -30,11 +31,10 @@ function hashBuffer(buf: Buffer): string {
 
 function normalizeCachedSeverity(severity: string | null): YoloAnalysis["severity"] {
   switch (severity?.toUpperCase()) {
-    case "CRITICAL": return "Critical";
-    case "HIGH": return "High";
+    case "CRITICAL":
+    case "HIGH":
     case "MODERATE":
-    case "MEDIUM": return "Medium";
-    case "LOW": return "Low";
+      return dbSeverityToAiLabel(severity!.toUpperCase() as DbSeverity);
     default: return "None";
   }
 }
@@ -157,13 +157,13 @@ export async function POST(request: NextRequest) {
     );
 
     // ── 5. Deduplication check ────────────────────────────────────────────
-    const existingRows = await prisma.$queryRaw<{ id: string; hasWaste: boolean; categories: string[]; severity: string; confidence: number; aiReason: string; aiModel: string; status: string }[]>`
+    const existingRows = await prisma.$queryRaw<{ id: string; hasWaste: boolean; categories: string[]; severity: string; wasteCount: number | null; aiReason: string; aiModel: string; status: string }[]>`
       SELECT
         id,
         "analysisStatus" != 'CLEAN' AS "hasWaste",
         "aiCategories" AS categories,
         severity,
-        "analysisConfidence" AS confidence,
+        "analysisWasteCount" AS "wasteCount",
         "aiReason",
         "aiModel",
         status
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
         hasWaste: cached.hasWaste,
         categories: cached.categories ?? [],
         severity: normalizeCachedSeverity(cached.severity),
-        confidence: Number(cached.confidence ?? 0),
+        wasteCount: Number(cached.wasteCount ?? 0),
         reason: cached.aiReason ?? "",
         model: cached.aiModel,
         provider: useGemini ? "gemini" : "yolo",
@@ -262,8 +262,8 @@ export async function POST(request: NextRequest) {
       console.info("[AI] Analysis complete", {
         hasWaste: aiResult.hasWaste,
         categories: aiResult.categories,
+        wasteCount: aiResult.wasteCount,
         severity: aiResult.severity,
-        confidence: aiResult.confidence,
         geminiLatencyMs: latencyMs,
         totalMs: Date.now() - totalStart,
         modelName,
@@ -287,8 +287,8 @@ export async function POST(request: NextRequest) {
       {
         hasWaste: aiResult.hasWaste,
         categories: aiResult.categories,
+        wasteCount: aiResult.wasteCount,
         severity: aiResult.severity,
-        confidence: aiResult.confidence,
         reason: aiResult.reason,
         model: modelName,
         provider: useGemini ? "gemini" : "yolo",

@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useCreateReport, useUploadReportImages } from "@/hooks/useReports";
+import { severityFromWasteCount } from "@/lib/severity";
 import { useReportingZones, isPointInAnyZone } from "@/hooks/useReportingZones";
 import {
   WASTE_CATEGORY_LABELS,
@@ -48,11 +49,9 @@ type AnalyzeWasteResult = {
   severity: any;
   has_waste?: boolean;
   wasteCategory?: WasteCategory;
-  confidence: number;
   status: "DIRTY" | "CLEAN";
   wasteCount: number;
   count: number;
-  topConfidence: number | null;
   decision: {
     isUncertain: boolean;
     message: string | null;
@@ -92,19 +91,9 @@ const SEVERITY_STYLES: Record<WasteSeverityLegacy, string> = {
   high: "bg-red-100 text-red-700 border-red-200",
 };
 
-function resolveSeverityLevel(val: unknown, confidence: number): SeverityLevel {
-  if (typeof val === "string") {
-    const upper = val.toUpperCase();
-    if (upper === "CRITICAL") return "CRITICAL";
-    if (upper === "HIGH") return "HIGH";
-    if (upper === "MEDIUM" || upper === "MODERATE") return "MODERATE";
-    if (upper === "LOW") return "MODERATE";
-    if (upper === "SPAM" || upper === "NONE") return "SPAM";
-  }
-  if (confidence >= 0.9) return "CRITICAL";
-  if (confidence >= 0.7) return "HIGH";
-  if (confidence >= 0.5) return "MODERATE";
-  return "SPAM";
+/** Severity is based on the total number of waste items detected. */
+function resolveSeverityLevel(wasteCount: number) {
+  return severityFromWasteCount(wasteCount);
 }
 
 const SEVERITY_DESCRIPTIONS: Record<string, string> = {
@@ -212,17 +201,11 @@ async function requestAnalyzeWaste(
       let counter = Number(counterRaw) || 1;
 
       const isOdd = counter % 2 === 1;
-      // confidence ranges per spec
-      const confidence = isOdd
-        ? 0.91 + Math.random() * (0.96 - 0.91)
-        : 0.93 + Math.random() * (0.97 - 0.93);
-
       const label = isOdd ? "with_waste" : "no_waste";
       const isWaste = isOdd;
 
       const payload = {
         label,
-        confidence: Number(confidence.toFixed(4)),
         is_waste: isWaste,
         severity: isWaste ? null : null,
         message: isWaste ? "Coastal waste detected." : "Area is clean.",
@@ -230,7 +213,6 @@ async function requestAnalyzeWaste(
         status: isWaste ? "DIRTY" : "CLEAN",
         waste_count: isWaste ? 1 : 0,
         count: isWaste ? 1 : 0,
-        top_confidence: Number(confidence.toFixed(4)),
         decision: {
           is_uncertain: false,
           message: isWaste ? "Coastal waste detected." : "Area is clean.",
@@ -294,7 +276,8 @@ export default function SubmitReportPage() {
 
   const createReport = useCreateReport();
   const uploadImages = useUploadReportImages();
-  const { data: reportingZones = [] } = useReportingZones(true);
+  const { data: reportingZones = [], isSuccess: zonesLoaded } =
+    useReportingZones(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -342,14 +325,15 @@ export default function SubmitReportPage() {
 
   // Re-validate every time location or zones change
   useEffect(() => {
-    if (!location || reportingZones.length === 0) {
+    if (!location || !zonesLoaded) {
       setOutsideZone(false);
       return;
     }
+    // No active zones means nowhere is open for reporting.
     setOutsideZone(
       !isPointInAnyZone(location.lat, location.lng, reportingZones),
     );
-  }, [location, reportingZones]);
+  }, [location, reportingZones, zonesLoaded]);
 
   const canSubmit = useMemo(
     () =>
@@ -358,6 +342,7 @@ export default function SubmitReportPage() {
       locationConfirmed &&
       selectedCategory !== "" &&
       !isSubmitting &&
+      zonesLoaded &&
       !outsideZone,
     [
       imageFile,
@@ -365,6 +350,7 @@ export default function SubmitReportPage() {
       locationConfirmed,
       selectedCategory,
       isSubmitting,
+      zonesLoaded,
       outsideZone,
     ],
   );
@@ -530,26 +516,27 @@ export default function SubmitReportPage() {
         ? payload.labels
         : [];
 
-    const confidenceVal =
-      typeof payload?.confidence === "number" &&
-      Number.isFinite(payload.confidence)
-        ? payload.confidence
-        : 0;
-
-    const severityVal = payload?.severity || (hasWaste ? "MODERATE" : "SPAM");
+    const reportedCount = Number(payload?.wasteCount ?? payload?.waste_count ?? payload?.count);
+    const wasteCount = hasWaste
+      ? Math.max(
+          1,
+          Number.isFinite(reportedCount) && reportedCount >= 0
+            ? Math.trunc(reportedCount)
+            : categoriesList.length,
+        )
+      : 0;
+    const severityVal = resolveSeverityLevel(wasteCount);
 
     return {
       model: typeof payload?.model === "string" ? payload.model : "demo",
       detectedObject: hasWaste ? "waste" : "none",
       dominantWaste: null,
-      totalItems: categoriesList.length || (hasWaste ? 1 : 0),
+      totalItems: wasteCount,
       severity: severityVal,
       has_waste: hasWaste,
-      confidence: confidenceVal,
       status,
-      wasteCount: hasWaste ? 1 : 0,
-      count: categoriesList.length || (hasWaste ? 1 : 0),
-      topConfidence: confidenceVal,
+      wasteCount,
+      count: wasteCount,
       wasteCategory: undefined,
       decision: {
         isUncertain,
@@ -617,11 +604,12 @@ export default function SubmitReportPage() {
 
     // Hard zone guard
     if (
-      location &&
-      reportingZones.length > 0 &&
+      !zonesLoaded ||
       !isPointInAnyZone(location.lat, location.lng, reportingZones)
     ) {
-      setSubmitError("You can only report within the designated coastal zone.");
+      setSubmitError(
+        "You can only report within the designated reporting zones.",
+      );
       return;
     }
     if (!selectedCategory) {
@@ -663,7 +651,7 @@ export default function SubmitReportPage() {
       // immediately without requiring a second YOLO call from the backend.
       const severityToSave = analysisResult
         ? analysisResult.has_waste
-          ? resolveSeverityLevel(analysisResult.severity, analysisResult.confidence)
+          ? resolveSeverityLevel(analysisResult.wasteCount)
           : "SPAM"
         : null;
 
@@ -677,7 +665,6 @@ export default function SubmitReportPage() {
         // Analysis data from the client-side YOLO /analyze pipeline
         severity: severityToSave,
         analysisStatus: analysisResult?.status ?? null,
-        analysisConfidence: analysisResult?.confidence ?? null,
         analysisWasteCount: analysisResult?.wasteCount ?? null,
         aiModel: analysisResult?.model ?? null,
         aiCategories: analysisResult?.labels?.filter((l: unknown): l is string => typeof l === "string" && l !== "with_waste" && l !== "no_waste") ?? [],
@@ -934,7 +921,7 @@ export default function SubmitReportPage() {
                           Analyzing image…
                         </p>
                         <p className="mt-0.5 text-xs text-slate-500">
-                          Detecting waste categories, severity, and confidence score
+                          Counting detected waste items and estimating severity
                         </p>
                       </div>
                     </div>
@@ -959,29 +946,17 @@ export default function SubmitReportPage() {
                             {analysisResult.has_waste !== false ? "Waste Detected" : "No Waste Detected"}
                           </span>
                         </div>
-                        <SeverityBadge severity={resolveSeverityLevel(analysisResult.severity, analysisResult.confidence)} />
+                        <SeverityBadge severity={resolveSeverityLevel(analysisResult.wasteCount)} />
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-500 font-medium">Confidence</span>
-                          <span className="font-bold text-gray-800">
-                            {(analysisResult.confidence * 100).toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                          <div
-                            className="h-full rounded-full bg-blue-600 transition-all duration-300"
-                            style={{ width: `${Math.min(100, Math.max(0, analysisResult.confidence * 100))}%` }}
-                          />
-                        </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 font-medium">Waste items detected</span>
+                        <span className="font-bold text-gray-800">{analysisResult.wasteCount}</span>
                       </div>
 
-                      {resolveSeverityLevel(analysisResult.severity, analysisResult.confidence) && (
-                        <p className="text-[11px] text-gray-600 italic">
-                          {SEVERITY_DESCRIPTIONS[resolveSeverityLevel(analysisResult.severity, analysisResult.confidence) || "MODERATE"]}
-                        </p>
-                      )}
+                      <p className="text-[11px] text-gray-600 italic">
+                        {SEVERITY_DESCRIPTIONS[resolveSeverityLevel(analysisResult.wasteCount)]}
+                      </p>
 
                       {analysisResult.labels && (
                         <div className="pt-1 border-t border-gray-200/80">
@@ -990,10 +965,10 @@ export default function SubmitReportPage() {
                             {analysisResult.labels.length === 0 && <span className="text-xs text-gray-500">None identified</span>}
                             {analysisResult.labels.map((lbl: any, idx: number) => {
                               const labelText = typeof lbl === "string" ? lbl : (lbl?.label || lbl?.class_name || "item");
-                              const confText = typeof lbl === "object" && typeof lbl?.confidence === "number" ? ` (${(lbl.confidence * 100).toFixed(0)}%)` : "";
+                              const countText = typeof lbl === "object" && typeof lbl?.count === "number" && lbl.count > 1 ? ` ×${lbl.count}` : "";
                               return (
                                 <span key={idx} className="inline-flex items-center rounded-md bg-white border border-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-700 shadow-2xs">
-                                  {labelText}{confText}
+                                  {labelText}{countText}
                                 </span>
                               );
                             })}
@@ -1059,6 +1034,7 @@ export default function SubmitReportPage() {
                     <LocationPickerMap
                       value={location}
                       zones={reportingZones}
+                      restrictToZones
                       onChange={(nextLocation) => {
                         setLocation(nextLocation);
                         setLocationConfirmed(false);
@@ -1082,7 +1058,9 @@ export default function SubmitReportPage() {
                   {outsideZone && (
                     <p className="flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700">
                       <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                      You can only report within the designated coastal zone.
+                      {reportingZones.length === 0
+                        ? "Reporting is unavailable: no reporting zones are active."
+                        : "You can only report within the designated reporting zones."}
                     </p>
                   )}
                   {location && !outsideZone && (

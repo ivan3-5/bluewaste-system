@@ -12,21 +12,31 @@ void main() {
       "hasWaste": true,
       "model": "yolo",
       "categories": ["plastic", "glass"],
-      "severity": "High",
-      "confidence": 0.8,
+      "wasteCount": 4,
+      "severity": "Low",
       "reason": "Plastic and glass detected.",
     });
     expect(result.model, "yolo");
     expect(result.categories, ["plastic", "glass"]);
+    expect(result.wasteCount, 4);
     expect(result.severity, WasteSeverity.high);
-    expect(result.confidence, 0.8);
+  });
+
+  test("severity is based on the number of waste items detected", () {
+    expect(WasteSeverity.fromWasteCount(0), WasteSeverity.spam);
+    expect(WasteSeverity.fromWasteCount(1), WasteSeverity.moderate);
+    expect(WasteSeverity.fromWasteCount(2), WasteSeverity.moderate);
+    expect(WasteSeverity.fromWasteCount(3), WasteSeverity.high);
+    expect(WasteSeverity.fromWasteCount(6), WasteSeverity.high);
+    expect(WasteSeverity.fromWasteCount(7), WasteSeverity.critical);
+    expect(WasteSeverity.fromWasteCount(20), WasteSeverity.critical);
   });
 
   test("on-device results identify the TFLite model", () {
     const result = DetectResult(
       hasWaste: false,
       message: "No waste detected.",
-      confidence: 0,
+      wasteCount: 0,
       severity: WasteSeverity.spam,
       layer1Passed: true,
     );
@@ -50,7 +60,7 @@ void main() {
                 "hasWaste": false,
                 "categories": <String>[],
                 "severity": "None",
-                "confidence": 0.0,
+                "wasteCount": 0,
                 "reason": "No waste detected.",
               },
             ),
@@ -98,8 +108,8 @@ void main() {
       "hasWaste": true,
       "model": "gemini-test",
       "categories": ["plastic_bottle"],
+      "wasteCount": 3,
       "severity": "High",
-      "confidence": 0.8,
       "reason": "A bottle is visible.",
     });
     await tester.pumpWidget(
@@ -113,8 +123,9 @@ void main() {
     );
     expect(find.text("Analysis Summary"), findsOneWidget);
     expect(find.text("Waste Detected"), findsOneWidget);
-    expect(find.text("Confidence"), findsOneWidget);
-    expect(find.text("80.0%"), findsOneWidget);
+    expect(find.text("Confidence"), findsNothing);
+    expect(find.text("Waste items detected"), findsOneWidget);
+    expect(find.text("3"), findsOneWidget);
     expect(find.text("Analysis Details"), findsOneWidget);
     expect(find.text("A bottle is visible."), findsOneWidget);
   });

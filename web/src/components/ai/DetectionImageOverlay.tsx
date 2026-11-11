@@ -76,7 +76,7 @@ export default function DetectionImageOverlay({
         context.fillRect(x, y, width, height);
         context.strokeRect(x, y, width, height);
 
-        const label = `${detection.className} ${(detection.confidence * 100).toFixed(1)}%`;
+        const label = detection.className;
         context.font = "12px sans-serif";
         const textWidth = context.measureText(label).width;
         const textHeight = 18;

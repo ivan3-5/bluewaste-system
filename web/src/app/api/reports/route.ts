@@ -45,7 +45,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     const imageUrl = body?.imageUrl?.toString().trim();
     const category = body?.category?.toString().trim();
-    const confidence = Number(body?.confidence);
     const latitude = Number(body?.latitude);
     const longitude = Number(body?.longitude);
     const locationName = body?.locationName?.toString().trim();
@@ -58,13 +57,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      !Number.isFinite(confidence) ||
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude)
-    ) {
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       return corsResponse(
-        { message: "confidence, latitude, and longitude must be numbers." },
+        { message: "latitude and longitude must be numbers." },
         { status: 400 },
       );
     }
@@ -81,7 +76,6 @@ export async function POST(request: Request) {
         title: locationName,
         description: description || "",
         category: category as "with_waste" | "no_waste",
-        analysisConfidence: confidence,
         latitude,
         longitude,
         address: locationName,
