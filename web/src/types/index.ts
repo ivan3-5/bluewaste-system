@@ -349,6 +349,67 @@ export interface ScheduleStatistics {
   monthlyTrend: { month: string; count: number }[];
 }
 
+export interface ConsolidatedGroupedReport {
+  id: string;
+  title: string;
+  description: string;
+  status: ReportStatus;
+  category: WasteCategory;
+  severity?: WasteSeverity | null;
+  wasteQuantity?: number | null;
+  latitude: number;
+  longitude: number;
+  address?: string | null;
+  reporterId?: string | null;
+  reporter?: {
+    id: string;
+    name: string;
+    email?: string;
+  } | null;
+  isAnonymous: boolean;
+  photoUrls: string[];
+  cleanupPhotoUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConsolidatedCleanupReport {
+  scheduleId: string;
+  scheduleTitle: string;
+  description: string;
+  barangay: string;
+  scheduledAt: string;
+  overallStatus: CleanupScheduleStatus;
+  notes?: string | null;
+  completionInfo?: {
+    completedAt?: string | null;
+    verifiedAt?: string | null;
+    verifiedBy?: {
+      id: string;
+      name: string;
+    } | null;
+    notes?: string | null;
+  } | null;
+  summary: {
+    totalReports: number;
+    totalCitizens: number;
+    cleanedReportsCount: number;
+    inProgressReportsCount: number;
+    scheduledReportsCount: number;
+    isFullyCleaned: boolean;
+  };
+  assignedWorkers: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+    phone?: string;
+  }[];
+  groupedReports: ConsolidatedGroupedReport[];
+  equipment: string[];
+  generatedAt: string;
+}
+
 export const SCHEDULE_STATUS_LABELS: Record<CleanupScheduleStatus, string> = {
   UPCOMING: "Upcoming",
   ONGOING: "Ongoing",

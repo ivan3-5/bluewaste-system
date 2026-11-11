@@ -1,16 +1,31 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { format } from "date-fns";
 import {
   ClipboardList,
   Clock,
   CheckCircle2,
   TrendingUp,
   Activity,
+  Layers,
+  MapPin,
+  CalendarDays,
+  FileText,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  ArrowRight,
 } from "lucide-react";
 import { useAssignedReports } from "@/hooks/useReports";
 import { useUnreadCount } from "@/hooks/useNotifications";
 import { StatusBadge } from "@/components/reports/StatusBadge";
+import { SeverityBadge } from "@/components/SeverityBadge";
 import { timeAgo } from "@/lib/utils";
 import {
   ListCardsSkeleton,
@@ -18,13 +33,36 @@ import {
   StatsCardsSkeleton,
 } from "@/components/skeletons/page-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { CleanupSchedule, SCHEDULE_STATUS_COLORS, SCHEDULE_STATUS_LABELS } from "@/types";
+import { ScheduleDetail } from "@/components/schedules/ScheduleDetail";
+import { ConsolidatedReportModal } from "@/components/schedules/ConsolidatedReportModal";
 
 export default function FieldWorkerDashboard() {
+  const [selectedSchedule, setSelectedSchedule] = useState<CleanupSchedule | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [reportModalScheduleId, setReportModalScheduleId] = useState<string | null>(null);
+  const [expandedSchedules, setExpandedSchedules] = useState<Record<string, boolean>>({});
+
+  const toggleScheduleExpand = (id: string) => {
+    setExpandedSchedules((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const { data: allData, isLoading: loadingAll } = useAssignedReports({});
   const { data: inProgressData } = useAssignedReports({
     status: "IN_PROGRESS",
   });
   const { data: unreadData } = useUnreadCount();
+
+  const { data: mySchedules = [], isLoading: loadingSchedules } = useQuery({
+    queryKey: ["my-schedules"],
+    queryFn: async () => {
+      const res = await api.get("/schedules/my-schedules?limit=50");
+      return (res.data.data as CleanupSchedule[]) || [];
+    },
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+  });
 
   const allReports = useMemo(() => allData?.data || [], [allData?.data]);
   const totalAssigned = allData?.pagination?.total || 0;
@@ -264,6 +302,200 @@ export default function FieldWorkerDashboard() {
           })}
         </div>
 
+        {/* ── Active Consolidated Cleanup Assignments ──────────────────────── */}
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Layers className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                Cleanup Assignments (Consolidated Schedules)
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Unified cleanup operations grouping multiple coastal waste locations scheduled for deployment
+              </p>
+            </div>
+            <Link
+              href="/field-worker/schedules"
+              className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 self-start sm:self-auto"
+            >
+              View Full Calendar & Schedules <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {loadingSchedules ? (
+            <div className="p-8 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center text-xs text-slate-500 animate-pulse">
+              Loading assigned cleanup schedules...
+            </div>
+          ) : mySchedules.length === 0 ? (
+            <div className="p-8 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center space-y-2">
+              <CalendarDays className="w-8 h-8 text-slate-400 mx-auto" />
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                No active cleanup operations assigned
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                When LGU Admins assign cleanup operations to your team, consolidated multi-report schedules will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {mySchedules.slice(0, 5).map((sched) => {
+                const reports = sched.reports || [];
+                const totalLocs = reports.length;
+                const cleanedLocs = reports.filter(
+                  (r) => r.status === "CLEANED",
+                ).length;
+                const progressPct =
+                  totalLocs > 0 ? Math.round((cleanedLocs / totalLocs) * 100) : 0;
+                const isExpanded = expandedSchedules[sched.id] ?? true;
+
+                return (
+                  <div
+                    key={sched.id}
+                    className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/90 shadow-sm overflow-hidden transition-all hover:border-indigo-300 dark:hover:border-indigo-800"
+                  >
+                    {/* Card Header Banner */}
+                    <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50 via-white to-indigo-50/20 dark:from-slate-800/60 dark:via-slate-900 dark:to-indigo-950/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                            style={{
+                              backgroundColor: `${SCHEDULE_STATUS_COLORS[sched.status]}15`,
+                              color: SCHEDULE_STATUS_COLORS[sched.status],
+                              border: `1px solid ${SCHEDULE_STATUS_COLORS[sched.status]}35`,
+                            }}
+                          >
+                            {SCHEDULE_STATUS_LABELS[sched.status]}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                            <MapPin className="w-3 h-3 text-blue-500" />
+                            {sched.barangay}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                            <CalendarDays className="w-3 h-3 text-indigo-500" />
+                            {format(new Date(sched.scheduledAt), "MMM d, yyyy")}
+                          </span>
+                          {totalLocs > 1 && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">
+                              <Layers className="w-3 h-3" />
+                              {totalLocs} Consolidated Reports
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                          {sched.title}
+                        </h3>
+
+                        {/* Progress Bar */}
+                        <div className="space-y-1 pt-1 max-w-md">
+                          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-400">
+                            <span>
+                              Cleanup Progress: {cleanedLocs} of {totalLocs} locations cleaned
+                            </span>
+                            <span>{progressPct}%</span>
+                          </div>
+                          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div
+                              className="bg-emerald-500 h-full transition-all duration-300 rounded-full"
+                              style={{ width: `${progressPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-start md:self-center shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setReportModalScheduleId(sched.id)}
+                          className="rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-xs font-bold h-9 px-3 gap-1.5"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                          Combined Report
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedSchedule(sched);
+                            setIsDetailOpen(true);
+                          }}
+                          className="rounded-xl border-slate-200 dark:border-slate-700 dark:text-slate-200 text-xs font-bold h-9 px-3"
+                        >
+                          Briefing
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => toggleScheduleExpand(sched.id)}
+                          className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          title={isExpanded ? "Collapse locations" : "Expand locations"}
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Grouped Reports Breakdown */}
+                    {isExpanded && (
+                      <div className="p-4 bg-slate-50/50 dark:bg-slate-900/50 space-y-2.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Associated Waste Locations — Inspect and complete each independently
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {reports.map((r) => (
+                            <div
+                              key={r.id}
+                              className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 shadow-sm flex flex-col justify-between space-y-2"
+                            >
+                              <div className="space-y-1.5">
+                                <div className="flex items-start justify-between gap-1">
+                                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100 line-clamp-1">
+                                    {r.title}
+                                  </p>
+                                  <StatusBadge status={r.status} />
+                                </div>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                  <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
+                                  <span className="truncate">{r.address || sched.barangay}</span>
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-mono">
+                                  GPS: {r.latitude.toFixed(4)}, {r.longitude.toFixed(4)}
+                                </p>
+                                {r.severity && (
+                                  <div className="pt-0.5">
+                                    <SeverityBadge severity={r.severity} />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  #{r.id.slice(0, 8)}
+                                </span>
+                                <Link
+                                  href={`/field-worker/tasks/${r.id}`}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-[11px] font-bold transition-colors"
+                                >
+                                  Inspect Location &rarr;
+                                </Link>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
           <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:shadow-none">
             <div className="flex items-center justify-between">
@@ -349,6 +581,30 @@ export default function FieldWorkerDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Schedule Detail Modal */}
+      {selectedSchedule && (
+        <ScheduleDetail
+          schedule={selectedSchedule}
+          isOpen={isDetailOpen}
+          onClose={() => {
+            setIsDetailOpen(false);
+            setSelectedSchedule(null);
+          }}
+          onEdit={() => {}}
+          onDelete={async () => {}}
+          isAdmin={false}
+        />
+      )}
+
+      {/* Consolidated Mission Report Modal */}
+      {reportModalScheduleId && (
+        <ConsolidatedReportModal
+          scheduleId={reportModalScheduleId}
+          isOpen={Boolean(reportModalScheduleId)}
+          onClose={() => setReportModalScheduleId(null)}
+        />
+      )}
     </div>
   );
 }

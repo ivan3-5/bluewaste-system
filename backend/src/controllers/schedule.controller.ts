@@ -120,4 +120,18 @@ export class ScheduleController {
       );
     }
   }
+
+  static async getConsolidatedReport(req: AuthRequest, res: Response) {
+    try {
+      const report = await ScheduleService.getConsolidatedReport(req.params.id);
+      res.json(report);
+    } catch (error) {
+      handleControllerError(
+        res,
+        error,
+        "Failed to generate consolidated cleanup report",
+        "SCHEDULE_REPORT_FAILED",
+      );
+    }
+  }
 }

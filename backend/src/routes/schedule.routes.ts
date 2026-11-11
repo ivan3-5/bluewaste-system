@@ -42,6 +42,13 @@ router.get(
 
 // Single schedule routes
 router.get(
+  "/:id/report",
+  authenticate,
+  authorize("LGU_ADMIN", "FIELD_WORKER"),
+  ScheduleController.getConsolidatedReport,
+);
+
+router.get(
   "/:id",
   authenticate,
   authorize("LGU_ADMIN", "FIELD_WORKER"),
