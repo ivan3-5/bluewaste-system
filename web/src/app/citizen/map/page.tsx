@@ -88,25 +88,6 @@ export default function CitizenMapPage() {
         )}
       </div>
 
-      {/* Waste bucket legend strip */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <button
-          onClick={() => setBucket(bucket === "with_waste" ? "" : "with_waste")}
-          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-            bucket === "with_waste"
-              ? "border-transparent bg-blue-600 text-white shadow-sm"
-              : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-          }`}
-        >
-          <span
-            className={`h-2 w-2 flex-shrink-0 rounded-full ${
-              bucket === "with_waste" ? "bg-white/70" : "bg-red-500"
-            }`}
-          />
-          With Waste
-        </button>
-      </div>
-
       {/* Report Detail Modal */}
       {selectedReport && (
         <div

@@ -276,7 +276,8 @@ export default function SubmitReportPage() {
 
   const createReport = useCreateReport();
   const uploadImages = useUploadReportImages();
-  const { data: reportingZones = [] } = useReportingZones(true);
+  const { data: reportingZones = [], isSuccess: zonesLoaded } =
+    useReportingZones(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -324,14 +325,15 @@ export default function SubmitReportPage() {
 
   // Re-validate every time location or zones change
   useEffect(() => {
-    if (!location || reportingZones.length === 0) {
+    if (!location || !zonesLoaded) {
       setOutsideZone(false);
       return;
     }
+    // No active zones means nowhere is open for reporting.
     setOutsideZone(
       !isPointInAnyZone(location.lat, location.lng, reportingZones),
     );
-  }, [location, reportingZones]);
+  }, [location, reportingZones, zonesLoaded]);
 
   const canSubmit = useMemo(
     () =>
@@ -340,6 +342,7 @@ export default function SubmitReportPage() {
       locationConfirmed &&
       selectedCategory !== "" &&
       !isSubmitting &&
+      zonesLoaded &&
       !outsideZone,
     [
       imageFile,
@@ -347,6 +350,7 @@ export default function SubmitReportPage() {
       locationConfirmed,
       selectedCategory,
       isSubmitting,
+      zonesLoaded,
       outsideZone,
     ],
   );
@@ -600,11 +604,12 @@ export default function SubmitReportPage() {
 
     // Hard zone guard
     if (
-      location &&
-      reportingZones.length > 0 &&
+      !zonesLoaded ||
       !isPointInAnyZone(location.lat, location.lng, reportingZones)
     ) {
-      setSubmitError("You can only report within the designated coastal zone.");
+      setSubmitError(
+        "You can only report within the designated reporting zones.",
+      );
       return;
     }
     if (!selectedCategory) {
@@ -1029,6 +1034,7 @@ export default function SubmitReportPage() {
                     <LocationPickerMap
                       value={location}
                       zones={reportingZones}
+                      restrictToZones
                       onChange={(nextLocation) => {
                         setLocation(nextLocation);
                         setLocationConfirmed(false);
@@ -1052,7 +1058,9 @@ export default function SubmitReportPage() {
                   {outsideZone && (
                     <p className="flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700">
                       <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                      You can only report within the designated coastal zone.
+                      {reportingZones.length === 0
+                        ? "Reporting is unavailable: no reporting zones are active."
+                        : "You can only report within the designated reporting zones."}
                     </p>
                   )}
                   {location && !outsideZone && (

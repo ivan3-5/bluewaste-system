@@ -48,7 +48,7 @@ export class ReportGeoService {
       ? Math.min(Math.max(parsedLimit, 1), 5000)
       : 2000;
 
-    const cacheKey = `bluewaste:geo:map:${JSON.stringify({
+    const cacheKey = `bluewaste:geo:v2:map:${JSON.stringify({
       status: filters?.status || null,
       category: filters?.category || null,
       limit,
@@ -62,7 +62,6 @@ export class ReportGeoService {
     const where: Prisma.ReportWhereInput = {
       isDeleted: false,
       isSpam: false,
-      status: { not: ReportStatus.CLEANED },
     };
     if (filters?.status) where.status = filters.status;
     if (filters?.category) where.category = filters.category;
@@ -95,10 +94,6 @@ export class ReportGeoService {
       const legacyWhere: Prisma.ReportWhereInput = {};
       if (filters?.status) legacyWhere.status = filters.status;
       if (filters?.category) legacyWhere.category = filters.category;
-
-      if (!filters?.status) {
-        legacyWhere.status = { not: ReportStatus.CLEANED };
-      }
 
       reports = await prisma.report.findMany({
         where: legacyWhere,
@@ -185,7 +180,7 @@ export class ReportGeoService {
       ? Math.min(Math.max(parsedLimit, 1), 5000)
       : 2000;
 
-    const cacheKey = `bluewaste:geo:incidents:${JSON.stringify({
+    const cacheKey = `bluewaste:geo:v2:incidents:${JSON.stringify({
       status: filters?.status || null,
       category: filters?.category || null,
       limit,
@@ -196,9 +191,7 @@ export class ReportGeoService {
       return cached;
     }
 
-    const where: Prisma.WasteIncidentWhereInput = {
-      isResolved: false,
-    };
+    const where: Prisma.WasteIncidentWhereInput = {};
     if (filters?.status) where.status = filters.status;
     if (filters?.category) where.category = filters.category;
 

@@ -87,7 +87,8 @@ const SEVERITY_CONFIG: Record<AiSeverity, { label: string; classes: string }> = 
 export default function ReportWastePage() {
   const router = useRouter();
   const { user, token, isLoading } = useAuth();
-  const { data: reportingZones = [] } = useReportingZones(true);
+  const { data: reportingZones = [], isSuccess: zonesLoaded } =
+    useReportingZones(true);
   const createReport = useCreateReport();
   const uploadImages = useUploadReportImages();
   const [outsideZone, setOutsideZone] = useState(false);
@@ -119,16 +120,16 @@ export default function ReportWastePage() {
 
   // Re-validate zone membership whenever location OR zones change
   useEffect(() => {
-    if (latitude === null || longitude === null || reportingZones.length === 0) {
+    if (latitude === null || longitude === null || !zonesLoaded) {
       setOutsideZone(false);
       return;
     }
     const inside = isPointInAnyZone(latitude, longitude, reportingZones);
     setOutsideZone(!inside);
     if (!inside) {
-      setLocationStatus("Location is outside the designated coastal zone.");
+      setLocationStatus("Location is outside the designated reporting zones.");
     }
-  }, [latitude, longitude, reportingZones]);
+  }, [latitude, longitude, reportingZones, zonesLoaded]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -210,10 +211,10 @@ export default function ReportWastePage() {
 
     // Hard zone guard
     if (
-      reportingZones.length > 0 &&
+      !zonesLoaded ||
       !isPointInAnyZone(latitude, longitude, reportingZones)
     ) {
-      setError("Reporting is only allowed within the designated coastal zone.");
+      setError("Reporting is only allowed within the designated reporting zones.");
       return;
     }
 
@@ -379,7 +380,9 @@ export default function ReportWastePage() {
               </div>
               {outsideZone && (
                 <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
-                  Reporting is only allowed within the designated coastal zone.
+                  {reportingZones.length === 0
+                    ? "Reporting is unavailable: no reporting zones are active."
+                    : "Reporting is only allowed within the designated reporting zones."}
                 </p>
               )}
             </div>
@@ -452,7 +455,9 @@ export default function ReportWastePage() {
             <Button
               id="analyze-submit-btn"
               onClick={handleAnalyzeAndSubmit}
-              disabled={!imageFile || isAnalyzing || outsideZone || latitude === null}
+              disabled={
+                !imageFile || isAnalyzing || !zonesLoaded || outsideZone || latitude === null
+              }
               className="w-full"
             >
               {isAnalyzing ? (

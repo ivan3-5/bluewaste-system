@@ -121,9 +121,9 @@ export function ScheduleForm({
 }: ScheduleFormProps) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"details" | "equipment" | "crew">(
-    "details",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "details" | "equipment" | "workers"
+  >("details");
 
   const [formData, setFormData] = useState({
     title: "",
@@ -438,7 +438,7 @@ export function ScheduleForm({
     }
     if (formData.workerIds.length === 0) {
       setErrorMessage("Please assign at least one field worker.");
-      setActiveTab("crew");
+      setActiveTab("workers");
       return;
     }
     if (formData.reportIds.length === 0) {
@@ -567,9 +567,9 @@ export function ScheduleForm({
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab("crew")}
+              onClick={() => setActiveTab("workers")}
               className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === "crew"
+                activeTab === "workers"
                   ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
                   : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
               }`}
@@ -943,7 +943,7 @@ export function ScheduleForm({
             )}
 
             {/* TAB 3: ASSIGN FIELD WORKERS */}
-            {activeTab === "crew" && (
+            {activeTab === "workers" && (
               <div className="space-y-5 animate-in fade-in duration-200">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">

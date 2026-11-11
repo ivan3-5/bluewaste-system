@@ -282,13 +282,19 @@ export const PRIORITY_LABELS: Record<ReportPriority, string> = {
 };
 
 export const STATUS_COLORS: Record<ReportStatus, string> = {
-  PENDING: "#f59e0b",
-  VERIFIED: "#3b82f6",
-  CLEANUP_SCHEDULED: "#8b5cf6",
-  IN_PROGRESS: "#f97316",
-  CLEANED: "#22c55e",
-  REJECTED: "#ef4444",
+  PENDING: "#f97316", // Orange
+  VERIFIED: "#2563eb", // Blue
+  IN_PROGRESS: "#eab308", // Yellow / Amber
+  CLEANUP_SCHEDULED: "#8b5cf6", // Purple
+  CLEANED: "#22c55e", // Green
+  REJECTED: "#ef4444", // Red
 };
+
+export function getStatusColor(status?: string): string {
+  if (!status) return "#f97316";
+  const s = status.toUpperCase();
+  return (STATUS_COLORS as Record<string, string>)[s] || "#f97316";
+}
 
 // ==================== CLEANUP SCHEDULES ====================
 
