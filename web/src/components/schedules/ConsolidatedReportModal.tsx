@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { generateConsolidatedCleanupReportPdf } from "@/lib/cleanup-report-pdf";
 import {
   ConsolidatedCleanupReport,
   SCHEDULE_STATUS_COLORS,
@@ -22,14 +23,14 @@ import { SeverityBadge } from "@/components/SeverityBadge";
 import { format } from "date-fns";
 import {
   FileText,
-  Printer,
+  FileDown,
+  Loader2,
   X,
   Users,
   MapPin,
   CalendarDays,
   ShieldCheck,
   CheckCircle2,
-  Clock,
   Layers,
   Copy,
   Check,
@@ -49,6 +50,8 @@ export function ConsolidatedReportModal({
   onClose,
 }: ConsolidatedReportModalProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const {
     data: report,
@@ -70,18 +73,35 @@ export function ConsolidatedReportModal({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handleExport = async () => {
+    if (!report) return;
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      await generateConsolidatedCleanupReportPdf(
+        report,
+        `combined-cleanup-report-${report.scheduleId.slice(0, 8)}.pdf`,
+      );
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Failed to export the combined report.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (isExporting) return;
+    setExportError(null);
+    onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
         overlayClassName="bg-black/50 backdrop-blur-sm"
-        className="max-w-4xl max-h-[92vh] flex flex-col p-0 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-2xl overflow-hidden print:max-w-none print:max-h-none print:border-none print:shadow-none"
+        className="max-w-4xl max-h-[92vh] flex flex-col p-0 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-2xl overflow-hidden"
       >
-        {/* Modal Action Header (hidden in print) */}
-        <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50/70 dark:bg-slate-900/80 flex items-center justify-between gap-4 print:hidden">
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50/70 dark:bg-slate-900/80 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl">
               <FileText className="w-5 h-5" />
@@ -99,17 +119,18 @@ export function ConsolidatedReportModal({
             <Button
               variant="outline"
               size="sm"
-              onClick={handlePrint}
-              disabled={isLoading || isError || !report}
+              onClick={handleExport}
+              disabled={isLoading || isError || !report || isExporting}
               className="gap-1.5 h-8 text-xs font-semibold rounded-xl border-gray-200 dark:border-slate-700 dark:text-slate-200"
             >
-              <Printer className="w-3.5 h-3.5" />
-              Print / Save PDF
+              {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+              {isExporting ? "Exporting…" : "Export PDF"}
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              onClick={onClose}
+              onClick={handleClose}
+              disabled={isExporting}
               className="h-8 w-8 p-0 rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-slate-200"
             >
               <X className="w-4 h-4" />
@@ -117,8 +138,12 @@ export function ConsolidatedReportModal({
           </div>
         </div>
 
-        {/* Modal Printable Scroll Content */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 print:p-0 print:overflow-visible">
+        {exportError && (
+          <p role="alert" className="px-6 pt-3 text-xs font-medium text-rose-700 dark:text-rose-300">
+            {exportError}
+          </p>
+        )}
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
           {isLoading && (
             <div className="flex flex-col items-center justify-center py-16 text-gray-500 dark:text-slate-400">
               <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3" />
@@ -139,7 +164,7 @@ export function ConsolidatedReportModal({
           )}
 
           {report && (
-            <div className="space-y-6 print:space-y-4">
+            <div className="space-y-6">
               {/* Official Document Letterhead */}
               <div className="text-center pb-4 border-b border-gray-200 dark:border-slate-800 space-y-1">
                 <p className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-slate-400 font-semibold">
@@ -416,7 +441,7 @@ export function ConsolidatedReportModal({
                 </div>
               </div>
 
-              {/* Signatures / Authority Section for Official Print */}
+              {/* Signatures / Authority Section */}
               <div className="pt-6 border-t border-gray-200 dark:border-slate-800 grid grid-cols-2 gap-8 text-center text-xs">
                 <div>
                   <p className="font-bold text-gray-800 dark:text-slate-200 uppercase">
