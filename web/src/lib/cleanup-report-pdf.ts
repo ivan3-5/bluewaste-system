@@ -86,6 +86,32 @@ async function loadImage(
   }
 }
 
+export function cleanRemarks(text?: string | null): string {
+  if (!text) return "";
+  const cleaned = text.replace(/^Automatically completed:\s*/i, "").trim();
+  if (!cleaned) return "";
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+/**
+ * Determines whether a cleanup schedule has valid combined waste reports available.
+ * Combined waste reports require multiple distinct waste reports consolidated
+ * into a single unified cleanup activity.
+ *
+ * @param reportData The consolidated cleanup report data returned by the backend endpoint.
+ * @returns true if the report data represents a valid combined waste report (multiple reports).
+ */
+export function hasValidCombinedReport(
+  reportData: ConsolidatedCleanupReport | null | undefined,
+): boolean {
+  if (!reportData || typeof reportData !== "object") return false;
+  const count =
+    Array.isArray(reportData.groupedReports)
+      ? reportData.groupedReports.length
+      : (reportData.summary?.totalReports ?? 0);
+  return count > 1;
+}
+
 function drawLetterhead(doc: jsPDF, cud: string) {
   doc.setTextColor(0, 0, 0);
   doc.setFont("helvetica", "normal");
@@ -105,15 +131,30 @@ function drawLetterhead(doc: jsPDF, cud: string) {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  const prefix = `CUD-${new Date().getFullYear()}-`;
+  const currentYear = new Date().getFullYear();
+  const trimmedCud = (cud || "").trim();
+
+  let fullText = "";
+  if (trimmedCud) {
+    if (/^CUD-/i.test(trimmedCud)) {
+      fullText = trimmedCud;
+    } else {
+      const codePart = trimmedCud.replace(/^[-_\s]+/, "");
+      fullText = `CUD-${currentYear}- ${codePart}`;
+    }
+  } else {
+    fullText = `CUD-${currentYear}-`;
+  }
+
   const lineEnd = PAGE_W - MARGIN_X;
-  const prefixW = doc.getTextWidth(prefix);
-  const valueW = Math.max(doc.getTextWidth(cud), 26);
-  const startX = lineEnd - prefixW - valueW;
-  doc.text(prefix, startX, 40);
-  if (cud) doc.text(cud, startX + prefixW + 1, 39.6);
-  doc.setLineWidth(0.2);
-  doc.line(startX + prefixW, 40.6, lineEnd, 40.6);
+  const textW = doc.getTextWidth(fullText);
+  const blankSpace = trimmedCud ? 0 : 26;
+  const startX = lineEnd - textW - blankSpace;
+
+  doc.text(fullText, startX, 40);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.25);
+  doc.line(startX, 40.6, lineEnd, 40.6);
 }
 
 function drawFooter(doc: jsPDF, page: number, total: number) {
@@ -290,8 +331,9 @@ function drawDetailsTable(doc: jsPDF, data: CleanupReportData, startY: number) {
   y += focalH;
 
   // Remarks
+  const cleanedRemarks = cleanRemarks(data.remarks) || " ";
   const remarkLines = doc.splitTextToSize(
-    data.remarks || " ",
+    cleanedRemarks,
     x1 - x0 - 22 - pad * 2,
   );
   const remarksH = Math.max(rowH, remarkLines.length * 4 + 3);
@@ -342,11 +384,40 @@ function drawPhotoRow(doc: jsPDF, images: LoadedImage[], y: number, h: number) {
 function drawSignatory(doc: jsPDF, s: Signatory, cx: number, y: number, maxWidth: number) {
   if (!s.name && !s.position) return;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text(s.name, cx, y, { align: "center", maxWidth });
+  doc.setFontSize(9.5);
+  doc.setTextColor(0, 0, 0);
+  const nameLines = doc.splitTextToSize(s.name, maxWidth);
+  doc.text(nameLines, cx, y, { align: "center" });
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
-  doc.text(s.position, cx, y + 4.5, { align: "center", maxWidth });
+  const posLines = doc.splitTextToSize(s.position, maxWidth);
+  const posOffset = Math.max(4.5, nameLines.length * 4.2);
+  doc.text(posLines, cx, y + posOffset, { align: "center" });
+}
+
+export function getSignaturesHeight(
+  data: Pick<CleanupReportData, "preparedBy" | "notedBy" | "approvedBy">,
+): number {
+  const SIGNATURE_GAP = 18;
+  const ROW_GAP = 22;
+  const SECTION_GAP = 12;
+
+  let total = 0;
+  const sections = [data.preparedBy, data.notedBy, data.approvedBy];
+
+  for (const list of sections) {
+    const filled = list.filter((s) => s.name || s.position);
+    if (!filled.length) continue;
+    const rows = Math.ceil(filled.length / 2);
+    total += SIGNATURE_GAP + 8;
+    if (rows > 1) {
+      total += (rows - 1) * ROW_GAP;
+    }
+    total += SECTION_GAP;
+  }
+
+  return Math.max(total, 60);
 }
 
 function drawSignatures(
@@ -357,39 +428,48 @@ function drawSignatures(
   const leftCx = MARGIN_X + CONTENT_W * 0.27;
   const rightCx = MARGIN_X + CONTENT_W * 0.73;
   const midCx = PAGE_W / 2;
-  const colW = CONTENT_W * 0.46;
+  const colW = CONTENT_W * 0.44;
+
+  const SIGNATURE_GAP = 18; // Sufficient vertical spacing above names for handwritten signatures
+  const ROW_GAP = 22; // Clear spacing between signatory rows within a section
+  const SECTION_GAP = 12; // Spacing between sections
+
   let y = startY;
 
-  const label = (text: string) => {
+  const renderSection = (title: string, list: Signatory[]) => {
+    const filled = list.filter((s) => s.name || s.position);
+    if (!filled.length) return;
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text(text, MARGIN_X, y);
-    y += 11;
-  };
+    doc.setTextColor(0, 0, 0);
+    doc.text(title, MARGIN_X, y);
 
-  const group = (list: Signatory[]) => {
-    const filled = list.filter((s) => s.name || s.position);
+    // Ample space for handwritten signature before the first row of names
+    y += SIGNATURE_GAP;
+
     for (let i = 0; i < filled.length; i += 2) {
       const pair = filled.slice(i, i + 2);
       if (pair.length === 1) {
-        drawSignatory(doc, pair[0], midCx, y, CONTENT_W);
+        drawSignatory(doc, pair[0], midCx, y, CONTENT_W * 0.7);
       } else {
         drawSignatory(doc, pair[0], leftCx, y, colW);
         drawSignatory(doc, pair[1], rightCx, y, colW);
       }
-      y += 14;
+
+      if (i + 2 < filled.length) {
+        y += ROW_GAP;
+      } else {
+        y += 5;
+      }
     }
+
+    y += SECTION_GAP;
   };
 
-  label("Prepared and Submitted by:");
-  // Template layout: first two side by side, the third centered below.
-  group(data.preparedBy);
-  y += 4;
-  label("Noted by:");
-  group(data.notedBy);
-  y += 4;
-  label("Approved by:");
-  group(data.approvedBy);
+  renderSection("Prepared and Submitted by:", data.preparedBy);
+  renderSection("Noted by:", data.notedBy);
+  renderSection("Approved by:", data.approvedBy);
 }
 
 export async function generateCleanupReportPdf(
@@ -452,7 +532,7 @@ export async function generateCleanupReportPdf(
     "No cleanup photos were uploaded for this report.",
     cleanedPhotos,
     50,
-    55,
+    48,
   );
   drawSignatures(doc, data, y2 + 4);
   drawFooter(doc, 2, 2);
@@ -462,25 +542,85 @@ export async function generateCleanupReportPdf(
 
 export async function generateConsolidatedCleanupReportPdf(
   report: ConsolidatedCleanupReport,
-  fileName: string,
+  data?: CleanupReportData,
+  fileName?: string,
 ) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const title = "Combined Clean-up Drive Report";
   const continuationTop = 47;
   const headingHeight = 9;
+  const resolvedFileName =
+    fileName || `combined-cleanup-report-${report.scheduleId.slice(0, 8)}.pdf`;
+
+  const effectiveData: CleanupReportData = data || {
+    cudNumber: "",
+    reportDate: report.generatedAt || new Date().toISOString(),
+    forName: "ENGR. FELIX JONASES P. SENAJON, EnP., MEP-Envi.",
+    forPosition: "CGDH, CENRO",
+    dateConducted: report.scheduledAt,
+    activityType: "Coastal Clean-up",
+    location:
+      report.groupedReports[0]?.address || report.barangay || "Panabo City",
+    male: 0,
+    female: 0,
+    wasteType:
+      Array.from(
+        new Set(
+          report.groupedReports.map(
+            (r) => WASTE_CATEGORY_LABELS[r.category] || r.category,
+          ),
+        ),
+      ).join(", ") || "Mixed waste",
+    wasteKg: "",
+    areaCovered: "",
+    organization: "City ENRO Panabo",
+    focalName:
+      report.completionInfo?.verifiedBy?.name ||
+      (report.assignedWorkers[0]
+        ? `${report.assignedWorkers[0].firstName} ${report.assignedWorkers[0].lastName}`
+        : ""),
+    focalPosition: report.completionInfo?.verifiedBy
+      ? "Verifying Officer"
+      : report.assignedWorkers[0]
+        ? "Field Lead"
+        : "",
+    remarks: cleanRemarks(
+      report.completionInfo?.notes ||
+      report.notes ||
+      `Combined clean-up drive covering ${report.groupedReports.length} waste reports across ${report.barangay || "Panabo City"}.`,
+    ),
+    preparedBy: [
+      { name: "RODULFO SARDA", position: "Labor General Foreman" },
+      { name: "JOEMARIS D. BUGUIS", position: "Environmental Management Specialist I" },
+      { name: "RECSON B. ENGALGADO, RPF, MSDA", position: "Environmental Management Specialist II" },
+    ],
+    notedBy: [
+      { name: "MARIO R. PAÑA", position: "Sr. Environmental Management Specialist" },
+      { name: "Engr. OLIVER Q. ORIOL", position: "CGADH, City ENRO" },
+    ],
+    approvedBy: [
+      { name: "Engr. FELIX JONASES P. SENAJON, EnP., MEP-Envi.", position: "CGDH, City ENRO" },
+    ],
+    reportedPhotoUrls: report.groupedReports.flatMap((r) => r.photoUrls),
+    cleanupPhotoUrls: report.groupedReports.flatMap((r) => r.cleanupPhotoUrls),
+  };
+
   doc.setProperties({ title });
-  drawLetterhead(doc, "");
+  drawLetterhead(doc, effectiveData.cudNumber);
   let y = drawDocumentHeader(
     doc,
-    { forName: "CGDH, CENRO", forPosition: "", reportDate: report.generatedAt },
-    title.toUpperCase(),
-    "The following is a summary of the clean-up activity and the waste reports linked to this schedule.",
+    effectiveData,
+    "COMBINED REPORT ON THE CONDUCTED CLEAN-UP DRIVE ACTIVITY",
+    "Please be informed that the undersigned personnel had conducted clean-up drive activity relative to the above mentioned subject and these are the following details, to wit;",
   );
+
+  // Draw clean-up drive details table submitted from the modal
+  y = drawDetailsTable(doc, effectiveData, y);
 
   const nextPage = () => {
     doc.addPage();
-    drawLetterhead(doc, "");
+    drawLetterhead(doc, effectiveData.cudNumber);
     y = continuationTop;
   };
 
@@ -548,50 +688,69 @@ export async function generateConsolidatedCleanupReportPdf(
     }
   };
 
+  // Add Combined Mission Overview section
+  y += 6;
   const { summary, completionInfo } = report;
-  const notes = completionInfo?.notes || report.notes;
-  table([
-    ["Activity", report.scheduleTitle],
-    ["Schedule ID", report.scheduleId],
-    ["Scheduled date", formatLongDate(report.scheduledAt)],
-    ["Location of the activity", report.barangay],
-    ["Status", SCHEDULE_STATUS_LABELS[report.overallStatus]],
-    ["Linked reports", String(summary.totalReports)],
-    ["Reporting citizens", String(summary.totalCitizens)],
-    ["Locations cleaned", `${summary.cleanedReportsCount} of ${summary.totalReports}`],
-    ["Assigned field workers", report.assignedWorkers.map((worker) => {
-      const contact = worker.phone || worker.email;
-      return `${worker.firstName} ${worker.lastName}${contact ? ` (${contact})` : ""}`;
-    }).join("\n") || "None"],
-    ["Equipment", report.equipment.join(", ") || "Standard cleanup safety equipment"],
-  ]);
+  const notes = cleanRemarks(completionInfo?.notes || report.notes);
+  table(
+    [
+      ["Operation / Mission", report.scheduleTitle],
+      ["Schedule ID", report.scheduleId],
+      ["Scheduled date", formatLongDate(report.scheduledAt)],
+      ["Location / Barangay", report.barangay || "Panabo City"],
+      ["Overall Status", SCHEDULE_STATUS_LABELS[report.overallStatus] || report.overallStatus],
+      ["Associated waste reports", String(summary.totalReports)],
+      ["Reporting citizens", String(summary.totalCitizens)],
+      ["Locations cleaned", `${summary.cleanedReportsCount} of ${summary.totalReports}`],
+      [
+        "Assigned field responders",
+        report.assignedWorkers
+          .map((worker) => {
+            const contact = worker.phone || worker.email;
+            return `${worker.firstName} ${worker.lastName}${contact ? ` (${contact})` : ""}`;
+          })
+          .join("\n") || "None",
+      ],
+      ["Allocated equipment", report.equipment.join(", ") || "Standard cleanup safety equipment"],
+    ],
+    ["Combined Cleanup Mission Overview"],
+  );
 
   if (completionInfo?.verifiedAt || completionInfo?.verifiedBy || notes) {
     y += 6;
-    table([
-      ["Verified by", completionInfo?.verifiedBy?.name || ""],
-      ["Verification date", formatLongDate(completionInfo?.verifiedAt)],
-      ["Remarks", notes || ""],
-    ], ["Completion and verification"]);
+    table(
+      [
+        ["Verified by", completionInfo?.verifiedBy?.name || ""],
+        ["Verification date", formatLongDate(completionInfo?.verifiedAt)],
+        ["Verification remarks", notes || ""],
+      ],
+      ["Completion and verification"],
+    );
   }
 
   y += 6;
-  const linkedReportsHeading = `Linked waste reports (${report.groupedReports.length})`;
+  const linkedReportsHeading = `Associated waste reports breakdown (${report.groupedReports.length})`;
   if (!report.groupedReports.length) {
     table([["Reports", "No linked waste reports"]], [linkedReportsHeading]);
   }
   for (const [index, item] of report.groupedReports.entries()) {
-    const reportHeading = `Report ${index + 1}`;
-    table([
-      ["Title", item.title],
-      ["Report ID", item.id],
-      ["Location", `${item.address || report.barangay || "Panabo City"}\n(${item.latitude.toFixed(5)}, ${item.longitude.toFixed(5)})`],
-      ["Reporter", item.isAnonymous ? "Anonymous Citizen" : item.reporter?.name || "Citizen"],
-      ["Waste category", WASTE_CATEGORY_LABELS[item.category] || item.category],
-      ["Severity", item.severity || ""],
-      ["Estimated quantity", item.wasteQuantity == null ? "" : `${item.wasteQuantity} items`],
-      ["Status", ADMIN_REPORT_STATUS_LABELS[item.status]],
-    ], index === 0 ? [linkedReportsHeading, reportHeading] : [reportHeading]);
+    const reportHeading = `Report ${index + 1}: ${item.title}`;
+    table(
+      [
+        ["Title", item.title],
+        ["Report ID", item.id],
+        [
+          "Location",
+          `${item.address || report.barangay || "Panabo City"}\n(${item.latitude.toFixed(5)}, ${item.longitude.toFixed(5)})`,
+        ],
+        ["Reporter", item.isAnonymous ? "Anonymous Citizen" : item.reporter?.name || "Citizen"],
+        ["Waste category", WASTE_CATEGORY_LABELS[item.category] || item.category],
+        ["Severity", item.severity || "N/A"],
+        ["Estimated quantity", item.wasteQuantity == null ? "N/A" : `${item.wasteQuantity} items`],
+        ["Status", ADMIN_REPORT_STATUS_LABELS[item.status] || item.status],
+      ],
+      index === 0 ? [linkedReportsHeading, reportHeading] : [reportHeading],
+    );
     y += 6;
   }
 
@@ -612,12 +771,12 @@ export async function generateConsolidatedCleanupReportPdf(
       }),
     );
   });
+
   heading("Photo documentation", photoRows.length ? headingHeight + photoHeight : 8);
-  const signatureHeight = 85;
-  for (const [index, row] of photoRows.entries()) {
+  const signatureHeight = getSignaturesHeight(effectiveData);
+  for (const row of photoRows) {
     const photos = await Promise.all(row.urls.map(loadImage));
-    const signatureSpace = index === photoRows.length - 1 ? signatureHeight + 14 : 0;
-    heading(row.label, photoHeight + signatureSpace);
+    heading(row.label, photoHeight);
     drawPhotoRow(doc, photos, y, photoHeight);
     y += photoHeight + 6;
   }
@@ -625,16 +784,12 @@ export async function generateConsolidatedCleanupReportPdf(
 
   y += 8;
   ensureSpace(signatureHeight);
-  drawSignatures(doc, {
-    preparedBy: [{ name: "City ENRO Field Coordination Unit", position: "" }],
-    notedBy: [{ name: "____________________________", position: "" }],
-    approvedBy: [{ name: "CGDH, City ENRO Panabo", position: "" }],
-  }, y);
+  drawSignatures(doc, effectiveData, y);
 
   const totalPages = doc.getNumberOfPages();
   for (let page = 1; page <= totalPages; page++) {
     doc.setPage(page);
     drawFooter(doc, page, totalPages);
   }
-  doc.save(fileName);
+  doc.save(resolvedFileName);
 }

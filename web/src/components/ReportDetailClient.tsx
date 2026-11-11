@@ -5,31 +5,9 @@ import Link from "next/link";
 import { Check, Copy, ExternalLink, MapPin, CheckCircle2, Circle, AlertCircle, CalendarDays, FileText } from "lucide-react";
 import type { AdminReportStatus } from "@/lib/admin-report";
 import { ReportStatusUpdater } from "@/components/ReportStatusUpdater";
-import { ConsolidatedReportModal } from "@/components/schedules/ConsolidatedReportModal";
+import { CombinedReportButton } from "@/components/GenerateReportButton";
 
-export function CombinedReportButton({ scheduleId }: { scheduleId: string }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-2xs transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-950"
-      >
-        <FileText className="h-3.5 w-3.5" />
-        Combined Report
-      </button>
-      {open && (
-        <ConsolidatedReportModal
-          scheduleId={scheduleId}
-          isOpen={open}
-          onClose={() => setOpen(false)}
-        />
-      )}
-    </>
-  );
-}
+export { CombinedReportButton };
 
 export function CopyButton({
   text,

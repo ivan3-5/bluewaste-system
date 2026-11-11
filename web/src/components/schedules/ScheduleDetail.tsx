@@ -16,6 +16,7 @@ import {
   SCHEDULE_STATUS_LABELS,
   CleanupScheduleStatus,
   Report,
+  ConsolidatedCleanupReport,
 } from "@/types";
 import { format } from "date-fns";
 import {
@@ -41,7 +42,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { ConsolidatedReportModal } from "./ConsolidatedReportModal";
+import { GenerateCleanupReportModal } from "@/components/GenerateReportButton";
+import { hasValidCombinedReport } from "@/lib/cleanup-report-pdf";
 import { Layers } from "lucide-react";
 
 interface ScheduleDetailProps {
@@ -82,7 +84,23 @@ export function ScheduleDetail({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [verifyNotes, setVerifyNotes] = useState("");
-  const [showConsolidatedModal, setShowConsolidatedModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+
+  // Fetch actual combined waste report data for the selected schedule
+  const { data: combinedReportData } = useQuery<ConsolidatedCleanupReport>({
+    queryKey: ["schedule-report", schedule?.id],
+    queryFn: async () => {
+      if (!schedule?.id) throw new Error("No schedule ID provided");
+      const res = await api.get(`/schedules/${schedule.id}/report`);
+      return res.data as ConsolidatedCleanupReport;
+    },
+    enabled: Boolean(schedule?.id && isOpen),
+    staleTime: 60 * 1000,
+  });
+
+  const hasCombinedReports = useMemo(() => {
+    return hasValidCombinedReport(combinedReportData);
+  }, [combinedReportData]);
 
   const uniqueCitizensCount = useMemo(() => {
     const reports = schedule?.reports || [];
@@ -196,6 +214,11 @@ export function ScheduleDetail({
       queryClient.invalidateQueries({
         queryKey: ["reports", "eligible-for-schedule"],
       });
+      if (schedule?.id) {
+        queryClient.invalidateQueries({
+          queryKey: ["schedule-report", schedule.id],
+        });
+      }
       setIsLinkingReports(false);
       setLinkDraftIds([]);
       onRefresh?.(updated);
@@ -259,15 +282,17 @@ export function ScheduleDetail({
                   </div>
                 )}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowConsolidatedModal(true)}
-                className="gap-1.5 rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-xs font-bold shrink-0 mt-1"
-              >
-                <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                Combined Report
-              </Button>
+              {hasCombinedReports && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowReportModal(true)}
+                  className="gap-1.5 rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-xs font-bold shrink-0 mt-1"
+                >
+                  <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  Combined Report
+                </Button>
+              )}
             </div>
 
             {/* Quick Metadata Grid */}
@@ -610,7 +635,7 @@ export function ScheduleDetail({
                   Completion & Verification Log
                 </div>
                 <p className="text-xs text-emerald-900 dark:text-emerald-200 leading-relaxed pl-5 whitespace-pre-wrap">
-                  {schedule.notes}
+                  {schedule.notes.replace(/^Automatically completed:\s*/i, "").trim()}
                 </p>
               </div>
             )}
@@ -618,13 +643,17 @@ export function ScheduleDetail({
 
           {/* Action Footer */}
           <div className="px-8 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowConsolidatedModal(true)}
-              className="rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 h-10 px-4 text-xs font-bold gap-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-            >
-              <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Combined Cleanup Report
-            </Button>
+            {hasCombinedReports ? (
+              <Button
+                variant="outline"
+                onClick={() => setShowReportModal(true)}
+                className="rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 h-10 px-4 text-xs font-bold gap-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+              >
+                <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Combined Cleanup Report
+              </Button>
+            ) : (
+              <div />
+            )}
 
             {isAdmin && (
               <div className="flex items-center gap-2">
@@ -772,12 +801,12 @@ export function ScheduleDetail({
         </DialogContent>
       </Dialog>
 
-      {/* Consolidated Mission Report Modal */}
-      {showConsolidatedModal && (
-        <ConsolidatedReportModal
+      {/* Clean-up Drive Report Modal (Combined Report) */}
+      {hasCombinedReports && showReportModal && schedule && (
+        <GenerateCleanupReportModal
           scheduleId={schedule.id}
-          isOpen={showConsolidatedModal}
-          onClose={() => setShowConsolidatedModal(false)}
+          open={showReportModal}
+          onOpenChange={setShowReportModal}
         />
       )}
     </>

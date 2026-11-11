@@ -614,7 +614,7 @@ async function tryAutoCompleteCleanupSchedule(
             "updatedAt" = NOW(),
             "verifiedAt" = COALESCE("verifiedAt", NOW()),
             notes = CASE
-              WHEN notes IS NULL OR notes = '' THEN 'Automatically completed: all associated waste reports have been cleaned.'
+              WHEN notes IS NULL OR notes = '' THEN 'All associated waste reports have been cleaned.'
               ELSE notes
             END
         WHERE id = ${cleanupScheduleId}
@@ -630,7 +630,7 @@ async function tryAutoCompleteCleanupSchedule(
         "updatedAt" = NOW(),
         "verifiedAt" = COALESCE("verifiedAt", NOW()),
         notes = CASE 
-          WHEN notes IS NULL OR notes = '' THEN 'Automatically completed: all associated waste reports have been cleaned.'
+          WHEN notes IS NULL OR notes = '' THEN 'All associated waste reports have been cleaned.'
           ELSE notes
         END
     WHERE cs.status IN ('UPCOMING', 'ONGOING')

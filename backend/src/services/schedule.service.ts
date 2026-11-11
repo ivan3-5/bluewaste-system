@@ -629,7 +629,7 @@ export class ScheduleService {
           verifiedAt: schedule.verifiedAt ?? new Date(),
           notes: schedule.notes
             ? schedule.notes
-            : "Automatically completed: all associated waste reports have been cleaned.",
+            : "All associated waste reports have been cleaned.",
         };
 
         if (verifierId) {
@@ -734,7 +734,7 @@ export class ScheduleService {
             verifiedAt: schedule.verifiedAt ?? new Date(),
             notes:
               schedule.notes ||
-              "Automatically completed: all associated waste reports have been cleaned.",
+              "All associated waste reports have been cleaned.",
           },
         });
         if (update.count === 0) continue;
@@ -982,6 +982,13 @@ export class ScheduleService {
       updatedAt: r.updatedAt.toISOString(),
     }));
 
+    const cleanedNotes = schedule.notes
+      ? schedule.notes.replace(/^Automatically completed:\s*/i, "").trim()
+      : schedule.notes;
+    const finalNotes = cleanedNotes
+      ? cleanedNotes.charAt(0).toUpperCase() + cleanedNotes.slice(1)
+      : cleanedNotes;
+
     return {
       scheduleId: schedule.id,
       scheduleTitle: schedule.title,
@@ -989,7 +996,7 @@ export class ScheduleService {
       barangay: schedule.barangay,
       scheduledAt: schedule.scheduledAt.toISOString(),
       overallStatus: schedule.status,
-      notes: schedule.notes,
+      notes: finalNotes,
       completionInfo: {
         completedAt:
           schedule.status === "COMPLETED"
@@ -1002,7 +1009,7 @@ export class ScheduleService {
               name: `${schedule.verifiedBy.firstName} ${schedule.verifiedBy.lastName}`,
             }
           : null,
-        notes: schedule.notes,
+        notes: finalNotes,
       },
       summary: {
         totalReports,
