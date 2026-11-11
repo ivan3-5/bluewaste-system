@@ -8,6 +8,8 @@ import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../data/report_service.dart";
+import "../data/detect_service.dart";
+import "widgets/report_result_card.dart";
 import "../data/offline_service.dart";
 import "widgets/pending_reports_banner.dart";
 import "../../../core/network/api_exception.dart";
@@ -519,7 +521,7 @@ class _ReportCardItem extends StatelessWidget {
                                       report.severity == "HIGH") ...[
                                     const SizedBox(width: 6),
                                     AppStatusPill(
-                                      label: report.severity!,
+                                      label: WasteSeverity.fromString(report.severity).label,
                                       color: report.severity == "CRITICAL"
                                           ? AppColors.destructive
                                           : AppColors.warning,
@@ -798,7 +800,7 @@ class _ReportDetailSheet extends StatelessWidget {
                         ),
                         if (report.severity != null)
                           AppStatusPill(
-                            label: report.severity!,
+                            label: WasteSeverity.fromString(report.severity).label,
                             color: report.severity == "CRITICAL"
                                 ? AppColors.destructive
                                 : report.severity == "HIGH"
@@ -825,6 +827,14 @@ class _ReportDetailSheet extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.md),
 
+                    if (report.severity != null) ...[
+                      WasteAnalysisSummary(
+                        hasWaste: report.hasDetectedWaste,
+                        severity: WasteSeverity.fromString(report.severity),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+
                     // Description Section Card
                     Container(
                       padding: const EdgeInsets.all(AppSpacing.md),
@@ -836,7 +846,7 @@ class _ReportDetailSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "ANALYSIS DETAILS",
+                            "CITIZEN COMMENT",
                             style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
                                   color: AppColors.mutedForeground,
@@ -937,14 +947,6 @@ class _ReportDetailSheet extends StatelessWidget {
                             label: "Last updated",
                             value: detailFormat.format(report.updatedAt),
                           ),
-                          if (report.analysisWasteCount != null) ...[
-                            const Divider(height: AppSpacing.md),
-                            _DetailRow(
-                              icon: Icons.delete_outline,
-                              label: "Waste items detected",
-                              value: "${report.analysisWasteCount}",
-                            ),
-                          ],
                         ],
                       ),
                     ),

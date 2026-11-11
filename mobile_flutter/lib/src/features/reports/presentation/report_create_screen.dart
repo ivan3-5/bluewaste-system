@@ -56,6 +56,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   // Submission result card state
   bool _showResultCard = false;
   DetectResult? _submittedResult;
+  String _submittedComment = "";
   bool _isSubmittedSuccess = false;
   int _countdownSeconds = 3;
   Timer? _redirectTimer;
@@ -394,7 +395,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     if (!isDirectSpamSubmit &&
         rawDescription.isNotEmpty &&
         rawDescription.length < 10) {
-      _showMessage("Description must be at least 10 characters when provided.");
+      _showMessage("Comment must be at least 10 characters when provided.");
       return;
     }
 
@@ -438,17 +439,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               categoryLabel == "With Waste")
           ? "Waste report"
           : "Waste report - $categoryLabel";
-      final aiAnalysisReason = _detectResult?.reason ?? _detectResult?.message;
-      final description = rawDescription.isNotEmpty
-          ? rawDescription
-          : (aiAnalysisReason != null && aiAnalysisReason.trim().isNotEmpty
-                ? aiAnalysisReason
-                : "Waste report submitted via mobile capture.");
-
       final report = await reportService.submitFullReport(
         data: {
           "title": title,
-          "description": description,
+          "description": rawDescription,
           "category": effectiveCategory,
           "latitude": _latitude!,
           "longitude": _longitude!,
@@ -472,7 +466,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           "aiCategories": _detectResult?.categories.isNotEmpty == true
               ? _detectResult!.categories
               : (_detectResult?.labels.map((l) => l.label).toList() ?? []),
-          "aiReason": _detectResult?.reason ?? _detectResult?.message,
+          "aiReason": _detectResult?.severity.summary(
+            _detectResult?.hasWaste == true,
+          ),
         },
         images: _images,
         offlineService: offlineService,
@@ -488,6 +484,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       final submittedResult = _detectResult;
       setState(() {
         _images.clear();
+        _submittedComment = rawDescription;
         _isAnonymous = false;
         _category = "with_waste";
         _isSpamFlagged = false;
@@ -603,7 +600,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     final rawDescription = _descriptionController.text.trim();
     final missingRequirements = <String>[
       if (rawDescription.isNotEmpty && rawDescription.length < 10)
-        "Description (10+ characters)",
+        "Comment (10+ characters)",
       if (!_hasLocation) "Location",
     ];
     if (_images.isEmpty) missingRequirements.add("Photo");
@@ -652,6 +649,15 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                     color: AppColors.mutedForeground,
                   ),
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (_submittedResult case final result?)
+                  WasteAnalysisSummary(
+                    hasWaste: result.hasWaste,
+                    severity: result.severity,
+                  ),
+                Text(
+                  "Citizen Comment: ${_submittedComment.isEmpty ? 'None' : _submittedComment}",
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Container(
@@ -713,6 +719,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           if (_showResultCard && _submittedResult != null) ...[
             ReportResultCard(
               result: _submittedResult!,
+              comment: _submittedComment,
               onDismiss: () {
                 setState(() {
                   _showResultCard = false;
@@ -912,6 +919,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         if (_showResultCard && _submittedResult != null) ...[
           ReportResultCard(
             result: _submittedResult!,
+            comment: _submittedComment,
             onDismiss: () {
               setState(() {
                 _showResultCard = false;
@@ -1045,10 +1053,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               ),
               if (_detectedWasteCount != null) ...[
                 const SizedBox(height: AppSpacing.sm),
-                DetectionBadge(
-                  wasteCount: _detectedWasteCount!,
+                WasteAnalysisSummary(
                   hasWaste: _detectResult?.hasWaste == true,
-                  isSpamFlagged: _isSpamFlagged,
+                  severity: _detectResult?.severity ?? WasteSeverity.unknown,
                 ),
               ],
               const SizedBox(height: AppSpacing.md),
@@ -1117,7 +1124,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 controller: _descriptionController,
                 onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
-                  labelText: "Description (optional)",
+                  labelText: "Citizen comment (optional)",
                   alignLabelWithHint: true,
                   prefixIcon: Icon(Icons.description_outlined),
                 ),

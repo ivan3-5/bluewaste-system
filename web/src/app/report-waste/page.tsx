@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { MAX_REPORT_PHOTOS, REPORT_PHOTO_ACCEPT, selectReportPhotos } from "@/lib/report-photos";
+import { AnalysisSummary } from "@/components/AnalysisSummary";
 import { ReportPhotoThumbnails, usePhotoUrl } from "@/components/reports/ReportPhotoThumbnails";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,30 +20,20 @@ import {
   ImagePlus,
   Sparkles,
   CheckCircle2,
-  AlertTriangle,
   XCircle,
   EyeOff,
 } from "lucide-react";
 import { useReportingZones, isPointInAnyZone } from "@/hooks/useReportingZones";
 import { useCreateReport, useUploadReportImages } from "@/hooks/useReports";
-import { severityFromWasteCount } from "@/lib/severity";
+import { dbSeverityToAiLabel, formatWasteAnalysis, severityFromWasteCount } from "@/lib/severity";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type AiSeverity = "Low" | "Medium" | "High" | "Critical" | "None";
-
 interface GeminiAnalysisResult {
   hasWaste: boolean;
-  categories: string[];
-  severity: AiSeverity;
   wasteCount: number;
-  reason: string;
   reportId: string;
-  status: string;
-  imageUrl?: string;
-  message?: string; // polite spam message
   cached?: boolean;
-  model: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -59,27 +50,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   battery: "Battery",
   diaper: "Diaper",
   cigarette_butt: "Cigarette Butt",
-};
-
-const CATEGORY_COLORS: Record<string, string> = {
-  plastic_bottle: "bg-blue-100 text-blue-800 border-blue-200",
-  plastic_bag: "bg-cyan-100 text-cyan-800 border-cyan-200",
-  fishing_net: "bg-teal-100 text-teal-800 border-teal-200",
-  rope: "bg-amber-100 text-amber-800 border-amber-200",
-  styrofoam: "bg-purple-100 text-purple-800 border-purple-200",
-  can: "bg-gray-100 text-gray-800 border-gray-200",
-  glass: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  battery: "bg-red-100 text-red-800 border-red-200",
-  diaper: "bg-pink-100 text-pink-800 border-pink-200",
-  cigarette_butt: "bg-orange-100 text-orange-800 border-orange-200",
-};
-
-const SEVERITY_CONFIG: Record<AiSeverity, { label: string; classes: string }> = {
-  Critical: { label: "Critical", classes: "bg-red-100 text-red-800 border-red-300" },
-  High: { label: "High", classes: "bg-orange-100 text-orange-800 border-orange-300" },
-  Medium: { label: "Medium", classes: "bg-yellow-100 text-yellow-800 border-yellow-300" },
-  Low: { label: "Low", classes: "bg-green-100 text-green-800 border-green-300" },
-  None: { label: "None", classes: "bg-slate-100 text-slate-600 border-slate-300" },
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -234,6 +204,11 @@ export default function ReportWastePage() {
       return;
     }
 
+    if (description.trim().length > 0 && description.trim().length < 10) {
+      setError("Comment must be at least 10 characters when provided.");
+      return;
+    }
+
     setIsAnalyzing(true);
     setError("");
     setResult(null);
@@ -243,9 +218,6 @@ export default function ReportWastePage() {
       formData.append("image", imageFile);
       formData.append("latitude", String(latitude));
       formData.append("longitude", String(longitude));
-      if (address.trim().length > 0) {
-        formData.append("description", address.trim());
-      }
       if (description.trim().length > 0) {
         formData.append("description", description.trim());
       }
@@ -268,31 +240,33 @@ export default function ReportWastePage() {
       const reportTitle = (rawCategoryLabel === "With Waste" || rawCategoryLabel === "No Waste")
         ? "Waste report"
         : `Waste report - ${rawCategoryLabel}`;
-      const reportDescription = description.trim().length > 0
-        ? description.trim()
-        : (address.trim().length > 0 ? address.trim() : (data.reason || `Waste report submitted via quick capture.`));
-
       const detectedWasteCount = data.hasWaste
         ? Math.max(1, Number(data.wasteCount) || data.categories?.length || 1)
         : 0;
 
+      const severity = severityFromWasteCount(detectedWasteCount);
       const createdReport = await createReport.mutateAsync({
         title: reportTitle,
-        description: reportDescription,
+        description: description.trim(),
         category: data.hasWaste ? "with_waste" : "no_waste",
         latitude: latitude,
         longitude: longitude,
         address: address.trim().length > 0 ? address.trim() : undefined,
         isAnonymous: isAnonymous,
-        severity: severityFromWasteCount(detectedWasteCount),
+        severity,
         analysisStatus: data.hasWaste ? "DIRTY" : "CLEAN",
         analysisWasteCount: detectedWasteCount,
         aiModel: data.model,
         aiCategories: data.categories,
-        aiReason: data.reason,
+        aiReason: formatWasteAnalysis(data.hasWaste, dbSeverityToAiLabel(severity)),
       });
 
-      const report = { ...data, reportId: createdReport.id } as GeminiAnalysisResult;
+      const report: GeminiAnalysisResult = {
+        hasWaste: data.hasWaste === true,
+        wasteCount: detectedWasteCount,
+        reportId: createdReport.id,
+        cached: data.cached === true,
+      };
       setSavedReport(report);
       await finishPhotoUpload(report);
     } catch (err) {
@@ -401,7 +375,7 @@ JPG, PNG or WEBP · 4 MB each
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="description">Additional description (optional)</Label>
+              <Label htmlFor="description">Citizen comment (optional)</Label>
               <Input
                 id="description"
                 placeholder="Describe what you see..."
@@ -570,94 +544,21 @@ JPG, PNG or WEBP · 4 MB each
                 : "border-amber-100"
             }`}
           >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                {result.hasWaste ? (
-                  <>
-                    <AlertTriangle className="h-5 w-5 text-orange-500" />
-                    Waste Detected
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    No Waste Found
-                  </>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {/* Spam / No Waste Message */}
+            <CardContent className="space-y-5 pt-5">
               {!result.hasWaste && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                  <p className="font-semibold">Report marked as Spam</p>
-                  <p className="mt-1">
-                    {result.message ||
-                      "No visible waste was detected in this image. Your report has been marked as Spam."}
-                  </p>
+                  <p className="font-semibold">Report marked as spam.</p>
                 </div>
               )}
 
-              {/* Analysis Summary */}
-              <h3 className="text-sm font-semibold text-gray-900">Analysis Summary</h3>
-                <div className="grid gap-5 md:grid-cols-2">
-                  {/* Categories */}
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
-                      Detected Categories
-                    </p>
-                    {result.categories.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {result.categories.map((cat) => (
-                          <span
-                            key={cat}
-                            className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                              CATEGORY_COLORS[cat] ?? "bg-slate-100 text-slate-700 border-slate-200"
-                            }`}
-                          >
-                            {CATEGORY_LABELS[cat] ?? cat.replace(/_/g, " ")}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-400">None identified</p>
-                    )}
-                  </div>
-
-                  {/* Severity */}
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
-                      Severity
-                    </p>
-                      <span
-                        className={`inline-block rounded-full border px-3 py-1 text-sm font-semibold ${
-                          SEVERITY_CONFIG[result.severity]?.classes ??
-                          "bg-slate-100 text-slate-700 border-slate-200"
-                        }`}
-                      >
-                        {SEVERITY_CONFIG[result.severity]?.label ?? result.severity}
-                      </span>
-                  </div>
-
-                  {/* Waste items detected */}
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
-                      Waste Items Detected
-                    </p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {result.wasteCount}
-                    </p>
-                  </div>
-
-                  {/* AI Reason */}
-                  <div className="md:col-span-2">
-                    <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
-                      Analysis Details
-                    </p>
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      {result.reason || "No additional analysis details are available."}
-                    </p>
-                  </div>
-                </div>
+              <AnalysisSummary
+                hasWaste={result.hasWaste}
+                severity={severityFromWasteCount(result.wasteCount)}
+              />
+              <div>
+                <p className="text-xs font-semibold text-gray-500">Citizen Comment</p>
+                <p className="mt-1 text-sm text-gray-700">{description.trim() || "None"}</p>
+              </div>
 
               {/* Location summary */}
               {(latitude !== null || longitude !== null) && (

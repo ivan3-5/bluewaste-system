@@ -17,11 +17,12 @@ enum WasteSeverity {
   unknown;
 
   /// Severity from the total number of waste items detected:
-  /// 0 → spam, 1-2 → moderate, 3-6 → high, 7+ → critical.
+  /// Zero means no waste. MODERATE is the stored value for Medium.
   static WasteSeverity fromWasteCount(int wasteCount) {
-    if (wasteCount >= 7) return WasteSeverity.critical;
-    if (wasteCount >= 3) return WasteSeverity.high;
-    if (wasteCount >= 1) return WasteSeverity.moderate;
+    if (wasteCount >= 25) return WasteSeverity.critical;
+    if (wasteCount >= 16) return WasteSeverity.high;
+    if (wasteCount >= 9) return WasteSeverity.moderate;
+    if (wasteCount >= 1) return WasteSeverity.low;
     return WasteSeverity.spam;
   }
 
@@ -48,36 +49,22 @@ enum WasteSeverity {
   String get label {
     switch (this) {
       case WasteSeverity.critical:
-        return "Critical 🔴";
+        return "Critical";
       case WasteSeverity.high:
-        return "High 🟠";
+        return "High";
       case WasteSeverity.moderate:
-        return "Moderate 🟡";
+        return "Medium";
       case WasteSeverity.low:
-        return "Low 🟢";
+        return "Low";
       case WasteSeverity.spam:
-        return "Spam ⚪";
+        return "None";
       case WasteSeverity.unknown:
         return "Unknown";
     }
   }
 
-  String get description {
-    switch (this) {
-      case WasteSeverity.critical:
-        return "Immediate cleanup required!";
-      case WasteSeverity.high:
-        return "Schedule cleanup within 24 hours.";
-      case WasteSeverity.moderate:
-        return "Queued for cleanup.";
-      case WasteSeverity.low:
-        return "Minor cleanup required.";
-      case WasteSeverity.spam:
-        return "Flagged for admin review.";
-      case WasteSeverity.unknown:
-        return "";
-    }
-  }
+  String summary(bool hasWaste) =>
+      '${hasWaste ? "Waste detected" : "No waste detected"}. Severity: ${hasWaste ? label : "None"}.';
 
   String? get dbValue {
     switch (this) {
@@ -86,8 +73,9 @@ enum WasteSeverity {
       case WasteSeverity.high:
         return "HIGH";
       case WasteSeverity.moderate:
-      case WasteSeverity.low:
         return "MODERATE";
+      case WasteSeverity.low:
+        return "LOW";
       case WasteSeverity.spam:
         return "SPAM";
       case WasteSeverity.unknown:
@@ -197,7 +185,6 @@ class DetectResult {
           .toList(growable: false);
     }
 
-    final reasonStr = (json["reason"] ?? json["message"] ?? "").toString();
     final hasWasteVal = json["hasWaste"] == true || json["has_waste"] == true;
     final reportedCount =
         (json["wasteCount"] ?? json["waste_count"] ?? json["count"]) as num?;
@@ -207,11 +194,14 @@ class DetectResult {
               .toInt()
         : 0;
 
+    final severity = WasteSeverity.fromWasteCount(wasteCountVal);
+    final reasonStr = severity.summary(hasWasteVal);
+
     return DetectResult(
       hasWaste: hasWasteVal,
       message: reasonStr,
       wasteCount: wasteCountVal,
-      severity: WasteSeverity.fromWasteCount(wasteCountVal),
+      severity: severity,
       layer1Passed:
           json["layer1_passed"] != false && json["layer1Passed"] != false,
       categories: categoriesList,

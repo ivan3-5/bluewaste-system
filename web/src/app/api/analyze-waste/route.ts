@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { classifyYoloPayload, inferWasteCategory } from "@/lib/waste-classification";
 import { requestYoloPayload } from "@/lib/ai/yolo";
-import { severityFromWasteCount } from "@/lib/severity";
+import { dbSeverityToAiLabel, formatWasteAnalysis, severityFromWasteCount } from "@/lib/severity";
 import { analyzeImageWithGemini } from "@/lib/ai/gemini";
 import { validateGeminiResult } from "@/lib/ai/validator";
 
@@ -245,7 +245,13 @@ export async function POST(request: NextRequest) {
       ? labelNames[0] ?? "unknown"
       : classification.detectedObject;
     const wasteCategory = inferWasteCategory(labels, classification.dominantWaste);
-    const decision = normalizeDecision(yoloJson);
+    const summary = formatWasteAnalysis(hasWaste, dbSeverityToAiLabel(dbSeverity));
+    const rawDecision = normalizeDecision(yoloJson);
+    const decision = {
+      ...rawDecision,
+      reason: summary,
+      message: rawDecision.retake_recommended ? "Please retake the photo for a clearer analysis." : summary,
+    };
     const thresholds =
       yoloJson && typeof yoloData.thresholds === "object"
         ? yoloData.thresholds
@@ -324,6 +330,7 @@ export async function POST(request: NextRequest) {
       dominantWaste: classification.dominantWaste,
       totalItems: wasteCount,
       severity: dbSeverity,
+      reason: summary,
       has_waste: hasWaste,
       wasteCategory,
       status,

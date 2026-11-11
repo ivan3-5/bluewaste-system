@@ -1,5 +1,6 @@
 "use client";
 
+import { citizenComment } from "@/lib/utils";
 import { useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -307,11 +308,9 @@ export default function TaskDetailPage() {
           </div>
 
           {/* Description */}
-          {report.description && (
-            <p className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3.5 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed border border-slate-100 dark:border-slate-800">
-              {report.description}
-            </p>
-          )}
+          <p className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3.5 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed border border-slate-100 dark:border-slate-800">
+              <span className="font-semibold">Citizen Comment:</span> {citizenComment(report.description, report.aiReason)}
+          </p>
 
           {/* Metadata Row */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs text-slate-600 dark:text-slate-400">

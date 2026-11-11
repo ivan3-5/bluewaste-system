@@ -1,180 +1,74 @@
 import "package:flutter/material.dart";
 
-import "../../../../core/theme/app_colors.dart";
 import "../../../../core/theme/app_spacing.dart";
 import "../../data/detect_service.dart";
 
-/// Displayed after a successful report submission or detection analysis.
-/// Shows:
-///   • Waste detected / No waste badge
-///   • Severity badge (color-coded)
-///   • Number of waste items detected
-///   • Detected waste labels
-///   • "Submit Another Report" dismiss button
+class WasteAnalysisSummary extends StatelessWidget {
+  const WasteAnalysisSummary({
+    super.key,
+    required this.hasWaste,
+    required this.severity,
+  });
+
+  final bool hasWaste;
+  final WasteSeverity severity;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Analysis Summary",
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(hasWaste ? "Waste detected" : "No waste detected"),
+        const SizedBox(height: AppSpacing.xs),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text("Severity"),
+            Text(hasWaste ? severity.label : "None"),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class ReportResultCard extends StatelessWidget {
   const ReportResultCard({
     super.key,
     required this.result,
     required this.onDismiss,
+    this.comment = "",
   });
 
   final DetectResult result;
   final VoidCallback onDismiss;
-
-  Color _severityColor() {
-    switch (result.severity) {
-      case WasteSeverity.critical:
-        return const Color(0xFFE74C3C);
-      case WasteSeverity.high:
-        return const Color(0xFFE67E22);
-      case WasteSeverity.moderate:
-        return const Color(0xFFF1C40F);
-      case WasteSeverity.spam:
-        return const Color(0xFF95A5A6);
-      default:
-        return const Color(0xFF7F8C8D);
-    }
-  }
+  final String comment;
 
   @override
   Widget build(BuildContext context) {
-    final color = _severityColor();
-
     return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: color.withValues(alpha: 0.5), width: 1.5),
-      ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Analysis Summary",
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            WasteAnalysisSummary(
+              hasWaste: result.hasWaste,
+              severity: result.severity,
             ),
             const SizedBox(height: AppSpacing.sm),
-            // ─ Header row ──────────────────────────────────────────────────
-            Row(
-              children: [
-                Icon(
-                  result.hasWaste
-                      ? Icons.check_circle_rounded
-                      : Icons.cancel_rounded,
-                  color: result.hasWaste
-                      ? const Color(0xFF27AE60)
-                      : const Color(0xFFE74C3C),
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    result.hasWaste ? "Waste Detected" : "No Waste Detected",
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                // Severity badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: color.withValues(alpha: 0.5)),
-                  ),
-                  child: Text(
-                    result.severity.label,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-
-            // ─ Waste item count ────────────────────────────────────────────
-            Row(
-              children: [
-                Text(
-                  "Waste items detected",
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelMedium?.copyWith(color: Colors.grey[600]),
-                ),
-                const Spacer(),
-                Text(
-                  "${result.wasteCount}",
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-
-            // ─ Severity description ────────────────────────────────────────
             Text(
-              result.severity.description,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+              "Citizen Comment: ${comment.trim().isEmpty ? 'None' : comment.trim()}",
             ),
-
-            // ─ Detected labels ─────────────────────────────────────────────
-            ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                "Detected Labels",
-                style: Theme.of(
-                  context,
-                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: result.labels.map((lbl) {
-                  return Chip(
-                    label: Text(
-                      lbl.count > 1 ? "${lbl.label} ×${lbl.count}" : lbl.label,
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    side: BorderSide(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                    ),
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-                    visualDensity: VisualDensity.compact,
-                  );
-                }).toList(),
-              ),
-              if (result.labels.isEmpty) const Text("None identified"),
-            ],
-            if ((result.reason ?? result.message).trim().isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                "Analysis Details",
-                style: Theme.of(
-                  context,
-                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              Text(result.reason ?? result.message),
-            ],
-
             const SizedBox(height: AppSpacing.md),
-
-            // ─ Dismiss / submit another ────────────────────────────────────
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(

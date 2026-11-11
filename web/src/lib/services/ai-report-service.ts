@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import type { GeminiWasteResult } from "@/lib/ai/validator";
-import { severityFromWasteCount } from "@/lib/severity";
+import { dbSeverityToAiLabel, formatWasteAnalysis, severityFromWasteCount } from "@/lib/severity";
 import { randomUUID } from "crypto";
 
 export interface CreateAiReportParams {
@@ -40,7 +40,7 @@ async function notifyLguAdmins(
     for (const admin of admins) {
       const notifId = randomUUID();
       const title = "New Auto-Analyzed Waste Report";
-      const message = `A new waste report has been submitted and analyzed. Severity: ${aiResult.severity} (${aiResult.wasteCount} item(s) detected). Categories: ${aiResult.categories.join(", ") || "None"}.`;
+      const message = formatWasteAnalysis(aiResult.hasWaste, dbSeverityToAiLabel(severityFromWasteCount(aiResult.wasteCount)));
 
       await tx.$executeRaw`
         INSERT INTO "Notification" (id, "userId", title, message, type, "reportId", "isRead", "createdAt")
@@ -89,7 +89,7 @@ export async function persistAiReportAndNotify(
       VALUES (
         ${reportId},
         ${locationName},
-        ${params.description ?? "Submitted via photo analysis."},
+        ${params.description?.trim() ?? ""},
         ${"with_waste"}::"WasteCategory",
         ${reportStatus}::"ReportStatus",
         ${params.latitude},
@@ -103,7 +103,7 @@ export async function persistAiReportAndNotify(
         ${analysisStatus}::"AnalysisStatus",
         ${params.aiResult.wasteCount},
         ${params.aiResult.categories},
-        ${params.aiResult.reason},
+        ${formatWasteAnalysis(params.aiResult.hasWaste, dbSeverityToAiLabel(dbSeverity))},
         ${params.modelName},
         ${params.imageHash},
         ${params.totalMs},

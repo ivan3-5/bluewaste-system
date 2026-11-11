@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-export type SeverityLevel = "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null | undefined;
+export type SeverityLevel = "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM" | null | undefined;
 
 const SEVERITY_CONFIG: Record<
   NonNullable<SeverityLevel>,
@@ -17,9 +17,14 @@ const SEVERITY_CONFIG: Record<
     className: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/40 dark:text-orange-300",
   },
   MODERATE: {
-    label: "Moderate",
+    label: "Medium",
     emoji: "🟡",
     className: "border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-950/40 dark:text-yellow-300",
+  },
+  LOW: {
+    label: "Low",
+    emoji: "🟢",
+    className: "border-green-200 bg-green-50 text-green-700 dark:border-green-500/30 dark:bg-green-950/40 dark:text-green-300",
   },
   SPAM: {
     label: "Spam",

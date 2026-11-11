@@ -1,5 +1,6 @@
 "use client";
 
+import { citizenComment } from "@/lib/utils";
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useMyReports } from "@/hooks/useReports";
@@ -281,7 +282,7 @@ export default function MyReportsPage() {
                       {report.title}
                     </h3>
                     <p className="mt-1.5 text-sm leading-relaxed text-gray-500 line-clamp-2">
-                      {report.description}
+                      {citizenComment(report.description, report.aiReason)}
                     </p>
                     <div className="mt-4 flex flex-wrap items-center gap-2.5">
                       <StatusBadge status={report.status} />

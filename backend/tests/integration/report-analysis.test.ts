@@ -37,14 +37,14 @@ describe("background report analysis", () => {
     expect(prismaMock.report.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         aiModel: "yolo", aiCategories: ["plastic"], analysisStatus: "DIRTY",
-        analysisWasteCount: 4, severity: "HIGH", analysisConfidence: null,
-        aiReason: "Detected categories: plastic.",
+        analysisWasteCount: 4, severity: "LOW", analysisConfidence: null,
+        aiReason: "Waste detected. Severity: Low.",
       }),
     }));
   });
 
   it.each([
-    [1, "MODERATE"], [2, "MODERATE"], [3, "HIGH"], [6, "HIGH"], [7, "CRITICAL"], [12, "CRITICAL"],
+    [1, "LOW"], [8, "LOW"], [9, "MODERATE"], [15, "MODERATE"], [16, "HIGH"], [24, "HIGH"], [25, "CRITICAL"],
   ])("derives YOLO severity from %i detected items", async (count, severity) => {
     prismaMock.report.findUnique.mockResolvedValue({
       id: "report-1", images: [{ imageUrl: "https://example.com/image.png" }],
@@ -118,8 +118,8 @@ describe("background report analysis", () => {
     expect(prismaMock.report.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         aiModel: "gemini-test", aiCategories: ["plastic_bottle"],
-        aiReason: "Plastic bottles are visible.", analysisConfidence: null,
-        analysisWasteCount: 3, severity: "HIGH",
+        aiReason: "Waste detected. Severity: Low.", analysisConfidence: null,
+        analysisWasteCount: 3, severity: "LOW",
       }),
     }));
   });

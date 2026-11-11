@@ -101,7 +101,7 @@ class ReportRecord {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<ReportImage> images;
-  /// Severity level from the hybrid pipeline (CRITICAL / HIGH / MODERATE / SPAM).
+  /// Severity level from the hybrid pipeline (CRITICAL / HIGH / MODERATE / LOW / SPAM).
   final String? severity;
   /// Total number of waste items detected by the analysis.
   final int? analysisWasteCount;
@@ -109,23 +109,23 @@ class ReportRecord {
   final String? aiReason;
 
   String get displayDescription {
-    if (aiReason != null &&
-        aiReason!.trim().isNotEmpty &&
-        !aiReason!.toLowerCase().contains("ready to submit") &&
-        !aiReason!.toLowerCase().contains("waste detected (")) {
-      return aiReason!;
+    final comment = description.trim();
+    final defaultComment = RegExp(
+      r"^(?:no description provided\.?|submitted via photo analysis\.|waste report submitted via (?:mobile|quick) capture\.(?: Category: (?:With|No) Waste\.)?)$",
+      caseSensitive: false,
+    );
+    final analysisSummary = RegExp(
+      r"^(?:Waste detected|No waste detected)\. Severity: (?:None|Low|Medium|High|Critical)\.$",
+    );
+    if (comment.isEmpty || defaultComment.hasMatch(comment)) return "None";
+    if (comment == aiReason?.trim() && !analysisSummary.hasMatch(comment)) {
+      return "None";
     }
-    if (description.trim().isNotEmpty &&
-        description.trim() != "No description provided." &&
-        description.trim() != "Waste report submitted via mobile capture." &&
-        !description.toLowerCase().contains("ready to submit")) {
-      return description;
-    }
-    if (category == "no_waste" || category == "NO_WASTE") {
-      return "AI Analysis: No visible waste or pollution detected in the submitted image.";
-    }
-    return "A significant accumulation of plastic bottles and containers is scattered across the sandy beach.";
+    return comment;
   }
+
+  bool get hasDetectedWaste =>
+      category.toLowerCase() != "no_waste" && severity != "SPAM";
 
   String get displayTitle => _cleanWasteTitle(title);
 

@@ -19,17 +19,18 @@ void main() {
     expect(result.model, "yolo");
     expect(result.categories, ["plastic", "glass"]);
     expect(result.wasteCount, 4);
-    expect(result.severity, WasteSeverity.high);
+    expect(result.severity, WasteSeverity.low);
   });
 
   test("severity is based on the number of waste items detected", () {
     expect(WasteSeverity.fromWasteCount(0), WasteSeverity.spam);
-    expect(WasteSeverity.fromWasteCount(1), WasteSeverity.moderate);
-    expect(WasteSeverity.fromWasteCount(2), WasteSeverity.moderate);
-    expect(WasteSeverity.fromWasteCount(3), WasteSeverity.high);
-    expect(WasteSeverity.fromWasteCount(6), WasteSeverity.high);
-    expect(WasteSeverity.fromWasteCount(7), WasteSeverity.critical);
-    expect(WasteSeverity.fromWasteCount(20), WasteSeverity.critical);
+    expect(WasteSeverity.fromWasteCount(1), WasteSeverity.low);
+    expect(WasteSeverity.fromWasteCount(8), WasteSeverity.low);
+    expect(WasteSeverity.fromWasteCount(9), WasteSeverity.moderate);
+    expect(WasteSeverity.fromWasteCount(15), WasteSeverity.moderate);
+    expect(WasteSeverity.fromWasteCount(16), WasteSeverity.high);
+    expect(WasteSeverity.fromWasteCount(24), WasteSeverity.high);
+    expect(WasteSeverity.fromWasteCount(25), WasteSeverity.critical);
   });
 
   test("on-device results identify the TFLite model", () {
@@ -101,32 +102,35 @@ void main() {
     );
   });
 
-  testWidgets("summary shows detection fields and available details", (
-    tester,
-  ) async {
-    final result = DetectResult.fromJson({
-      "hasWaste": true,
-      "model": "gemini-test",
-      "categories": ["plastic_bottle"],
-      "wasteCount": 3,
-      "severity": "High",
-      "reason": "A bottle is visible.",
-    });
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: ReportResultCard(result: result, onDismiss: () {}),
+  testWidgets(
+    "summary shows detection and severity without counts or model text",
+    (tester) async {
+      final result = DetectResult.fromJson({
+        "hasWaste": true,
+        "model": "gemini-test",
+        "categories": ["plastic_bottle"],
+        "wasteCount": 3,
+        "severity": "High",
+        "reason": "A bottle is visible.",
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ReportResultCard(result: result, onDismiss: () {}),
+            ),
           ),
         ),
-      ),
-    );
-    expect(find.text("Analysis Summary"), findsOneWidget);
-    expect(find.text("Waste Detected"), findsOneWidget);
-    expect(find.text("Confidence"), findsNothing);
-    expect(find.text("Waste items detected"), findsOneWidget);
-    expect(find.text("3"), findsOneWidget);
-    expect(find.text("Analysis Details"), findsOneWidget);
-    expect(find.text("A bottle is visible."), findsOneWidget);
-  });
+      );
+      expect(find.text("Analysis Summary"), findsOneWidget);
+      expect(find.text("Waste detected"), findsOneWidget);
+      expect(find.text("Confidence"), findsNothing);
+      expect(find.text("Waste items detected"), findsNothing);
+      expect(find.text("3"), findsNothing);
+      expect(find.text("Severity"), findsOneWidget);
+      expect(find.text("Low"), findsOneWidget);
+      expect(find.text("Citizen Comment: None"), findsOneWidget);
+      expect(find.text("A bottle is visible."), findsNothing);
+    },
+  );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { dbSeverityToAiLabel } from "@/lib/severity";
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import type { FeatureCollection, Polygon } from "geojson";
@@ -492,6 +493,7 @@ export default function WasteMap({
       const severityColors: Record<string, { bg: string; color: string }> = {
         CRITICAL: { bg: "#fef2f2", color: "#dc2626" },
         HIGH: { bg: "#fff7ed", color: "#ea580c" },
+        LOW: { bg: "#f0fdf4", color: "#15803d" },
         MODERATE: { bg: "#fefce8", color: "#ca8a04" },
         SPAM: { bg: "#f3f4f6", color: "#6b7280" },
       };
@@ -502,7 +504,7 @@ export default function WasteMap({
             severityColors[severity]?.color || "#4b5563"
           };border:1px solid ${
             severityColors[severity]?.color || "#9ca3af"
-          }40;">⚡ ${severity}</span>`
+          }40;">⚡ ${dbSeverityToAiLabel(severity)}</span>`
         : "";
 
       const imgHtml = report.images?.[0]?.imageUrl

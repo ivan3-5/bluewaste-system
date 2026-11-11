@@ -53,27 +53,12 @@ export async function getReverseGeocodedLocation(latitude: number, longitude: nu
   }
 }
 
-export function formatAnalysisDetails(
-  categories?: string[] | null,
-  defaultReason?: string | null,
-): string {
-  if (
-    defaultReason &&
-    typeof defaultReason === "string" &&
-    defaultReason.trim().length > 0 &&
-    !defaultReason.toLowerCase().includes("ready to submit") &&
-    !defaultReason.toLowerCase().includes("waste detected (") &&
-    !defaultReason.toLowerCase().includes("waste report submitted")
-  ) {
-    return defaultReason.trim();
-  }
+const legacyCommentPlaceholder = /^(?:no description provided\.?|submitted via photo analysis\.|waste report submitted via (?:mobile|quick) capture\.(?: Category: (?:With|No) Waste\.)?)$/i;
+const analysisSummary = /^(?:Waste detected|No waste detected)\. Severity: (?:None|Low|Medium|High|Critical)\.$/;
 
-  const cleanCategories = (categories || [])
-    .filter((cat) => typeof cat === "string" && cat !== "with_waste" && cat !== "no_waste")
-    .map((cat) => cat.toLowerCase().replace(/_/g, " "));
-
-  if (cleanCategories.length === 0) {
-    return "No additional analysis details are available.";
-  }
-  return `Detected categories: ${cleanCategories.join(", ")}.`;
+export function citizenComment(description?: string | null, aiReason?: string | null): string {
+  const comment = description?.trim();
+  if (!comment || legacyCommentPlaceholder.test(comment)) return "None";
+  if (comment === aiReason?.trim() && !analysisSummary.test(comment)) return "None";
+  return comment;
 }

@@ -17,7 +17,7 @@ export interface AdminReport {
   description: string | null;
   status: AdminReportStatus;
   /** Severity from the hybrid YOLOv8 + Cloud Vision pipeline */
-  severity?: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
+  severity?: "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM" | null;
   reporterName?: string | null;
   reporterEmail?: string | null;
   assignedToId?: string | null;
@@ -62,7 +62,7 @@ export interface IncidentMapData {
   id: string;
   category: AdminReportCategory;
   status: AdminReportStatus;
-  severity?: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
+  severity?: "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM" | null;
   latitude: number;
   longitude: number;
   address: string | null;

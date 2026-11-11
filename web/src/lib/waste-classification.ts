@@ -1,3 +1,4 @@
+import { severityFromWasteCount } from "@/lib/severity";
 import type {
   WasteCategory,
   WasteDetection,
@@ -19,7 +20,7 @@ export interface ClassificationResult {
   detectedObject: string;
   dominantWaste: WasteType | null;
   totalItems: number;
-  /** Severity in the DB enum format: CRITICAL | HIGH | MODERATE | SPAM */
+  /** Severity in the DB enum format: CRITICAL | HIGH | MODERATE | LOW | SPAM */
   severity: WasteSeverity;
   wasteCategory: WasteCategory;
   confidence: number;
@@ -289,9 +290,7 @@ function mapLabelToWasteType(label: string): WasteType | null {
 }
 
 function toSeverity(totalItems: number): WasteSeverity {
-  if (totalItems >= 7) return "CRITICAL";
-  if (totalItems >= 3) return "HIGH";
-  return "MODERATE";
+  return severityFromWasteCount(totalItems);
 }
 
 function toBbox(detection: DetectionBox): number[] {

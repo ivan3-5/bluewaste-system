@@ -1,5 +1,5 @@
 import "server-only";
-import { aiSeverityFromWasteCount } from "@/lib/severity";
+import { aiSeverityFromWasteCount, formatWasteAnalysis } from "@/lib/severity";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -135,6 +135,7 @@ export function validateGeminiResult(raw: unknown): ValidationResult {
   // hasWaste and wasteCount must agree: no waste → 0 items, waste → at least 1.
   const hasWaste = obj.hasWaste as boolean;
   const wasteCount = hasWaste ? Math.max(1, Math.trunc(obj.wasteCount)) : 0;
+  const severity = aiSeverityFromWasteCount(wasteCount);
 
   return {
     valid: true,
@@ -142,8 +143,8 @@ export function validateGeminiResult(raw: unknown): ValidationResult {
       hasWaste,
       categories: obj.categories as WasteCategory[],
       wasteCount,
-      severity: aiSeverityFromWasteCount(wasteCount),
-      reason: obj.reason as string,
+      severity,
+      reason: formatWasteAnalysis(hasWaste, severity),
     },
   };
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { SeverityBadge } from "@/components/SeverityBadge";
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -9,7 +10,6 @@ import {
   X,
   MapPin,
   Calendar,
-  AlertTriangle,
   Tag,
   Clock,
   ExternalLink,
@@ -154,22 +154,7 @@ export default function CitizenMapPage() {
                     {WASTE_CATEGORY_LABELS[selectedReport.category] || selectedReport.category}
                   </span>
 
-                  {selectedReport.severity && (
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        selectedReport.severity === "CRITICAL"
-                          ? "bg-red-50 text-red-700 border border-red-200"
-                          : selectedReport.severity === "HIGH"
-                            ? "bg-orange-50 text-orange-700 border border-orange-200"
-                            : selectedReport.severity === "MODERATE"
-                              ? "bg-yellow-50 text-yellow-700 border border-yellow-200"
-                              : "bg-gray-50 text-gray-600 border border-gray-200"
-                      }`}
-                    >
-                      <AlertTriangle className="h-3 w-3" />
-                      {selectedReport.severity}
-                    </span>
-                  )}
+                  <SeverityBadge severity={selectedReport.severity} />
                 </div>
               </div>
 

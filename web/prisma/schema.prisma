@@ -69,6 +69,7 @@ enum Severity {
   CRITICAL
   HIGH
   MODERATE
+  LOW
   SPAM
 }
 

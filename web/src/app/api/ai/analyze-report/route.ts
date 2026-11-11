@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import { analyzeImageWithGemini, GeminiError } from "@/lib/ai/gemini";
 import { validateGeminiResult } from "@/lib/ai/validator";
 import { analyzeImageWithYolo, type YoloAnalysis } from "@/lib/ai/yolo";
-import { dbSeverityToAiLabel, type DbSeverity } from "@/lib/severity";
+import { aiSeverityFromWasteCount, dbSeverityToAiLabel, formatWasteAnalysis, type DbSeverity } from "@/lib/severity";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import prisma from "@/lib/prisma";
 
@@ -34,6 +34,7 @@ function normalizeCachedSeverity(severity: string | null): YoloAnalysis["severit
     case "CRITICAL":
     case "HIGH":
     case "MODERATE":
+    case "LOW":
       return dbSeverityToAiLabel(severity!.toUpperCase() as DbSeverity);
     default: return "None";
   }
@@ -178,20 +179,21 @@ export async function POST(request: NextRequest) {
       const cached = existingRows[0];
       console.info(`[AI] Duplicate image detected — returning cached result for report ${cached.id}`);
 
+      const severity = !cached.hasWaste ? "None" : cached.wasteCount != null
+        ? aiSeverityFromWasteCount(Math.max(cached.wasteCount, 1))
+        : normalizeCachedSeverity(cached.severity);
       return NextResponse.json({
         hasWaste: cached.hasWaste,
         categories: cached.categories ?? [],
-        severity: normalizeCachedSeverity(cached.severity),
+        severity,
         wasteCount: Number(cached.wasteCount ?? 0),
-        reason: cached.aiReason ?? "",
+        reason: formatWasteAnalysis(cached.hasWaste, severity),
         model: cached.aiModel,
         provider: useGemini ? "gemini" : "yolo",
         reportId: null,
         status: cached.status,
         cached: true,
-        message: cached.hasWaste
-          ? undefined
-          : "No visible waste was detected in this image. Your report has been marked as Spam.",
+        message: cached.hasWaste ? undefined : formatWasteAnalysis(false, "None"),
       });
     }
 
@@ -295,10 +297,7 @@ export async function POST(request: NextRequest) {
         reportId: null,
         status: reportStatus,
         imageUrl,
-        ...(isSpam && {
-          message:
-            "No visible waste was detected in this image. Your report has been marked as Spam.",
-        }),
+        ...(isSpam && { message: aiResult.reason }),
       },
       { status: 200 },
     );

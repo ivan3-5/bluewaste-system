@@ -17,6 +17,8 @@ vi.mock("@/lib/ai/gemini", () => ({
 import { POST } from "../src/app/api/ai/analyze-report/route";
 import { POST as legacyPOST } from "../src/app/api/analyze-waste/route";
 import { normalizeYoloResult } from "../src/lib/ai/yolo";
+import { validateGeminiResult } from "../src/lib/ai/validator";
+import { citizenComment } from "../src/lib/utils";
 
 const yoloPayload = {
   has_waste: true,
@@ -67,8 +69,8 @@ describe("web image analysis", () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      hasWaste: true, categories: ["plastic", "glass"], severity: "High",
-      wasteCount: 4, reason: "Waste detected.", model: "yolo",
+      hasWaste: true, categories: ["plastic", "glass"], severity: "Low",
+      wasteCount: 4, reason: "Waste detected. Severity: Low.", model: "yolo",
     });
     expect(mocks.gemini).not.toHaveBeenCalled();
     expect(fetchMock.mock.calls[0][0]).toBe("https://example.hf.space/gradio_api/call/analyze");
@@ -90,8 +92,8 @@ describe("web image analysis", () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      hasWaste: true, categories: ["plastic_bottle"], severity: "High",
-      wasteCount: 3, reason: "A bottle is visible.", model: "gemini-test",
+      hasWaste: true, categories: ["plastic_bottle"], severity: "Low",
+      wasteCount: 3, reason: "Waste detected. Severity: Low.", model: "gemini-test",
     });
     expect(mocks.gemini).toHaveBeenCalledOnce();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -125,7 +127,7 @@ describe("web image analysis", () => {
     vi.stubGlobal("fetch", fetchMock);
     const response = await POST(request());
     expect(await response.json()).toMatchObject({
-      severity: "Medium", model: "yolo", cached: true,
+      severity: "Low", reason: "Waste detected. Severity: Low.", model: "yolo", cached: true,
     });
     expect(mocks.query.mock.calls.at(-1)?.at(-1)).toBe("yolo");
     expect(fetchMock).not.toHaveBeenCalled();
@@ -141,19 +143,37 @@ describe("web image analysis", () => {
     const response = await POST(request());
     expect(await response.json()).toMatchObject({
       hasWaste: false, categories: [], severity: "None", wasteCount: 0,
-      reason: "No waste detected.", model: "yolo",
+      reason: "No waste detected. Severity: None.", model: "yolo",
     });
     expect(fetchMock.mock.calls[0][1].body).toBeInstanceOf(FormData);
   });
 
   it.each([
-    [1, "Medium", "MODERATE"], [2, "Medium", "MODERATE"], [3, "High", "HIGH"],
-    [6, "High", "HIGH"], [7, "Critical", "CRITICAL"], [15, "Critical", "CRITICAL"],
-  ])("derives severity from %i detected YOLO items, ignoring the reported severity", (count, label) => {
-    const result = normalizeYoloResult({
-      has_waste: true, severity: "SPAM", waste_count: count, labels: [{ label: "plastic", count }],
+    [0, "None"], [1, "Low"], [8, "Low"], [9, "Medium"], [15, "Medium"],
+    [16, "High"], [24, "High"], [25, "Critical"],
+  ])("uses the same severity and summary for %i detected items in both providers", (count, label) => {
+    const hasWaste = count > 0;
+    const categories = hasWaste ? ["plastic_bottle"] : [];
+    const yolo = normalizeYoloResult({
+      has_waste: hasWaste, severity: "SPAM", waste_count: count, labels: categories,
+      message: `Found ${count} bottles.`,
     });
-    expect(result).toMatchObject({ hasWaste: true, severity: label, wasteCount: count });
+    const gemini = validateGeminiResult({
+      hasWaste, severity: "None", wasteCount: count, categories,
+      reason: `There are ${count} bottles.`,
+    });
+    expect(yolo).toMatchObject({
+      hasWaste, severity: label, wasteCount: count,
+      reason: `${hasWaste ? "Waste detected" : "No waste detected"}. Severity: ${label}.`,
+    });
+    expect(gemini).toEqual({ valid: true, data: yolo });
+  });
+
+  it("shows None for missing comments and legacy analysis stored as a comment", () => {
+    expect(citizenComment("  ")).toBe("None");
+    expect(citizenComment("Found three items.", "Found three items.")).toBe("None");
+    expect(citizenComment("Please check the shoreline.", "Found three items.")).toBe("Please check the shoreline.");
+    expect(citizenComment("Waste detected. Severity: Low.", "Waste detected. Severity: Low.")).toBe("Waste detected. Severity: Low.");
   });
 
   it("treats a YOLO result with no detected items as spam in both endpoints", async () => {
@@ -166,7 +186,7 @@ describe("web image analysis", () => {
     const response = await POST(request());
     expect(await response.json()).toMatchObject({
       hasWaste: false, severity: "None", wasteCount: 0, status: "REJECTED",
-      message: expect.stringContaining("Spam"),
+      message: "No waste detected. Severity: None.",
     });
 
     stubEmpty();
@@ -178,11 +198,11 @@ describe("web image analysis", () => {
     vi.stubEnv("USE_GEMINI", "true");
     vi.stubEnv("GEMINI_API_KEY", "test-key");
     mocks.gemini.mockResolvedValue({
-      result: { hasWaste: true, categories: ["can"], wasteCount: 8, severity: "Low", reason: "Many cans." },
+      result: { hasWaste: true, categories: ["can"], wasteCount: 25, severity: "Low", reason: "Many cans." },
       modelName: "gemini-test", latencyMs: 1,
     });
     const response = await POST(request());
-    expect(await response.json()).toMatchObject({ severity: "Critical", wasteCount: 8 });
+    expect(await response.json()).toMatchObject({ severity: "Critical", wasteCount: 25, reason: "Waste detected. Severity: Critical." });
   });
 
   it("uses the Gradio protocol in the legacy endpoint", async () => {
@@ -207,7 +227,7 @@ describe("web image analysis", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       provider: "gemini", aiModel: "gemini-test", has_waste: true,
-      labels: ["plastic_bottle"], waste_count: 3, severity: "HIGH",
+      labels: ["plastic_bottle"], waste_count: 3, severity: "LOW", reason: "Waste detected. Severity: Low.",
       detectedObject: "plastic_bottle", wasteCategory: "PLASTIC_WASTE",
     });
     expect(mocks.gemini).toHaveBeenCalledOnce();
@@ -227,7 +247,7 @@ describe("web image analysis", () => {
     const response = await legacyPOST(legacyRequest(true));
     expect(response.status).toBe(200);
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
-      detectedObject: "plastic_bottle", labels: ["plastic_bottle"], severity: "HIGH",
+      detectedObject: "plastic_bottle", labels: ["plastic_bottle"], severity: "LOW",
     });
   });
 });

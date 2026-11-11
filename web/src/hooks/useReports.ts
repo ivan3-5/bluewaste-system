@@ -116,7 +116,7 @@ export function useCreateReport() {
       address?: string;
       isAnonymous?: boolean;
       /** Pre-computed severity from the client-side YOLO /analyze pipeline */
-      severity?: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
+      severity?: "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM" | null;
       /** Pre-computed status from client-side analysis */
       analysisStatus?: "DIRTY" | "CLEAN" | null;
       /** Number of waste items detected */

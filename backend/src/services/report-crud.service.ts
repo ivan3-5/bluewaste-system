@@ -75,7 +75,7 @@ export class ReportCrudService {
     isSpamFlagged?: boolean;
     spamReason?: string;
     yoloConfidence?: number;
-    severity?: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
+    severity?: Severity | null;
     analysisStatus?: "DIRTY" | "CLEAN" | null;
     analysisConfidence?: number | null;
     analysisWasteCount?: number | null;
@@ -93,7 +93,7 @@ export class ReportCrudService {
 
     const clientSpamFlagged = data.isSpamFlagged === true;
     const resolvedSpamReason = clientSpamFlagged
-      ? (data.spamReason ?? "No waste detected by YOLOv8")
+      ? (data.spamReason ?? "No waste detected in the submitted photo")
       : data.category === "no_waste"
         ? "No visible waste or pollution detected in the submitted image."
         : null;
@@ -105,13 +105,6 @@ export class ReportCrudService {
         : data.severity;
 
     const report = await prisma.$transaction(async (tx) => {
-      const resolvedDescription =
-        data.description && data.description.trim().length > 0
-          ? data.description
-          : data.aiReason && data.aiReason.trim().length > 0
-            ? data.aiReason
-            : "Waste report submitted via mobile capture.";
-
       let resolvedAddress = data.address?.trim() || null;
       if (!resolvedAddress || resolvedAddress.toLowerCase().startsWith("waste report")) {
         try {
@@ -136,7 +129,7 @@ export class ReportCrudService {
       const created = await tx.report.create({
         data: {
           title: data.title,
-          description: resolvedDescription,
+          description: data.description?.trim() ?? "",
           category: data.category,
           latitude: data.latitude,
           longitude: data.longitude,
@@ -187,7 +180,7 @@ export class ReportCrudService {
             data.latitude,
             data.longitude,
             data.category as WasteCategory,
-            (data.severity as Severity | null) ?? null,
+            resolvedSeverity ?? null,
             data.address,
           );
         } catch (dedupError) {

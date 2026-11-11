@@ -27,8 +27,9 @@ export interface Report {
   spamReason?: string | null;
   analysisStatus?: "DIRTY" | "CLEAN" | null;
   analysisWasteCount?: number | null;
+  aiReason?: string | null;
   analyzedAt?: string | null;
-  severity?: "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null;
+  severity?: "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM" | null;
   reporterId?: string;
   reporter?: {
     id: string;
@@ -77,9 +78,9 @@ export type WasteType = "PLASTIC" | "ORGANIC" | "GLASS" | "METAL" | "PAPER";
 
 /**
  * Severity levels used by the DB Severity enum and the SeverityBadge component.
- * Values must match the Prisma `Severity` enum: CRITICAL | HIGH | MODERATE | SPAM
+ * Values must match the Prisma `Severity` enum: CRITICAL | HIGH | MODERATE | LOW | SPAM
  */
-export type WasteSeverity = "CRITICAL" | "HIGH" | "MODERATE" | "SPAM";
+export type WasteSeverity = "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM";
 
 /** @deprecated Old lowercase severity values — kept for legacy pages still using them */
 export type WasteSeverityLegacy = "low" | "medium" | "high";

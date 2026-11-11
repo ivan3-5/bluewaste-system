@@ -1,3 +1,4 @@
+import { citizenComment } from "@/lib/utils";
 import { getDashboardReportById } from "@/lib/dashboard-reports";
 import MapView from "@/components/MapView";
 import Link from "next/link";
@@ -105,7 +106,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
   const hasWasteAnalysis = Boolean(
     report.aiModel != null ||
     report.analyzedAt != null ||
-    (report.severity != null && report.severity !== "SPAM") ||
+    report.severity != null ||
     (report.aiCategories && report.aiCategories.length > 0)
   );
 
@@ -319,7 +320,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
                     latitude: report.latitude,
                     longitude: report.longitude,
                     locationName: displayLocationName,
-                    description: report.description,
+                    description: citizenComment(report.description, report.aiReason),
                     status: report.status,
                     reportedAt: report.reportedAt,
                     updatedAt: report.updatedAt,
@@ -338,20 +339,8 @@ export default async function ReportDetailPage({ params }: PageProps) {
         <div className="space-y-3.5 lg:col-span-5">
           {/* Gemini AI Analysis Panel (Redesigned compact) */}
           <AiAnalysisPanel
-            reportId={report.id}
-            hasWaste={
-              hasWasteAnalysis ? report.category !== "no_waste" : null
-            }
-            aiCategories={report.aiCategories}
-            severity={
-              report.severity as "CRITICAL" | "HIGH" | "MODERATE" | "SPAM" | null
-            }
-            wasteCount={report.wasteCount}
-            aiReason={report.aiReason}
-            aiModel={report.aiModel}
-            aiProcessingMs={report.aiProcessingMs}
-            aiGeminiMs={report.aiGeminiMs}
-            analyzedAt={report.analyzedAt}
+            hasWaste={hasWasteAnalysis ? report.category !== "no_waste" && report.severity !== "SPAM" : null}
+            severity={report.severity}
           />
 
           {/* Consolidated Report Specification & Personnel Card */}
@@ -452,21 +441,14 @@ export default async function ReportDetailPage({ params }: PageProps) {
               </div>
             </dl>
 
-            {/* Citizen Notes (if provided) */}
-            {report.description ? (
-              <div className="mt-2.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-2.5">
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">
-                  Citizen Notes
-                </span>
-                <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-300 italic">
-                  &ldquo;{report.description}&rdquo;
-                </p>
-              </div>
-            ) : (
-              <div className="mt-2.5 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/30 px-2.5 py-1.5 text-[11px] text-slate-400 dark:text-slate-500">
-                No citizen notes attached to this report.
-              </div>
-            )}
+            <div className="mt-2.5 rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 dark:border-slate-800 dark:bg-slate-800/40">
+              <span className="mb-0.5 block text-[10px] font-semibold uppercase text-slate-400">
+                Citizen Comment
+              </span>
+              <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                {citizenComment(report.description, report.aiReason)}
+              </p>
+            </div>
           </section>
         </div>
       </div>

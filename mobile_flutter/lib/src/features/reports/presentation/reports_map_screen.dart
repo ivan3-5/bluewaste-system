@@ -522,7 +522,7 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
                               ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
-                              "Analysis Details",
+                              "Citizen Comment",
                               style: Theme.of(context)
                                   .textTheme
                                   .titleSmall

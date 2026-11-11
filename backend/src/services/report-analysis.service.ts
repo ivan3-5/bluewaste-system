@@ -2,7 +2,7 @@ import prisma from "../config/database";
 import { WasteCategory, AnalysisStatus, Severity } from "@prisma/client";
 import { NotificationService } from "./notification.service";
 import { env } from "../config/env";
-import { severityFromWasteCount } from "../utils/severity";
+import { formatWasteAnalysis, severityFromWasteCount } from "../utils/severity";
 
 interface YoloLabel {
   label: string;
@@ -33,27 +33,6 @@ function toNonNegativeInt(value: unknown, fallback = 0) {
     }
   }
   return fallback;
-}
-
-function formatAnalysisDetails(categories: string[] = [], defaultReason?: string | null): string {
-  if (
-    defaultReason &&
-    typeof defaultReason === "string" &&
-    defaultReason.trim().length > 0 &&
-    !defaultReason.toLowerCase().includes("ready to submit") &&
-    !defaultReason.toLowerCase().includes("waste detected (")
-  ) {
-    return defaultReason.trim();
-  }
-
-  const cleanCategories = categories
-    .filter((cat) => typeof cat === "string" && cat !== "with_waste" && cat !== "no_waste")
-    .map((cat) => cat.toLowerCase().replace(/_/g, " "));
-
-  if (cleanCategories.length === 0) {
-    return "No additional analysis details are available.";
-  }
-  return `Detected categories: ${cleanCategories.join(", ")}.`;
 }
 
 function toSafeJson(text: string): unknown {
@@ -275,7 +254,7 @@ export class ReportAnalysisService {
             analyzedAt: now,
             severity: resolvedSeverity,
             aiCategories: labels.filter((l: string) => l !== "with_waste" && l !== "no_waste"),
-            aiReason: spamReason ?? (hasWaste ? formatAnalysisDetails(labels.filter((l: string) => l !== "with_waste" && l !== "no_waste"), analysis.reason) : "No visible waste detected."),
+            aiReason: formatWasteAnalysis(resolvedSeverity),
             aiModel: analysis.model,
           },
         }),
@@ -287,7 +266,7 @@ export class ReportAnalysisService {
                   previousStatus: report.status,
                   newStatus: report.status,
                   changedById: report.reporterId,
-                  notes: `Auto analysis: ${shouldMarkSpam ? "marked as spam" : `severity=${resolvedSeverity}`}`,
+                  notes: shouldMarkSpam ? "Auto analysis: marked as spam" : formatWasteAnalysis(resolvedSeverity),
                 },
               }),
             ]
@@ -305,7 +284,7 @@ export class ReportAnalysisService {
             : "Report Analysis Completed",
           message: shouldMarkSpam
             ? `Your report "${report.title}" was automatically marked as spam by the system.`
-            : `Your report "${report.title}" was analyzed — severity: ${resolvedSeverity}.`,
+            : formatWasteAnalysis(resolvedSeverity),
           type: "SYSTEM",
           reportId,
         });

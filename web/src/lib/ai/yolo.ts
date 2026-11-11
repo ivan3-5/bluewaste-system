@@ -1,6 +1,6 @@
 import "server-only";
 
-import { aiSeverityFromWasteCount, type AiSeverityLabel } from "@/lib/severity";
+import { aiSeverityFromWasteCount, formatWasteAnalysis, type AiSeverityLabel } from "@/lib/severity";
 
 export interface YoloAnalysis {
   hasWaste: boolean;
@@ -49,15 +49,14 @@ export function normalizeYoloResult(rawPayload: unknown): YoloAnalysis {
   const reportedCount = toCount(result.waste_count) ?? toCount(result.count) ?? labelItemTotal;
   const hasWaste = result.has_waste && reportedCount > 0;
   const wasteCount = hasWaste ? reportedCount : 0;
+  const severity = aiSeverityFromWasteCount(wasteCount);
 
   return {
     hasWaste,
     categories: [...new Set(categories)],
     wasteCount,
-    severity: aiSeverityFromWasteCount(wasteCount),
-    reason: typeof result.spam_reason === "string" && result.spam_reason.trim()
-      ? result.spam_reason.trim()
-      : typeof result.message === "string" ? result.message.trim() : "",
+    severity,
+    reason: formatWasteAnalysis(hasWaste, severity),
   };
 }
 

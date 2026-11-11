@@ -9,7 +9,9 @@ import { useMyWasteReports } from "@/hooks/useWasteReports";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
-import type { WasteSeverityLegacy, WasteType } from "@/types";
+import { AnalysisSummary } from "@/components/AnalysisSummary";
+import { severityFromWasteCount } from "@/lib/severity";
+import type { WasteType } from "@/types";
 import {
   ListCardsSkeleton,
   PageHeadingSkeleton,
@@ -30,12 +32,6 @@ const WASTE_TYPE_LABELS: Record<WasteType, string> = {
   GLASS: "Glass",
   METAL: "Metal",
   PAPER: "Paper",
-};
-
-const SEVERITY_STYLES: Record<WasteSeverityLegacy, string> = {
-  low: "bg-green-100 text-green-800 border-green-200",
-  medium: "bg-amber-100 text-amber-800 border-amber-200",
-  high: "bg-red-100 text-red-800 border-red-200",
 };
 
 export default function MyWasteReportsPage() {
@@ -133,25 +129,10 @@ export default function MyWasteReportsPage() {
                       )}
                     </div>
 
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-gray-500">
-                        Total items
-                      </p>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {report.totalItems}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-gray-500">
-                        Severity
-                      </p>
-                      <span
-                        className={`mt-1 inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${SEVERITY_STYLES[report.severity]}`}
-                      >
-                        {report.severity}
-                      </span>
-                    </div>
+                    <AnalysisSummary
+                      hasWaste={report.totalItems > 0}
+                      severity={severityFromWasteCount(report.totalItems)}
+                    />
 
                     <div>
                       <p className="text-xs uppercase tracking-wide text-gray-500">

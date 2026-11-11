@@ -41,16 +41,28 @@ CUSTOM_CONF_THRESHOLD      = float(os.getenv("CUSTOM_CONF",           "0.30"))
 DETECT_CONF_THRESHOLD      = float(os.getenv("DETECT_CONF",           "0.30"))
 
 # Severity is based on the total number of waste items detected in the photo.
-SEVERITY_CRITICAL_COUNT    = 7
-SEVERITY_HIGH_COUNT        = 3
+SEVERITY_CRITICAL_COUNT    = 25
+SEVERITY_HIGH_COUNT        = 16
 
 
 def severity_from_count(waste_count: int) -> str:
-    """0 → SPAM (no waste), 1-2 → MODERATE, 3-6 → HIGH, 7+ → CRITICAL."""
-    if waste_count >= SEVERITY_CRITICAL_COUNT: return "CRITICAL"
-    if waste_count >= SEVERITY_HIGH_COUNT:     return "HIGH"
-    if waste_count >= 1:                       return "MODERATE"
+    if waste_count >= SEVERITY_CRITICAL_COUNT:
+        return "CRITICAL"
+    if waste_count >= SEVERITY_HIGH_COUNT:
+        return "HIGH"
+    if waste_count >= 9:
+        return "MODERATE"
+    if waste_count >= 1:
+        return "LOW"
     return "SPAM"
+
+
+def analysis_summary(severity: str) -> str:
+    if severity == "SPAM":
+        return "No waste detected. Severity: None."
+    label = "Medium" if severity == "MODERATE" else severity.title()
+    return f"Waste detected. Severity: {label}."
+
 
 # ── COCO /predict thresholds (Layer-1 model reused for /predict) ──────────────
 WASTE_CONFIDENCE_THRESHOLD         = 0.20
@@ -206,7 +218,7 @@ def _analyze_gpu(image: Image.Image) -> dict:
             "severity": "SPAM", "has_waste": False, "waste_count": 0, "count": 0,
             "labels": [], "all_labels": [], "layer1_passed": False,
             "spam_reason": "No objects detected in the image. Photo may be blurry, empty, or too dark.",
-            "message": "No objects detected — image flagged as spam.",
+            "message": analysis_summary("SPAM"),
         }
 
     # ── Layer 2 ───────────────────────────────────────────────────────────────
@@ -233,15 +245,10 @@ def _analyze_gpu(image: Image.Image) -> dict:
             "severity": "SPAM", "has_waste": False, "waste_count": 0, "count": 0,
             "labels": [], "all_labels": [], "layer1_passed": True,
             "spam_reason": "No waste-related objects were detected by the waste model.",
-            "message": "No waste labels detected — image flagged as spam.",
+            "message": analysis_summary("SPAM"),
         }
 
     severity = severity_from_count(waste_count)
-    messages = {
-        "CRITICAL": "Critical waste level — immediate cleanup required! 🔴",
-        "HIGH":     "High waste level — schedule cleanup within 24 hours. 🟠",
-        "MODERATE": "Moderate waste level — queued for cleanup. 🟡",
-    }
     return {
         "severity":      severity,
         "has_waste":     True,
@@ -251,7 +258,7 @@ def _analyze_gpu(image: Image.Image) -> dict:
         "all_labels":    labels,
         "layer1_passed": True,
         "spam_reason":   None,
-        "message":       f"{waste_count} waste item(s) detected. {messages[severity]}",
+        "message":       analysis_summary(severity),
     }
 
 
@@ -315,7 +322,7 @@ def _detect_gpu(image: Image.Image) -> dict:
         "has_waste":   has_waste,
         "waste_count": waste_count,
         "severity":    severity_from_count(waste_count),
-        "message":     f"{waste_count} waste item(s) detected." if has_waste else "No waste detected.",
+        "message":     analysis_summary(severity_from_count(waste_count)),
     }
 
 
@@ -356,7 +363,7 @@ with gr.Blocks(title="BlueWaste YOLO Analyzer", theme=gr.themes.Soft()) as demo:
     | 2 | `weights/best.pt` (custom) | Waste classification |
 
     **Severity scoring** — based on the total number of waste items detected by `best.pt`:
-    `≥ 7` → CRITICAL 🔴 · `3–6` → HIGH 🟠 · `1–2` → MODERATE 🟡 · `0` → SPAM ⚪
+    `25+` → Critical · `16–24` → High · `9–15` → Medium · `1–8` → Low · `0` → None
     """)
 
     with gr.Tabs():

@@ -401,7 +401,7 @@ class TFLiteService {
         .toList()
       ..sort((a, b) => b.count.compareTo(a.count));
 
-    final message = _buildMessage(List.from(categories), wasteCount);
+    final message = severity.summary(wasteCount > 0);
 
     return DetectResult(
       hasWaste: wasteCount > 0,
@@ -414,20 +414,6 @@ class TFLiteService {
       allLabels: labels,
       reason: message,
     );
-  }
-
-  String _buildMessage(List<String> categories, int wasteCount) {
-    final items = "$wasteCount item${wasteCount == 1 ? "" : "s"}";
-    if (categories.isEmpty) {
-      return "Detected $items of waste.";
-    }
-    final readable =
-        categories.map((c) => c.replaceAll("_", " ")).toSet().toList();
-    if (readable.length == 1) {
-      return "Detected $items of ${readable.first} waste.";
-    }
-    final last = readable.removeLast();
-    return "Detected $items of ${readable.join(", ")} and $last waste.";
   }
 
   void dispose() {

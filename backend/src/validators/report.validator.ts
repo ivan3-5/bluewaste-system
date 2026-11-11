@@ -4,8 +4,10 @@ export const createReportSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters").max(200),
   description: z
     .string()
-    .min(10, "Description must be at least 10 characters")
-    .max(2000),
+    .trim()
+    .max(2000)
+    .refine((value) => value.length === 0 || value.length >= 10, "Description must be at least 10 characters when provided")
+    .default(""),
   // Accept both legacy Flutter category names (PLASTIC_WASTE, ORGANIC_WASTE, etc.)
   // and the canonical DB enum values (with_waste, no_waste).
   // The category is also set/overridden by the YOLO analysis pipeline after upload.
@@ -26,7 +28,7 @@ export const createReportSchema = z.object({
   yoloConfidence: z.number().min(0).max(100).nullable().optional(),
   /** Pre-computed severity from the client-side YOLO /analyze pipeline */
   severity: z
-    .enum(["CRITICAL", "HIGH", "MODERATE", "SPAM"])
+    .enum(["CRITICAL", "HIGH", "MODERATE", "LOW", "SPAM"])
     .nullable()
     .optional(),
   /** Pre-computed analysis status from the client-side YOLO pipeline */

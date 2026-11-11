@@ -5,21 +5,14 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useCreateReport, useUploadReportImages } from "@/hooks/useReports";
-import { severityFromWasteCount } from "@/lib/severity";
+import { dbSeverityToAiLabel, formatWasteAnalysis, severityFromWasteCount, type DbSeverity } from "@/lib/severity";
 import { useReportingZones, isPointInAnyZone } from "@/hooks/useReportingZones";
-import {
-  WASTE_CATEGORY_LABELS,
-  WasteCategory,
-  WasteSeverityLegacy,
-  WasteType,
-} from "@/types";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { MAX_REPORT_PHOTOS, REPORT_PHOTO_ACCEPT, selectReportPhotos } from "@/lib/report-photos";
 import { ReportPhotoThumbnails, usePhotoUrl } from "@/components/reports/ReportPhotoThumbnails";
-import { formatAnalysisDetails } from "@/lib/utils";
-import { DetectionBox, inferWasteCategory } from "@/lib/waste-classification";
+import { DetectionBox } from "@/lib/waste-classification";
 import DetectionImageOverlay from "@/components/ai/DetectionImageOverlay";
-import { SeverityBadge, type SeverityLevel } from "@/components/SeverityBadge";
+import { AnalysisSummary } from "@/components/AnalysisSummary";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,22 +35,12 @@ const LocationPickerMap = dynamic(
 
 type AnalyzeWasteResult = {
   model: string;
-  detectedObject: string;
-  dominantWaste: WasteType | null;
-  totalItems: number;
-  severity: any;
-  has_waste?: boolean;
-  wasteCategory?: WasteCategory;
+  severity: DbSeverity;
+  has_waste: boolean;
   status: "DIRTY" | "CLEAN";
   wasteCount: number;
-  count: number;
-  decision: {
-    isUncertain: boolean;
-    message: string | null;
-    retakeRecommended: boolean;
-    captureTips: string[];
-  };
-  labels: any[];
+  decision: { retakeRecommended: boolean };
+  labels: unknown[];
   detections: DetectionBox[];
 };
 
@@ -68,60 +51,12 @@ const WASTE_BUCKET_LABELS: Record<WasteBucket, string> = {
   no_waste: "No Waste",
 };
 
-const WASTE_TYPE_LABELS: Record<WasteType, string> = {
-  PLASTIC: "Plastic",
-  ORGANIC: "Organic",
-  GLASS: "Glass",
-  METAL: "Metal",
-  PAPER: "Paper",
-};
-
-const DOMINANT_WASTE_STYLES: Record<WasteType, string> = {
-  PLASTIC: "bg-blue-100 text-blue-700 border-blue-200",
-  ORGANIC: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  GLASS: "bg-teal-100 text-teal-700 border-teal-200",
-  METAL: "bg-amber-100 text-amber-700 border-amber-200",
-  PAPER: "bg-slate-100 text-slate-700 border-slate-200",
-};
-
-const SEVERITY_STYLES: Record<WasteSeverityLegacy, string> = {
-  low: "bg-green-100 text-green-700 border-green-200",
-  medium: "bg-amber-100 text-amber-700 border-amber-200",
-  high: "bg-red-100 text-red-700 border-red-200",
-};
-
-/** Severity is based on the total number of waste items detected. */
-function resolveSeverityLevel(wasteCount: number) {
-  return severityFromWasteCount(wasteCount);
-}
-
-const SEVERITY_DESCRIPTIONS: Record<string, string> = {
-  CRITICAL: "Immediate cleanup required!",
-  HIGH: "Schedule cleanup within 24 hours.",
-  MODERATE: "Queued for cleanup.",
-  SPAM: "Flagged for admin review.",
-};
-
 function mapAnalysisToBucket(result: AnalyzeWasteResult): WasteBucket {
   // has_waste is the authoritative field from the YOLO /analyze endpoint.
   // Fall back to status only when has_waste is not explicitly set.
   if (result.has_waste === true) return "with_waste";
   if (result.has_waste === false) return "no_waste";
   return result.status === "DIRTY" ? "with_waste" : "no_waste";
-}
-
-function resolveWasteCategoryForSubmission(result: AnalyzeWasteResult | null) {
-  if (result?.wasteCategory) {
-    return result.wasteCategory;
-  }
-  if (result) {
-    return inferWasteCategory(result.labels || [], result.dominantWaste);
-  }
-  return "PLASTIC_WASTE" as WasteCategory;
-}
-
-function buildDefaultDescription(bucket: WasteBucket) {
-  return `Waste report submitted via mobile capture. Category: ${WASTE_BUCKET_LABELS[bucket]}.`;
 }
 
 function geolocationErrorMessage(code: number) {
@@ -488,22 +423,6 @@ export default function SubmitReportPage() {
       decisionPayload?.retake_recommended,
       isUncertain,
     );
-    const decisionMessage =
-      typeof payload?.reason === "string" && payload.reason.trim().length > 0
-        ? payload.reason.trim()
-        : typeof payload?.message === "string" && payload.message.trim().length > 0
-          ? payload.message.trim()
-          : typeof decisionPayload?.message === "string" &&
-              decisionPayload.message.trim().length > 0
-            ? decisionPayload.message.trim()
-            : null;
-
-    const captureTips = Array.isArray(decisionPayload?.capture_tips)
-      ? decisionPayload.capture_tips.filter(
-          (tip: unknown): tip is string => typeof tip === "string",
-        )
-      : [];
-
     const categoriesList = Array.isArray(payload?.categories)
       ? payload.categories
       : Array.isArray(payload?.labels)
@@ -519,25 +438,15 @@ export default function SubmitReportPage() {
             : categoriesList.length,
         )
       : 0;
-    const severityVal = resolveSeverityLevel(wasteCount);
+    const severityVal = severityFromWasteCount(wasteCount);
 
     return {
       model: typeof payload?.model === "string" ? payload.model : "demo",
-      detectedObject: hasWaste ? "waste" : "none",
-      dominantWaste: null,
-      totalItems: wasteCount,
       severity: severityVal,
       has_waste: hasWaste,
       status,
       wasteCount,
-      count: wasteCount,
-      wasteCategory: undefined,
-      decision: {
-        isUncertain,
-        message: decisionMessage,
-        retakeRecommended,
-        captureTips,
-      },
+      decision: { retakeRecommended },
       labels: categoriesList,
       detections: Array.isArray(payload?.detections) ? payload.detections : [],
     };
@@ -557,14 +466,8 @@ export default function SubmitReportPage() {
       setSelectedCategory(mapAnalysisToBucket(result));
       if (result.decision.retakeRecommended) {
         setDecisionMessage(
-          result.decision.message ||
-            "Uncertain classification. Please retake the image for better accuracy.",
+          "Please retake the photo for a clearer analysis.",
         );
-      } else if (!result.has_waste) {
-        setDecisionMessage("No waste detected in this image.");
-      } else {
-        const countLabel = result.wasteCount > 0 ? ` (${result.wasteCount} item${result.wasteCount !== 1 ? "s" : ""})` : "";
-        setDecisionMessage(`Waste detected${countLabel}. Ready to submit.`);
       }
     } catch (error) {
       if (request !== analysisRequest.current) return;
@@ -646,7 +549,7 @@ export default function SubmitReportPage() {
     const trimmedDescription = description.trim();
     if (trimmedDescription.length > 0 && trimmedDescription.length < 10) {
       setSubmitError(
-        "Description must be at least 10 characters when provided.",
+        "Comment must be at least 10 characters when provided.",
       );
       return;
     }
@@ -656,30 +559,15 @@ export default function SubmitReportPage() {
     setDecisionMessage("");
 
     try {
-      const resolvedCategory =
-        resolveWasteCategoryForSubmission(analysisResult);
       const categoryBucketLabel = WASTE_BUCKET_LABELS[selectedCategory];
       const reportTitle = (categoryBucketLabel === "With Waste" || categoryBucketLabel === "No Waste" || !categoryBucketLabel)
         ? "Waste report"
         : `Waste report - ${categoryBucketLabel}`;
-      const reportDescription =
-        trimmedDescription.length > 0
-          ? trimmedDescription
-          : buildDefaultDescription(selectedCategory);
-
-      // Backend expects a simple bucket category: "with_waste" | "no_waste".
-      // Use the selectedCategory (set from analysis or user) to satisfy the API.
-      // Also forward the pre-computed YOLO analysis data so severity is stored
-      // immediately without requiring a second YOLO call from the backend.
-      const severityToSave = analysisResult
-        ? analysisResult.has_waste
-          ? resolveSeverityLevel(analysisResult.wasteCount)
-          : "SPAM"
-        : null;
+      const severityToSave = analysisResult?.severity ?? null;
 
       const report = await createReport.mutateAsync({
         title: reportTitle,
-        description: reportDescription,
+        description: trimmedDescription,
         category: selectedCategory,
         latitude: location.lat,
         longitude: location.lng,
@@ -690,10 +578,9 @@ export default function SubmitReportPage() {
         analysisWasteCount: analysisResult?.wasteCount ?? null,
         aiModel: analysisResult?.model ?? null,
         aiCategories: analysisResult?.labels?.filter((l: unknown): l is string => typeof l === "string" && l !== "with_waste" && l !== "no_waste") ?? [],
-        aiReason: formatAnalysisDetails(
-          analysisResult?.labels?.filter((l: unknown): l is string => typeof l === "string" && l !== "with_waste" && l !== "no_waste"),
-          analysisResult?.decision?.message
-        ),
+        aiReason: analysisResult && severityToSave
+          ? formatWasteAnalysis(analysisResult.has_waste === true, dbSeverityToAiLabel(severityToSave))
+          : null,
       });
 
       setSavedReportId(report.id);
@@ -741,6 +628,10 @@ export default function SubmitReportPage() {
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-gray-600">
             Thank you for helping protect our coastal areas. Your waste report has been submitted and is queued for review.
+          </p>
+
+          <p className="mt-3 text-sm text-gray-600">
+            <span className="font-semibold">Citizen Comment:</span> {description.trim() || "None"}
           </p>
 
           <div className="my-6 rounded-xl bg-gray-50 p-3.5 text-xs font-medium text-gray-700 ring-1 ring-gray-100">
@@ -969,7 +860,7 @@ export default function SubmitReportPage() {
                           Analyzing image…
                         </p>
                         <p className="mt-0.5 text-xs text-slate-500">
-                          Counting detected waste items and estimating severity
+                          Checking for waste and assessing severity
                         </p>
                       </div>
                     </div>
@@ -983,53 +874,10 @@ export default function SubmitReportPage() {
                   )}
 
                   {!isAnalyzing && analysisResult && (
-                    <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3.5">
-                      <h3 className="text-xs font-bold text-gray-900">Analysis Summary</h3>
-                      <div className="flex items-center justify-between gap-2 border-b border-gray-200/80 pb-2.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${analysisResult.has_waste !== false ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-                            {analysisResult.has_waste !== false ? "✓" : "✕"}
-                          </span>
-                          <span className="text-xs font-bold text-gray-900">
-                            {analysisResult.has_waste !== false ? "Waste Detected" : "No Waste Detected"}
-                          </span>
-                        </div>
-                        <SeverityBadge severity={resolveSeverityLevel(analysisResult.wasteCount)} />
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500 font-medium">Waste items detected</span>
-                        <span className="font-bold text-gray-800">{analysisResult.wasteCount}</span>
-                      </div>
-
-                      <p className="text-[11px] text-gray-600 italic">
-                        {SEVERITY_DESCRIPTIONS[resolveSeverityLevel(analysisResult.wasteCount)]}
-                      </p>
-
-                      {analysisResult.labels && (
-                        <div className="pt-1 border-t border-gray-200/80">
-                          <span className="text-[11px] font-semibold text-gray-700 block mb-1.5">Detected Labels:</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {analysisResult.labels.length === 0 && <span className="text-xs text-gray-500">None identified</span>}
-                            {analysisResult.labels.map((lbl: any, idx: number) => {
-                              const labelText = typeof lbl === "string" ? lbl : (lbl?.label || lbl?.class_name || "item");
-                              const countText = typeof lbl === "object" && typeof lbl?.count === "number" && lbl.count > 1 ? ` ×${lbl.count}` : "";
-                              return (
-                                <span key={idx} className="inline-flex items-center rounded-md bg-white border border-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-700 shadow-2xs">
-                                  {labelText}{countText}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                      {analysisResult.decision.message && (
-                        <div className="border-t border-gray-200/80 pt-2">
-                          <span className="block text-[11px] font-semibold text-gray-700">Analysis Details</span>
-                          <p className="mt-1 text-xs text-gray-600">{analysisResult.decision.message}</p>
-                        </div>
-                      )}
-                    </div>
+                    <AnalysisSummary
+                      hasWaste={analysisResult.has_waste === true}
+                      severity={analysisResult.severity}
+                    />
                   )}
 
                   {decisionMessage && (
@@ -1201,7 +1049,7 @@ export default function SubmitReportPage() {
                         htmlFor="description"
                         className="text-xs font-medium text-gray-700"
                       >
-                        Description{" "}
+                        Citizen Comment{" "}
                         <span className="text-gray-400 font-normal">
                           (optional)
                         </span>

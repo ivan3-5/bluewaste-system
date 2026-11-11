@@ -22,6 +22,7 @@ export const DEDUP_MAX_THRESHOLD_METERS = 50;
  * 0.0005° ≈ 55 m at the equator — safely covers the 50 m max radius.
  */
 const BBOX_DEGREES = 0.0005;
+const SEVERITY_ORDER: Severity[] = ["SPAM", "LOW", "MODERATE", "HIGH", "CRITICAL"];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -184,14 +185,20 @@ export class ReportDedupService {
       // 1. Update incident contributor count (and optionally escalate severity)
       await (tx as typeof prisma).wasteIncident.update({
         where: { id: nearby.id },
-        data: {
-          contributorCount: { increment: 1 },
-          // Escalate severity if the new report is more critical
-          ...(this._isSeverityHigher(severity, nearby.status) && severity
-            ? { severity }
-            : {}),
-        },
+        data: { contributorCount: { increment: 1 } },
       });
+      if (severity && severity !== "SPAM") {
+        await tx.wasteIncident.updateMany({
+          where: {
+            id: nearby.id,
+            OR: [
+              { severity: null },
+              { severity: { in: SEVERITY_ORDER.slice(0, SEVERITY_ORDER.indexOf(severity)) } },
+            ],
+          },
+          data: { severity },
+        });
+      }
 
       // 2. Find the primary (oldest) report of this incident to copy
       //    its assigned workers to the newly grouped report.
@@ -276,26 +283,6 @@ export class ReportDedupService {
     });
 
     return incident.id;
-  }
-
-  /**
-   * Determine if the incoming report's severity is higher than the incident's
-   * current severity so we can escalate the incident level.
-   */
-  private static _isSeverityHigher(
-    incomingSeverity: Severity | null | undefined,
-    _currentStatus: ReportStatus,
-  ): boolean {
-    // Severity rank (higher index = more critical)
-    const rank: Record<string, number> = {
-      SPAM: 0,
-      MODERATE: 1,
-      HIGH: 2,
-      CRITICAL: 3,
-    };
-
-    if (!incomingSeverity) return false;
-    return (rank[incomingSeverity] ?? 0) > 0;
   }
 
   // ── Status propagation ───────────────────────────────────────────────────────

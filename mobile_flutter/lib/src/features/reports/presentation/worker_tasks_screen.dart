@@ -10,6 +10,7 @@ import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../data/report_service.dart";
+import "../data/detect_service.dart";
 import "../domain/report_models.dart";
 import "worker_home_screen.dart";
 import "worker_route_screen.dart";
@@ -860,7 +861,7 @@ class _WorkerTaskCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          task.severity!.toUpperCase(),
+                          WasteSeverity.fromString(task.severity).label,
                           style: TextStyle(
                             color: task.severity == "CRITICAL"
                                 ? AppColors.destructive
@@ -936,7 +937,7 @@ class _WorkerTaskCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  task.displayDescription,
+                  "Citizen Comment: ${task.displayDescription}",
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

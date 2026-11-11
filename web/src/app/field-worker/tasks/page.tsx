@@ -1,5 +1,6 @@
 "use client";
 
+import { citizenComment } from "@/lib/utils";
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -207,7 +208,7 @@ export default function TasksPage() {
                     </div>
 
                     <p className="text-sm text-gray-500 dark:text-slate-400 line-clamp-2 leading-relaxed mt-auto hidden sm:block">
-                      {report.description || "No description provided."}
+                      {citizenComment(report.description, report.aiReason)}
                     </p>
                   </div>
                 </div>
