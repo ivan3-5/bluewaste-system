@@ -19,7 +19,6 @@ import {
   CheckCircle2,
   XCircle,
   LayoutList,
-  MapPin,
   Search,
   Filter,
   RotateCw,
@@ -56,6 +55,38 @@ function SchedulesDashboard() {
     useState<CleanupSchedule | null>(null);
   const [editingSchedule, setEditingSchedule] =
     useState<CleanupSchedule | null>(null);
+
+  // Auto-open schedule modal when pre-selected reports are passed from MapView or Report Details
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const scheduleReportsParam = params.get("scheduleReports");
+    if (scheduleReportsParam) {
+      const reportIds = scheduleReportsParam.split(",").filter(Boolean);
+      if (reportIds.length > 0) {
+        const lat = parseFloat(params.get("lat") || "") || 7.3032;
+        const lng = parseFloat(params.get("lng") || "") || 125.6811;
+        const barangay = params.get("barangay") || "";
+        const locationName = params.get("locationName") || barangay || "";
+        const shortLoc =
+          locationName.split(",").slice(0, 2).join(",").trim() ||
+          locationName ||
+          barangay ||
+          "Coastal Area";
+        setEditingSchedule({
+          reportIds,
+          latitude: lat,
+          longitude: lng,
+          barangay,
+          locationName,
+          title: `Coastal Cleanup - ${shortLoc}`,
+        } as any);
+        setIsFormOpen(true);
+      }
+      // Clean up the URL query params without a full page reload
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -540,7 +571,7 @@ function SchedulesDashboard() {
           )}
         </div>
 
-        {/* 2-Way View Switcher */}
+        {/* View Switcher */}
         <div className="bg-gray-100/90 dark:bg-slate-800 p-1 rounded-2xl inline-flex self-start lg:self-auto gap-1 border border-gray-200/50 dark:border-slate-700 shadow-inner">
           <button
             onClick={() => setView("calendar")}

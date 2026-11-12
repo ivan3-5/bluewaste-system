@@ -174,13 +174,23 @@ export function ScheduleCleanupButton({
   reportId,
   status,
   isAlreadyScheduled,
+  latitude,
+  longitude,
+  locationName,
   className = "",
 }: {
-  reportId: string;
+  reportId?: string;
   status: AdminReportStatus;
   isAlreadyScheduled: boolean;
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
   className?: string;
 }) {
+  if (status === "CLEANED" || status === "REJECTED") {
+    return null;
+  }
+
   if (isAlreadyScheduled) {
     return (
       <Link
@@ -215,9 +225,13 @@ export function ScheduleCleanupButton({
     );
   }
 
+  const scheduleHref = reportId
+    ? `/dashboard/schedules?scheduleReports=${encodeURIComponent(reportId)}&reportId=${encodeURIComponent(reportId)}${latitude ? `&lat=${latitude}` : ""}${longitude ? `&lng=${longitude}` : ""}${locationName ? `&barangay=${encodeURIComponent(locationName)}&locationName=${encodeURIComponent(locationName)}` : ""}`
+    : "/dashboard/schedules";
+
   return (
     <Link
-      href={`/dashboard/schedules?reportId=${encodeURIComponent(reportId)}`}
+      href={scheduleHref}
       className={`inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-primary/90 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 cursor-pointer ${className}`}
     >
       <CalendarDays className="h-3.5 w-3.5 text-white/90" />
@@ -230,11 +244,17 @@ export function ReportDetailActionHub({
   reportId,
   initialStatus,
   isAlreadyScheduled,
+  reportLatitude,
+  reportLongitude,
+  reportLocation,
   children,
 }: {
   reportId: string;
   initialStatus: AdminReportStatus;
   isAlreadyScheduled: boolean;
+  reportLatitude?: number;
+  reportLongitude?: number;
+  reportLocation?: string;
   children?: React.ReactNode;
 }) {
   const [currentStatus, setCurrentStatus] =
@@ -246,7 +266,7 @@ export function ReportDetailActionHub({
 
   const isScheduled =
     isAlreadyScheduled ||
-    ["CLEANUP_SCHEDULED", "IN_PROGRESS", "CLEANED"].includes(currentStatus);
+    ["CLEANUP_SCHEDULED", "IN_PROGRESS"].includes(currentStatus);
 
   return (
     <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0 border-t border-slate-100 dark:border-slate-800 lg:border-t-0">
@@ -263,6 +283,9 @@ export function ReportDetailActionHub({
         reportId={reportId}
         status={currentStatus}
         isAlreadyScheduled={isScheduled}
+        latitude={reportLatitude}
+        longitude={reportLongitude}
+        locationName={reportLocation}
       />
     </div>
   );

@@ -152,6 +152,30 @@ export class ReportController {
     }
   }
 
+  /**
+   * GET /reports/radius-groups
+   * Calculates GPS-based radius grouping (default: 50 meters).
+   * Identifies nearby waste reports, groups them for cleanup scheduling,
+   * computes pairwise distances, and preserves individual citizen submissions.
+   */
+  static async getRadiusGroups(req: AuthRequest, res: Response) {
+    try {
+      const query = (req.query || {}) as QueryFilters & {
+        radius?: string;
+        hasCleanupSchedule?: string;
+      };
+      const result = await ReportGeoService.getRadiusGroupedReports(query as any);
+      res.json(result);
+    } catch (error) {
+      handleControllerError(
+        res,
+        error,
+        "Failed to calculate radius grouped reports",
+        "RADIUS_GROUPING_FAILED",
+      );
+    }
+  }
+
   static async addImages(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;

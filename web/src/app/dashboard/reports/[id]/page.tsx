@@ -98,6 +98,18 @@ export default async function ReportDetailPage({ params }: PageProps) {
           .join(", ")
       : null);
 
+  const assignedWorkerList: string[] =
+    report.assignedWorkers && report.assignedWorkers.length > 0
+      ? report.assignedWorkers
+          .map((w) => `${w.firstName} ${w.lastName}`.trim())
+          .filter(Boolean)
+      : assignedWorkersText
+        ? assignedWorkersText
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+
   const cleanupWorkerName =
     report.cleanedByName ||
     assignedWorkersText ||
@@ -167,6 +179,9 @@ export default async function ReportDetailPage({ params }: PageProps) {
             reportId={report.id}
             initialStatus={report.status}
             isAlreadyScheduled={isAlreadyScheduled}
+            reportLatitude={report.latitude}
+            reportLongitude={report.longitude}
+            reportLocation={displayLocationName}
           >
             <GenerateReportButton
               report={{ ...report, locationName: displayLocationName }}
@@ -187,12 +202,12 @@ export default async function ReportDetailPage({ params }: PageProps) {
       </section>
 
       {/* ── Main High-Efficiency 2-Column Content ── */}
-      <div className="grid gap-3.5 lg:grid-cols-12 items-start">
+      <div className="grid gap-3.5 lg:grid-cols-12 items-stretch">
         {/* ── Left Column: Visual & Geographic Intelligence (7 cols) ── */}
-        <div className="space-y-3.5 lg:col-span-7">
+        <div className="flex flex-col lg:col-span-7 h-full">
           {/* Card: Photographic Evidence (Citizen vs Cleanup Result) */}
-          <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-2xs">
-            <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-100 dark:border-slate-800">
+          <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-2xs flex-1 flex flex-col justify-between h-full">
+            <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-50 dark:bg-blue-950/40 text-primary">
                   <Camera className="h-3.5 w-3.5" />
@@ -211,11 +226,11 @@ export default async function ReportDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 flex-1 items-stretch">
               {/* Citizen Submission Box */}
-              <figure className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex flex-col justify-between">
-                <div>
-                  <figcaption className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+              <figure className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex flex-col justify-between h-full">
+                <div className="flex-1 flex flex-col min-h-0">
+                  <figcaption className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 shrink-0">
                     <span className="flex items-center gap-1.5">
                       <Camera className="h-3.5 w-3.5 text-slate-500" />
                       Citizen Submission
@@ -225,20 +240,21 @@ export default async function ReportDetailPage({ params }: PageProps) {
                   {reportImages.length > 0 ? (
                     <ReportPhotoCarousel
                       images={reportImages}
-                      heightClassName="h-60 sm:h-72"
+                      className="flex-1 flex flex-col min-h-0"
+                      heightClassName="h-64 sm:h-72 lg:h-full lg:flex-1 min-h-[260px] sm:min-h-[288px] lg:min-h-[330px]"
                       reporterName={report.reporterName || "Anonymous Citizen"}
                       reportedAt={report.reportedAt}
                     />
                   ) : (
-                    <div className="flex h-60 sm:h-72 items-center justify-center p-4 text-center text-xs text-slate-400 dark:text-slate-500">
+                    <div className="flex flex-1 min-h-[260px] sm:min-h-[288px] lg:min-h-[330px] items-center justify-center p-4 text-center text-xs text-slate-400 dark:text-slate-500">
                       No citizen submission photo available.
                     </div>
                   )}
                 </div>
-                <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-3 py-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-3 py-1.5 text-[11px] text-slate-600 dark:text-slate-400 shrink-0">
                   <span className="truncate">
-                    Reported by:{" "}
-                    <strong className="font-semibold text-slate-800 dark:text-slate-200">
+                    Submitted by:{" "}
+                    <strong className="font-bold text-slate-800 dark:text-slate-200">
                       {report.reporterName || "Anonymous Citizen"}
                     </strong>
                   </span>
@@ -249,9 +265,9 @@ export default async function ReportDetailPage({ params }: PageProps) {
               </figure>
 
               {/* Cleanup Result Box */}
-              <figure className="overflow-hidden rounded-lg border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/20 flex flex-col justify-between">
-                <div>
-                  <figcaption className="flex items-center justify-between border-b border-emerald-200 dark:border-emerald-500/30 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
+              <figure className="overflow-hidden rounded-lg border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/20 flex flex-col justify-between h-full">
+                <div className="flex-1 flex flex-col min-h-0">
+                  <figcaption className="flex items-center justify-between border-b border-emerald-200 dark:border-emerald-500/30 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 shrink-0">
                     <span className="flex items-center gap-1.5">
                       <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                       Cleanup Result
@@ -264,12 +280,13 @@ export default async function ReportDetailPage({ params }: PageProps) {
                         id: image.id,
                         imageUrl: image.imageUrl,
                       }))}
-                      heightClassName="h-60 sm:h-72"
+                      className="flex-1 flex flex-col min-h-0"
+                      heightClassName="h-64 sm:h-72 lg:h-full lg:flex-1 min-h-[260px] sm:min-h-[288px] lg:min-h-[330px]"
                       submittedBy={cleanupWorkerName}
                       submittedAt={report.cleanedAt}
                     />
                   ) : (
-                    <div className="flex h-60 sm:h-72 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4 text-center">
+                    <div className="flex flex-1 min-h-[260px] sm:min-h-[288px] lg:min-h-[330px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4 text-center">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mb-1.5">
                         <Clock className="h-4 w-4" />
                       </div>
@@ -282,12 +299,12 @@ export default async function ReportDetailPage({ params }: PageProps) {
                     </div>
                   )}
                 </div>
-                {cleanupImages.length > 0 && (
-                  <div className="flex items-center justify-between border-t border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/30 px-3 py-1.5 text-[11px] text-emerald-900 dark:text-emerald-200">
+                {cleanupImages.length > 0 ? (
+                  <div className="flex items-center justify-between border-t border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/30 px-3 py-1.5 text-[11px] text-emerald-900 dark:text-emerald-200 shrink-0">
                     <span className="truncate flex items-center gap-1">
                       <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      Proof submitted by:{" "}
-                      <strong className="font-semibold text-emerald-800 dark:text-emerald-200">
+                      Submitted by:{" "}
+                      <strong className="font-bold text-emerald-800 dark:text-emerald-200">
                         {cleanupWorkerName}
                       </strong>
                     </span>
@@ -295,49 +312,18 @@ export default async function ReportDetailPage({ params }: PageProps) {
                       Click photo to view large
                     </span>
                   </div>
+                ) : (
+                  <div className="flex items-center justify-between border-t border-emerald-200/50 dark:border-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-950/20 px-3 py-1.5 text-[11px] text-emerald-900/70 dark:text-emerald-200/70 shrink-0">
+                    <span className="truncate flex items-center gap-1">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600/70 dark:text-emerald-400/70 shrink-0" />
+                      <span>Pending resolution proof</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">
+                      Field verification
+                    </span>
+                  </div>
                 )}
               </figure>
-            </div>
-          </section>
-
-          {/* Card: Location Map (Space-efficient viewport) */}
-          <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-2xs">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400">
-                  <MapPin className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    Location Coordinates
-                  </h2>
-                </div>
-              </div>
-            </div>
-
-            <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner">
-              <MapView
-                reports={[
-                  {
-                    id: report.id,
-                    imageUrl: report.imageUrl,
-                    images: report.images,
-                    category: report.category,
-                    wasteCount: report.wasteCount,
-                    latitude: report.latitude,
-                    longitude: report.longitude,
-                    locationName: displayLocationName,
-                    description: citizenComment(report.description, report.aiReason),
-                    status: report.status,
-                    reportedAt: report.reportedAt,
-                    updatedAt: report.updatedAt,
-                  },
-                ]}
-                center={[report.latitude, report.longitude]}
-                zoom={16}
-                hideControls
-                mapHeightClassName="h-48 sm:h-52"
-              />
             </div>
           </section>
         </div>
@@ -358,7 +344,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
                   <FileText className="h-3.5 w-3.5" />
                 </div>
                 <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                  Report Context & Team
+                  Report Context & Worker
                 </h2>
               </div>
             </div>
@@ -382,46 +368,37 @@ export default async function ReportDetailPage({ params }: PageProps) {
               </div>
 
               <div className="rounded-lg bg-slate-50/80 dark:bg-slate-800/60 p-2.5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-1">
                   <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Assigned Worker
+                    Assigned Worker{assignedWorkerList.length > 1 ? "s" : ""}
                   </dt>
                   {isAlreadyScheduled && (
-                    <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/50 px-1 py-0.2 rounded">
+                    <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/50 px-1 py-0.2 rounded shrink-0">
                       Scheduled
                     </span>
                   )}
                 </div>
-                <dd className="mt-1 flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
-                  <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                  <span className="truncate">
-                    {assignedWorkersText || "Unassigned"}
-                  </span>
-                </dd>
-                <div className="mt-1 flex items-center gap-1.5">
-                  {isAlreadyScheduled ? (
-                    <Link
-                      href="/dashboard/schedules"
-                      className="text-[11px] font-semibold text-primary hover:underline"
-                    >
-                      View Schedule →
-                    </Link>
-                  ) : report.status === "VERIFIED" ? (
-                    <Link
-                      href={`/dashboard/schedules?reportId=${encodeURIComponent(report.id)}`}
-                      className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
-                    >
-                      + Assign Team
-                    </Link>
+                <dd className="mt-1" title={assignedWorkersText || "Unassigned"}>
+                  {assignedWorkerList.length > 0 ? (
+                    <div className={`${assignedWorkerList.length > 1 ? "grid grid-cols-2" : "flex"} gap-1.5 pt-0.5`}>
+                      {assignedWorkerList.map((name, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 px-1.5 py-0.5 text-[11px] font-semibold text-slate-800 dark:text-slate-200 shadow-2xs min-w-0"
+                          title={name}
+                        >
+                          <Users className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{name}</span>
+                        </span>
+                      ))}
+                    </div>
                   ) : (
-                    <span
-                      className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60 select-none"
-                      title="Report must be verified before assigning a team"
-                    >
-                      + Assign Team
-                    </span>
+                    <div className="flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400 text-xs">
+                      <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span>Unassigned</span>
+                    </div>
                   )}
-                </div>
+                </dd>
               </div>
 
               <div className="rounded-lg bg-slate-50/80 dark:bg-slate-800/60 p-2.5">
@@ -459,6 +436,56 @@ export default async function ReportDetailPage({ params }: PageProps) {
           </section>
         </div>
       </div>
+
+      {/* ── Full-Width Section: Location Coordinates Map ── */}
+      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 sm:p-4 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400">
+              <MapPin className="h-3.5 w-3.5" />
+            </div>
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                Location Coordinates
+              </h2>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              {displayLocationName}
+            </span>
+            <span className="rounded bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+              {report.latitude.toFixed(6)}, {report.longitude.toFixed(6)}
+            </span>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner">
+          <MapView
+            reports={[
+              {
+                id: report.id,
+                imageUrl: report.imageUrl,
+                images: report.images,
+                category: report.category,
+                wasteCount: report.wasteCount,
+                latitude: report.latitude,
+                longitude: report.longitude,
+                locationName: displayLocationName,
+                description: citizenComment(report.description, report.aiReason),
+                status: report.status,
+                reportedAt: report.reportedAt,
+                updatedAt: report.updatedAt,
+              },
+            ]}
+            center={[report.latitude, report.longitude]}
+            zoom={16}
+            hideControls
+            showLegend={false}
+            mapHeightClassName="h-[320px] sm:h-[380px] lg:h-[420px]"
+          />
+        </div>
+      </section>
     </div>
   );
 }

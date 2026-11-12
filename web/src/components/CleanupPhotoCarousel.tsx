@@ -52,7 +52,14 @@ export function CleanupPhotoCarousel({
       }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [isLightboxOpen, total]);
 
   if (total === 0) return null;
@@ -100,21 +107,6 @@ export function CleanupPhotoCarousel({
             </button>
           </div>
 
-          {/* Bottom Worker Attribution Banner */}
-          {submittedBy && (
-            <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center rounded-md bg-slate-950/85 backdrop-blur-sm px-2.5 py-1.5 text-white shadow-md pointer-events-none">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <User className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                <span className="text-[11px] text-slate-300">
-                  Submitted by:{" "}
-                  <strong className="text-white font-semibold">
-                    {submittedBy}
-                  </strong>
-                </span>
-              </div>
-            </div>
-          )}
-
           {/* Next / Previous arrows */}
           {hasMultiple && (
             <div className="absolute inset-y-0 inset-x-1.5 flex items-center justify-between pointer-events-none">
@@ -147,7 +139,7 @@ export function CleanupPhotoCarousel({
         </div>
 
         {hasMultiple && (
-          <div className="flex items-center justify-center gap-1.5 bg-emerald-50/80 dark:bg-emerald-950/40 py-1.5 border-t border-emerald-200 dark:border-emerald-800/60">
+          <div className="flex items-center justify-center gap-1.5 bg-emerald-50/80 dark:bg-emerald-950/40 py-1.5 border-t border-emerald-200 dark:border-emerald-800/60 shrink-0">
             {images.map((_, idx) => (
               <button
                 key={idx}
@@ -165,117 +157,115 @@ export function CleanupPhotoCarousel({
         )}
       </div>
 
-      {/* ── Fullscreen Lightbox Modal (View Large) ── */}
+      {/* ── Centered Lightbox Modal (View Large) ── */}
       {isLightboxOpen && (
         <div
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-black/95 p-4 sm:p-6 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 md:p-6 bg-[#181c24]/65 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
           onClick={() => setIsLightboxOpen(false)}
         >
-          {/* Top Bar */}
+          {/* Centered Modal Card Container */}
           <div
-            className="flex w-full max-w-5xl items-center justify-between pb-3 border-b border-white/10 text-white"
+            className="relative flex flex-col w-full max-w-4xl lg:max-w-5xl max-h-[90vh] bg-slate-900/95 dark:bg-slate-950/95 border border-slate-700/60 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md animate-in zoom-in-95 duration-200 my-auto text-white"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                <ShieldCheck className="h-4 w-4" />
-                Cleanup Verification Proof
-              </span>
-              {submittedBy && (
-                <span className="flex items-center gap-1.5 text-xs text-slate-300">
-                  <User className="h-3.5 w-3.5 text-emerald-400" />
-                  Submitted by:{" "}
-                  <strong className="text-white font-semibold">
-                    {submittedBy}
-                  </strong>
+            {/* Top Bar */}
+            <div className="flex w-full items-center justify-between px-4 sm:px-5 py-3 border-b border-white/10 bg-slate-950/40 shrink-0">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Cleanup Verification Proof
                 </span>
-              )}
+                {submittedBy && (
+                  <span className="flex items-center gap-1.5 text-xs text-slate-300">
+                    <User className="h-3.5 w-3.5 text-emerald-400" />
+                    Submitted by:{" "}
+                    <strong className="text-white font-bold">
+                      {submittedBy}
+                    </strong>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                {hasMultiple && (
+                  <span className="text-xs font-semibold text-slate-400">
+                    Proof {currentIndex + 1} of {total}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsLightboxOpen(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white transition hover:scale-105 active:scale-95"
+                  title="Close (Esc)"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Large Center Photo */}
+            <div className="relative flex-1 w-full flex items-center justify-center p-3 sm:p-5 bg-black/40 min-h-[320px] max-h-[64vh]">
+              <div className="relative w-full h-full min-h-[300px] sm:min-h-[380px] max-h-[60vh]">
+                <Image
+                  src={currentImage.imageUrl}
+                  alt={`Cleanup proof ${currentIndex + 1}`}
+                  fill
+                  sizes="(max-width: 1200px) 90vw, 1024px"
+                  className="object-contain drop-shadow-md"
+                  priority
+                />
+              </div>
+
               {hasMultiple && (
-                <span className="text-xs font-semibold text-slate-400">
-                  Proof {currentIndex + 1} of {total}
-                </span>
+                <>
+                  <button
+                    type="button"
+                    onClick={goToPrevious}
+                    disabled={currentIndex === 0}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-sm transition disabled:opacity-0 disabled:pointer-events-none hover:scale-105 active:scale-95 shadow-xl border border-white/10"
+                    aria-label="Previous proof"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goToNext}
+                    disabled={currentIndex === total - 1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-sm transition disabled:opacity-0 disabled:pointer-events-none hover:scale-105 active:scale-95 shadow-xl border border-white/10"
+                    aria-label="Next proof"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </>
               )}
-              <button
-                type="button"
-                onClick={() => setIsLightboxOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition hover:scale-105 active:scale-95"
-                title="Close (Esc)"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Large Center Photo */}
-          <div
-            className="relative flex h-[74vh] w-full max-w-5xl items-center justify-center my-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative h-full w-full">
-              <Image
-                src={currentImage.imageUrl}
-                alt={`Cleanup proof ${currentIndex + 1}`}
-                fill
-                sizes="95vw"
-                className="object-contain"
-                priority
-              />
             </div>
 
+            {/* Bottom Thumbnails */}
             {hasMultiple && (
-              <>
-                <button
-                  type="button"
-                  onClick={goToPrevious}
-                  disabled={currentIndex === 0}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-sm transition disabled:opacity-0 disabled:pointer-events-none hover:scale-105 active:scale-95 shadow-xl"
-                  aria-label="Previous proof"
-                >
-                  <ChevronLeft className="h-7 w-7" />
-                </button>
-                <button
-                  type="button"
-                  onClick={goToNext}
-                  disabled={currentIndex === total - 1}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-sm transition disabled:opacity-0 disabled:pointer-events-none hover:scale-105 active:scale-95 shadow-xl"
-                  aria-label="Next proof"
-                >
-                  <ChevronRight className="h-7 w-7" />
-                </button>
-              </>
+              <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-950/60 border-t border-white/10 overflow-x-auto shrink-0">
+                {images.map((img, idx) => (
+                  <button
+                    key={img.id || idx}
+                    type="button"
+                    onClick={() => setCurrentIndex(idx)}
+                    className={`relative h-12 w-16 sm:h-14 sm:w-20 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
+                      idx === currentIndex
+                        ? "border-emerald-400 scale-105 shadow-md shadow-emerald-500/20"
+                        : "border-white/20 opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    <Image
+                      src={img.imageUrl}
+                      alt={`Thumb ${idx + 1}`}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
             )}
           </div>
-
-          {/* Bottom Thumbnails */}
-          {hasMultiple && (
-            <div
-              className="flex items-center gap-2 pt-3 max-w-5xl overflow-x-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {images.map((img, idx) => (
-                <button
-                  key={img.id || idx}
-                  type="button"
-                  onClick={() => setCurrentIndex(idx)}
-                  className={`relative h-14 w-20 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
-                    idx === currentIndex
-                      ? "border-emerald-400 scale-105 shadow-lg shadow-emerald-500/20"
-                      : "border-white/20 opacity-60 hover:opacity-100"
-                  }`}
-                >
-                  <Image
-                    src={img.imageUrl}
-                    alt={`Thumb ${idx + 1}`}
-                    fill
-                    className="object-cover"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </>

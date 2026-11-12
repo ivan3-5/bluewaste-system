@@ -6,22 +6,22 @@ import { ScheduleService } from "./schedule.service";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Default deduplication radius from env (1–50 m). Prefer 30 m per spec. */
+/** Default deduplication / radius grouping threshold from env. Default: 50 m. */
 export const DEDUP_DISTANCE_THRESHOLD_METERS: number = env.DEDUP_DISTANCE_METERS;
 
 /**
- * Hard upper-bound regardless of env config.
- * Reports >50 m apart are always treated as separate incidents.
+ * Upper-bound limit for incident grouping.
+ * Defaults to max of 500m or env.DEDUP_DISTANCE_METERS.
  */
-export const DEDUP_MAX_THRESHOLD_METERS = 50;
+export const DEDUP_MAX_THRESHOLD_METERS = Math.max(50, env.DEDUP_DISTANCE_METERS);
 
 /**
  * Bounding-box expansion in degrees added on top of the threshold
  * for the initial coarse DB filter (before precise Haversine check).
  *
- * 0.0005° ≈ 55 m at the equator — safely covers the 50 m max radius.
+ * 0.001° ≈ 110 m at the equator — safely covers the 50 m max radius.
  */
-const BBOX_DEGREES = 0.0005;
+const BBOX_DEGREES = 0.001;
 const SEVERITY_ORDER: Severity[] = ["SPAM", "LOW", "MODERATE", "HIGH", "CRITICAL"];
 
 // ─── Types ────────────────────────────────────────────────────────────────────

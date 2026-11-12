@@ -43,6 +43,7 @@ export default function ScheduleMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const circlesLayerRef = useRef<L.LayerGroup | null>(null);
 
   // Filter schedules that have valid coordinates
   const validSchedules = useMemo(
@@ -80,24 +81,31 @@ export default function ScheduleMap({
       maxZoom: 19,
     }).addTo(map);
 
+    const circlesLayer = L.layerGroup().addTo(map);
     const markersLayer = L.layerGroup().addTo(map);
+    circlesLayerRef.current = circlesLayer;
     markersLayerRef.current = markersLayer;
     mapRef.current = map;
 
     return () => {
+      circlesLayer.clearLayers();
+      markersLayer.clearLayers();
       map.remove();
       mapRef.current = null;
+      circlesLayerRef.current = null;
       markersLayerRef.current = null;
     };
   }, []); // Run once on mount
 
-  // Sync Markers whenever validSchedules or onScheduleClick changes
+  // Sync Markers & 50m Radius Circles whenever validSchedules or onScheduleClick changes
   useEffect(() => {
     const map = mapRef.current;
     const markersLayer = markersLayerRef.current;
+    const circlesLayer = circlesLayerRef.current;
     if (!map || !markersLayer) return;
 
     markersLayer.clearLayers();
+    if (circlesLayer) circlesLayer.clearLayers();
 
     if (validSchedules.length === 0) return;
 
@@ -105,6 +113,24 @@ export default function ScheduleMap({
 
     validSchedules.forEach((schedule) => {
       bounds.push([schedule.latitude, schedule.longitude]);
+      const statusColor = SCHEDULE_STATUS_COLORS[schedule.status] || "#3b82f6";
+
+      // Draw 50-meter radius circle around scheduled cleanup area
+      if (circlesLayer) {
+        const circle = L.circle([schedule.latitude, schedule.longitude], {
+          radius: 50,
+          color: statusColor,
+          fillColor: statusColor,
+          fillOpacity: 0.16,
+          weight: 2,
+          dashArray: "5, 5",
+        });
+        circle.bindTooltip(
+          `<strong>⭕ 50m Cleanup Area</strong><br/>${schedule.title}`,
+          { direction: "top", offset: [0, -10] },
+        );
+        circlesLayer.addLayer(circle);
+      }
 
       const marker = L.marker([schedule.latitude, schedule.longitude], {
         icon: getIconForStatus(schedule.status),
@@ -141,7 +167,8 @@ export default function ScheduleMap({
 
           <div style="background:#f9fafb; border:1px solid #f3f4f6; border-radius:12px; padding:8px 10px; margin-bottom:10px; font-size:11px; color:#374151;">
             📅 ${timeFormatted}
-            ${gearCount > 0 ? `<div style="margin-top:4px; color:#4f46e5; font-weight:600;">🛠️ ${gearCount} gear items allocated</div>` : ""}
+            <div style="margin-top:4px; color:#2563eb; font-weight:600;">⭕ 50-Meter Operational Cleanup Perimeter</div>
+            ${gearCount > 0 ? `<div style="margin-top:3px; color:#4f46e5; font-weight:600;">🛠️ ${gearCount} gear items allocated</div>` : ""}
           </div>
 
           <button id="btn-view-briefing-${schedule.id}" style="width:100%; height:34px; font-size:12px; font-weight:700; color:#ffffff; background:linear-gradient(to right, #2563eb, #4f46e5); border:none; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 6px rgba(79,70,229,0.25);">
@@ -199,6 +226,10 @@ export default function ScheduleMap({
 
         {/* Legend */}
         <div className="flex items-center gap-3 flex-wrap text-xs font-semibold">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100/60 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-900/60">
+            <span className="w-3 h-3 rounded-full border-2 border-dashed border-indigo-500 bg-indigo-500/20" />
+            50m Radius Area
+          </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100/60 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-900/60">
             <span className="w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-blue-200 dark:ring-blue-900" />
             Upcoming

@@ -16,8 +16,14 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { formatScheduleDateTime, parseScheduleDateTime } from "@/lib/schedule-date";
-import { CleanupScheduleStatus, User, Report } from "@/types";
+import { CleanupScheduleStatus, User, Report, CleanupRadiusGroup } from "@/types";
 import { getReverseGeocodedLocation } from "@/lib/utils";
+import {
+  groupReportsByRadius,
+  haversineDistance,
+  formatDistance,
+  DEFAULT_RADIUS_METERS,
+} from "@/lib/geo-grouping";
 import {
   Users,
   FileText,
@@ -33,6 +39,8 @@ import {
   Compass,
   ShieldCheck,
   Layers,
+  Circle,
+  Sliders,
 } from "lucide-react";
 
 export type ScheduleWorkerOption = Pick<User, "id" | "firstName" | "lastName" | "email">;
@@ -197,7 +205,58 @@ export function ScheduleForm({
     });
   }, [formData.scheduledAt, allSchedules, isEditing]);
 
+  const [extraReports, setExtraReports] = useState<Report[]>([]);
+
+  // If preselected report IDs are provided via initialData, ensure they exist in displayedReports
+  useEffect(() => {
+    if (!isOpen || !initialData) return;
+    const targetIds: string[] =
+      Array.isArray(initialData.reportIds) && initialData.reportIds.length > 0
+        ? initialData.reportIds
+        : Array.isArray(initialData.reports) && initialData.reports.length > 0
+          ? initialData.reports.map((r: any) => r.id)
+          : [];
+
+    if (targetIds.length === 0) return;
+
+    const missingIds = targetIds.filter(
+      (id) =>
+        !eligibleReports.some((r) => r.id === id) &&
+        !extraReports.some((r) => r.id === id) &&
+        !(initialData.reports && initialData.reports.some((r: any) => r.id === id)),
+    );
+
+    if (missingIds.length > 0) {
+      Promise.all(
+        missingIds.map((id) =>
+          api
+            .get(`/reports/${id}`)
+            .then((res) => (res.data?.data || res.data) as Report)
+            .catch(() => null),
+        ),
+      ).then((fetched) => {
+        const valid = fetched.filter(Boolean) as Report[];
+        if (valid.length > 0) {
+          setExtraReports((prev) => {
+            const next = [...prev];
+            valid.forEach((v) => {
+              if (!next.some((n) => n.id === v.id)) next.push(v);
+            });
+            return next;
+          });
+        }
+      });
+    }
+  }, [isOpen, initialData, eligibleReports, extraReports]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setExtraReports([]);
+    }
+  }, [isOpen]);
+
   const displayedReports = useMemo(() => {
+    let baseList: Report[] = [];
     if (isEditing && initialData?.reports) {
       const currentReports = (initialData.reports as Report[]) || [];
       const unassigned = eligibleReports.filter(
@@ -205,12 +264,30 @@ export function ScheduleForm({
           !er.cleanupScheduleId &&
           !currentReports.some((cr: any) => cr.id === er.id),
       );
-      return [...currentReports, ...unassigned];
+      baseList = [...currentReports, ...unassigned];
+    } else {
+      baseList = eligibleReports.filter((r) => !r.cleanupScheduleId);
     }
-    return initialReport && !reportInList
-      ? [initialReport, ...eligibleReports]
-      : eligibleReports;
-  }, [isEditing, initialData?.reports, eligibleReports, initialReport, reportInList]);
+    const merged = [...baseList];
+    if (initialReport && !merged.some((m) => m.id === initialReport.id)) {
+      merged.unshift(initialReport);
+    }
+    if (extraReports.length > 0) {
+      extraReports.forEach((extra) => {
+        if (!merged.some((m) => m.id === extra.id)) {
+          merged.unshift(extra);
+        }
+      });
+    }
+    return merged;
+  }, [
+    isEditing,
+    initialData?.reports,
+    eligibleReports,
+    extraReports,
+    initialReport,
+    reportInList,
+  ]);
 
   const selectedCitizenCount = useMemo(() => {
     const selected = displayedReports.filter((r: any) =>
@@ -224,6 +301,50 @@ export function ScheduleForm({
     });
     return set.size + anon;
   }, [formData.reportIds, displayedReports]);
+
+  // ── GPS 50-Meter Radius Grouping States ────────────────────────────────────
+  const [reportGroupingMode, setReportGroupingMode] = useState<"radius" | "flat">("radius");
+  const [groupingRadius, setGroupingRadius] = useState<number>(50);
+
+  const radiusGroups = useMemo(() => {
+    return groupReportsByRadius(displayedReports, groupingRadius);
+  }, [displayedReports, groupingRadius]);
+
+  const groupedAreas = useMemo(
+    () => radiusGroups.filter((g) => g.isGrouped),
+    [radiusGroups],
+  );
+
+  const isolatedGroups = useMemo(
+    () => radiusGroups.filter((g) => !g.isGrouped),
+    [radiusGroups],
+  );
+
+  const selectedReportsDistanceInfo = useMemo(() => {
+    const selected = displayedReports.filter((r: any) =>
+      formData.reportIds.includes(r.id),
+    );
+    if (selected.length <= 1) {
+      return { count: selected.length, maxDistanceMeters: 0, isWithinRadius: true };
+    }
+    let maxDist = 0;
+    for (let i = 0; i < selected.length; i++) {
+      for (let j = i + 1; j < selected.length; j++) {
+        const d = haversineDistance(
+          selected[i].latitude,
+          selected[i].longitude,
+          selected[j].latitude,
+          selected[j].longitude,
+        );
+        if (d > maxDist) maxDist = d;
+      }
+    }
+    return {
+      count: selected.length,
+      maxDistanceMeters: Math.round(maxDist * 10) / 10,
+      isWithinRadius: maxDist <= groupingRadius,
+    };
+  }, [formData.reportIds, displayedReports, groupingRadius]);
 
   const [geocodedAddresses, setGeocodedAddresses] = useState<Record<string, string>>({});
 
@@ -282,17 +403,37 @@ export function ScheduleForm({
   useEffect(() => {
     setErrorMessage(null);
     if (initialData && isOpen) {
-      const initialBarangay = initialData.barangay || "";
       const rawInitialLoc =
+        initialData.locationName ||
         initialData.reports?.[0]?.address ||
         initialData.barangay ||
         "";
       const initialLocation = rawInitialLoc.toLowerCase().startsWith("waste report")
         ? ""
         : rawInitialLoc;
+      const initialBarangay =
+        initialData.barangay ||
+        detectBarangayFromLocation(initialLocation) ||
+        "";
+
+      const initialReportIds: string[] =
+        Array.isArray(initialData.reportIds) && initialData.reportIds.length > 0
+          ? initialData.reportIds
+          : Array.isArray(initialData.reports) && initialData.reports.length > 0
+            ? initialData.reports.map((r: any) => r.id)
+            : [];
+
+      const initialEquipment: string[] =
+        Array.isArray(initialData.equipment) && initialData.equipment.length > 0
+          ? initialData.equipment
+          : STANDARD_PRESET;
 
       setFormData({
-        title: initialData.title || "",
+        title:
+          initialData.title ||
+          (initialLocation
+            ? `Coastal Cleanup - ${initialLocation.split(",").slice(0, 2).join(",").trim()}`
+            : "Coastal Cleanup Operation"),
         locationName: initialLocation,
         description: initialData.description || "",
         barangay: initialBarangay,
@@ -302,11 +443,9 @@ export function ScheduleForm({
         workerIds: initialData.workers
           ? initialData.workers.map((w: any) => w.workerId)
           : [],
-        reportIds: initialData.reports
-          ? initialData.reports.map((r: any) => r.id)
-          : [],
+        reportIds: initialReportIds,
         status: initialData.status || "UPCOMING",
-        equipment: initialData.equipment || [],
+        equipment: initialEquipment,
       });
     } else if (isOpen && !isEditing) {
       setFormData({
@@ -343,6 +482,64 @@ export function ScheduleForm({
     });
   }, [isOpen, isEditing, initialReport]);
 
+  // Synchronize location info if reports were preselected but location was empty or default
+  useEffect(() => {
+    if (!isOpen) return;
+    if (formData.reportIds.length > 0 && displayedReports.length > 0) {
+      const selectedReports = displayedReports.filter((r: any) =>
+        formData.reportIds.includes(r.id),
+      );
+      if (selectedReports.length > 0) {
+        setFormData((prev) => {
+          let updatedLoc = prev.locationName;
+          let updatedBarangay = prev.barangay;
+          let updatedLat = prev.latitude;
+          let updatedLng = prev.longitude;
+          let updatedTitle = prev.title;
+
+          if (!updatedLoc || updatedLoc.toLowerCase().startsWith("waste report")) {
+            const firstWithLoc = selectedReports.find((r: any) => resolveLocationForReport(r));
+            if (firstWithLoc) {
+              const res = resolveLocationForReport(firstWithLoc);
+              updatedLoc = res;
+              updatedBarangay = updatedBarangay || detectBarangayFromLocation(res);
+              if (!updatedTitle || updatedTitle === "Coastal Cleanup Operation") {
+                const shortLoc = res.split(",").slice(0, 2).join(",").trim();
+                updatedTitle = `Coastal Cleanup - ${shortLoc || res}`;
+              }
+            }
+          }
+
+          if (updatedLat === 7.3032 && updatedLng === 125.6811) {
+            const sumLat = selectedReports.reduce((s: number, r: any) => s + r.latitude, 0);
+            const sumLng = selectedReports.reduce((s: number, r: any) => s + r.longitude, 0);
+            updatedLat = sumLat / selectedReports.length;
+            updatedLng = sumLng / selectedReports.length;
+          }
+
+          if (
+            updatedLoc === prev.locationName &&
+            updatedBarangay === prev.barangay &&
+            updatedLat === prev.latitude &&
+            updatedLng === prev.longitude &&
+            updatedTitle === prev.title
+          ) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            locationName: updatedLoc,
+            barangay: updatedBarangay,
+            latitude: updatedLat,
+            longitude: updatedLng,
+            title: updatedTitle,
+          };
+        });
+      }
+    }
+  }, [isOpen, formData.reportIds, displayedReports, resolveLocationForReport]);
+
   // Handle Location Name changes: Automatically fills in Target Barangay / Coastal Area
   const handleLocationNameChange = (newLocationName: string) => {
     const autoBarangay = detectBarangayFromLocation(newLocationName);
@@ -372,8 +569,9 @@ export function ScheduleForm({
         updated.title = `Coastal Cleanup - ${shortLoc || newLocationName}`;
       }
 
-      // Auto-link matching reports if not already selected
-      if (matchingReports.length > 0 && prev.reportIds.length === 0) {
+      // Auto-link matching reports ONLY if no reports were already selected or passed via initialData
+      const hasInitialReportIds = Array.isArray(initialData?.reportIds) && initialData.reportIds.length > 0;
+      if (matchingReports.length > 0 && prev.reportIds.length === 0 && !hasInitialReportIds) {
         updated.reportIds = matchingReports.map((r: any) => r.id);
         updated.latitude = matchingReports[0].latitude;
         updated.longitude = matchingReports[0].longitude;
@@ -452,6 +650,73 @@ export function ScheduleForm({
         title: updatedTitle,
       };
     });
+  };
+
+  // Select or Deselect an entire 50-meter radius group of reports with 1 click
+  const handleGroupToggle = (group: CleanupRadiusGroup) => {
+    const groupReportIds = group.reports
+      .filter(
+        (r: any) =>
+          !r.cleanupScheduleId ||
+          (isEditing && r.cleanupScheduleId === initialData?.id),
+      )
+      .map((r: any) => r.id);
+
+    if (groupReportIds.length === 0) return;
+
+    const allSelected = groupReportIds.every((id: string) =>
+      formData.reportIds.includes(id),
+    );
+
+    let nextReportIds: string[];
+    if (allSelected) {
+      nextReportIds = formData.reportIds.filter(
+        (id) => !groupReportIds.includes(id),
+      );
+    } else {
+      nextReportIds = Array.from(new Set([...formData.reportIds, ...groupReportIds]));
+    }
+
+    const selected = displayedReports.filter((r: any) =>
+      nextReportIds.includes(r.id),
+    );
+
+    let newLocationName = formData.locationName;
+    let newBarangay = formData.barangay;
+    let newLat = formData.latitude;
+    let newLng = formData.longitude;
+
+    if (selected.length > 0) {
+      newLat = group.center.latitude;
+      newLng = group.center.longitude;
+      const resolved =
+        group.barangay || resolveLocationForReport(group.reports[0]);
+      if (resolved) {
+        newLocationName = resolved;
+        newBarangay = detectBarangayFromLocation(resolved);
+      }
+    }
+
+    let updatedTitle = formData.title;
+    if (
+      !formData.title.trim() ||
+      formData.title.startsWith("Coastal Cleanup - ")
+    ) {
+      if (newLocationName) {
+        const shortLoc = newLocationName.split(",").slice(0, 2).join(",").trim();
+        updatedTitle = `Coastal Cleanup - ${shortLoc || newLocationName}`;
+      }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      reportIds: nextReportIds,
+      locationName: newLocationName,
+      barangay: newBarangay,
+      latitude: newLat,
+      longitude: newLng,
+      title: updatedTitle,
+    }));
   };
 
   const handleWorkerToggle = (workerId: string) => {
@@ -609,11 +874,10 @@ export function ScheduleForm({
             <button
               type="button"
               onClick={() => setActiveTab("details")}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === "details"
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === "details"
                   ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
                   : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
-              }`}
+                }`}
             >
               1. Operation Details
               {formData.reportIds.length > 0 && (
@@ -625,11 +889,10 @@ export function ScheduleForm({
             <button
               type="button"
               onClick={() => setActiveTab("equipment")}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === "equipment"
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === "equipment"
                   ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
                   : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
-              }`}
+                }`}
             >
               2. Equipment
               {formData.equipment.length > 0 && (
@@ -641,11 +904,10 @@ export function ScheduleForm({
             <button
               type="button"
               onClick={() => setActiveTab("workers")}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === "workers"
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === "workers"
                   ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
                   : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
-              }`}
+                }`}
             >
               3. Assign
               {formData.workerIds.length > 0 && (
@@ -738,17 +1000,56 @@ export function ScheduleForm({
                   </div>
 
                   {/* Waste Reports Linking */}
-                  <div className="space-y-2.5 md:col-span-2 pt-1">
-                    <div className="flex items-center justify-between">
+                  <div className="space-y-3 md:col-span-2 pt-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <Label className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                         <FileText className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                         Waste Reports *
                       </Label>
-                      {formData.reportIds.length > 0 && (
-                        <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900/50">
-                          {formData.reportIds.length} selected
-                        </span>
-                      )}
+
+                      {/* Grouping Mode Pill Switcher & Radius Selector */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center bg-gray-100 dark:bg-slate-800 p-0.5 rounded-lg border border-gray-200 dark:border-slate-700 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setReportGroupingMode("radius")}
+                            className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 ${reportGroupingMode === "radius"
+                                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                                : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
+                              }`}
+                          >
+                            <Circle className="w-3 h-3 text-indigo-500 fill-indigo-500/20" />
+                            <span>50m Radius Groups ({groupedAreas.length})</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReportGroupingMode("flat")}
+                            className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 ${reportGroupingMode === "flat"
+                                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                                : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
+                              }`}
+                          >
+                            <span>All Reports ({displayedReports.length})</span>
+                          </button>
+                        </div>
+
+                        {reportGroupingMode === "radius" && (
+                          <div className="flex items-center gap-1 text-[11px] bg-indigo-50/70 dark:bg-indigo-950/40 px-2 py-1 rounded-lg border border-indigo-100 dark:border-indigo-900/50">
+                            <span className="font-semibold text-indigo-700 dark:text-indigo-300">Radius:</span>
+                            <select
+                              value={groupingRadius}
+                              onChange={(e) => setGroupingRadius(Number(e.target.value))}
+                              className="bg-transparent font-bold text-indigo-900 dark:text-indigo-200 focus:outline-none cursor-pointer"
+                            >
+                              <option value={20} className="dark:bg-slate-900">20m</option>
+                              <option value={30} className="dark:bg-slate-900">30m</option>
+                              <option value={50} className="dark:bg-slate-900">50m (Default)</option>
+                              <option value={75} className="dark:bg-slate-900">75m</option>
+                              <option value={100} className="dark:bg-slate-900">100m</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/40 text-[11px] text-emerald-800 dark:text-emerald-300">
@@ -775,91 +1076,418 @@ export function ScheduleForm({
                       </div>
                     )}
 
-                    <div className="border border-gray-200 dark:border-slate-800 rounded-2xl divide-y dark:divide-slate-800 max-h-60 overflow-y-auto bg-gray-50/30 dark:bg-slate-900/50">
-                      {displayedReports.length === 0 ? (
-                        <div className="p-4 text-xs text-gray-500 dark:text-slate-400 text-center">
-                          No eligible unassigned waste reports (VERIFIED) available.
+                    {/* Proximity / Distance Verification Banner */}
+                    {selectedReportsDistanceInfo.count > 1 && (
+                      <div
+                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs ${selectedReportsDistanceInfo.isWithinRadius
+                            ? "bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/50 text-emerald-900 dark:text-emerald-200"
+                            : "bg-blue-50/90 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50 text-blue-900 dark:text-blue-200"
+                          }`}
+                      >
+                        {selectedReportsDistanceInfo.isWithinRadius ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                        ) : (
+                          <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                        )}
+                        <div>
+                          <p className="font-bold">
+                            {selectedReportsDistanceInfo.isWithinRadius
+                              ? `GPS Proximity Verified (${selectedReportsDistanceInfo.maxDistanceMeters}m spread)`
+                              : `Geographical Spread (${selectedReportsDistanceInfo.maxDistanceMeters}m spread)`}
+                          </p>
+                          <p className="text-[11px] mt-0.5 opacity-90">
+                            {selectedReportsDistanceInfo.isWithinRadius
+                              ? `All selected waste reports are within ${selectedReportsDistanceInfo.maxDistanceMeters}m of each other (within the ${groupingRadius}m cleanup perimeter). Optimal for a single cleanup crew deployment!`
+                              : `Selected waste reports span ${selectedReportsDistanceInfo.maxDistanceMeters} meters (exceeds ${groupingRadius}m radius). They can still be scheduled together as a broad operation, or organized into separate localized cleanup deployments.`}
+                          </p>
                         </div>
-                      ) : (
-                        displayedReports.map((report: any) => {
-                          const isLinked = formData.reportIds.includes(
-                            report.id,
-                          );
-                          const isAssignedToOther = Boolean(
-                            report.cleanupScheduleId &&
-                              (!isEditing || report.cleanupScheduleId !== initialData?.id),
-                          );
-                          const reportLoc =
-                            resolveLocationForReport(report) || "Location unavailable";
-                          return (
-                            <label
-                              key={report.id}
-                              className={`flex items-center gap-3 p-3 transition-colors ${
-                                isAssignedToOther
-                                  ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
-                                  : isLinked
-                                    ? "bg-blue-50/40 dark:bg-slate-800/70 cursor-pointer hover:bg-white dark:hover:bg-slate-800/50"
-                                    : "hover:bg-white dark:hover:bg-slate-800/50 cursor-pointer"
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isLinked}
-                                disabled={isAssignedToOther}
-                                onChange={() => {
-                                  if (!isAssignedToOther) {
-                                    handleReportToggle(report.id);
-                                  }
-                                }}
-                                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-slate-600 dark:bg-slate-800 shrink-0 disabled:opacity-40"
-                              />
-                              {report.images && report.images.length > 0 ? (
-                                <Image
-                                  src={report.images[0].imageUrl}
-                                  alt="waste photo"
-                                  width={40}
-                                  height={40}
-                                  unoptimized
-                                  className="w-10 h-10 object-cover rounded-lg border border-gray-200 dark:border-slate-700 shrink-0"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 bg-gray-100 dark:bg-slate-800 rounded-lg flex items-center justify-center shrink-0">
-                                  <FileText className="w-4 h-4 text-gray-400 dark:text-slate-500" />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2">
-                                  <p className="text-xs font-bold text-gray-900 dark:text-slate-100 truncate">
-                                    {report.title}
-                                  </p>
-                                  {isAssignedToOther ? (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
-                                      Already Scheduled
-                                    </span>
-                                  ) : isLinked ? (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50">
-                                      Selected
-                                    </span>
-                                  ) : (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
-                                      Available
-                                    </span>
+                      </div>
+                    )}
+
+                    {/* RADIUS GROUPED MODE */}
+                    {reportGroupingMode === "radius" ? (
+                      <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
+                        {/* Grouped 50m Areas */}
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between text-xs font-bold text-gray-700 dark:text-slate-300">
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                              Recommended {groupingRadius}m Cleanup Areas ({groupedAreas.length})
+                            </span>
+                            <span className="text-[10px] text-gray-500 dark:text-slate-400 font-normal">
+                              Nearby reports clustered by GPS distance
+                            </span>
+                          </div>
+
+                          {groupedAreas.length === 0 ? (
+                            <div className="p-3 text-center text-xs text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-gray-200 dark:border-slate-700">
+                              No clusters found within {groupingRadius}m radius. Reports are spaced farther apart.
+                            </div>
+                          ) : (
+                            groupedAreas.map((group) => {
+                              const groupUnassignedReports = group.reports.filter(
+                                (r: any) =>
+                                  !r.cleanupScheduleId ||
+                                  (isEditing && r.cleanupScheduleId === initialData?.id),
+                              );
+                              const allGroupSelected =
+                                groupUnassignedReports.length > 0 &&
+                                groupUnassignedReports.every((r: any) =>
+                                  formData.reportIds.includes(r.id),
+                                );
+                              const someGroupSelected =
+                                groupUnassignedReports.some((r: any) =>
+                                  formData.reportIds.includes(r.id),
+                                );
+                              const groupLoc =
+                                group.barangay ||
+                                resolveLocationForReport(group.reports[0]) ||
+                                "Grouped Cleanup Zone";
+
+                              return (
+                                <div
+                                  key={group.id}
+                                  className={`rounded-2xl border transition-all overflow-hidden ${allGroupSelected
+                                      ? "border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm"
+                                      : "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-gray-300 dark:hover:border-slate-700"
+                                    }`}
+                                >
+                                  {/* Area Card Header */}
+                                  <div className="p-3 bg-gray-50/70 dark:bg-slate-800/60 border-b border-gray-100 dark:border-slate-800/80 flex items-center justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                        <h4 className="text-xs font-bold text-gray-900 dark:text-slate-100 truncate">
+                                          {groupLoc}
+                                        </h4>
+                                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50">
+                                          ⭕ {group.reports.length} Reports
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-500 dark:text-slate-400">
+                                        <span>👥 {group.citizenCount} Contributor{group.citizenCount > 1 ? "s" : ""}</span>
+                                        <span>•</span>
+                                        <span>Spread: <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">{group.maxSpreadMeters}m</strong></span>
+                                        <span>•</span>
+                                        <span className="text-[10px] text-gray-400 dark:text-slate-500">Radius: {group.radiusMeters}m</span>
+                                      </div>
+                                    </div>
+
+                                    {/* Select All in Area Button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleGroupToggle(group)}
+                                      disabled={groupUnassignedReports.length === 0}
+                                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${groupUnassignedReports.length === 0
+                                          ? "opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800 text-gray-400"
+                                          : allGroupSelected
+                                            ? "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+                                            : someGroupSelected
+                                              ? "bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-200"
+                                              : "bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700"
+                                        }`}
+                                    >
+                                      {allGroupSelected ? (
+                                        <>
+                                          <Check className="w-3.5 h-3.5" />
+                                          <span>Area Selected</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span>Select 50m Area</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+
+                                  {/* Pairwise Distance Chips */}
+                                  {group.pairwiseDistances.length > 0 && (
+                                    <div className="px-3 py-1.5 bg-indigo-50/20 dark:bg-indigo-950/10 border-b border-gray-100 dark:border-slate-800/60 flex items-center gap-2 overflow-x-auto text-[10px]">
+                                      <span className="text-gray-400 dark:text-slate-500 font-medium shrink-0">Distances:</span>
+                                      {group.pairwiseDistances.slice(0, 3).map((p, pIdx) => (
+                                        <span
+                                          key={pIdx}
+                                          className="shrink-0 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-semibold"
+                                        >
+                                          {(p.reportATitle || "Report").slice(0, 12)}... ↔ {(p.reportBTitle || "Report").slice(0, 12)}...: <strong>{p.distanceMeters}m</strong>
+                                        </span>
+                                      ))}
+                                      {group.pairwiseDistances.length > 3 && (
+                                        <span className="text-gray-400 dark:text-slate-500 shrink-0">
+                                          +{group.pairwiseDistances.length - 3} more pairs
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
+
+                                  {/* Member Reports */}
+                                  <div className="divide-y dark:divide-slate-800/80">
+                                    {group.reports.map((report: any) => {
+                                      const isLinked = formData.reportIds.includes(report.id);
+                                      const isAssignedToOther = Boolean(
+                                        report.cleanupScheduleId &&
+                                        (!isEditing || report.cleanupScheduleId !== initialData?.id),
+                                      );
+                                      const reportLoc = resolveLocationForReport(report) || "Location unavailable";
+                                      const distInfo = group.distancesFromCenter.find(
+                                        (d) => d.reportId === report.id,
+                                      );
+
+                                      return (
+                                        <label
+                                          key={report.id}
+                                          className={`flex items-center gap-3 p-2.5 transition-colors ${isAssignedToOther
+                                              ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
+                                              : isLinked
+                                                ? "bg-indigo-50/50 dark:bg-slate-800/80 cursor-pointer hover:bg-white dark:hover:bg-slate-800/60"
+                                                : "hover:bg-gray-50/60 dark:hover:bg-slate-800/40 cursor-pointer"
+                                            }`}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={isLinked}
+                                            disabled={isAssignedToOther}
+                                            onChange={() => {
+                                              if (!isAssignedToOther) {
+                                                handleReportToggle(report.id);
+                                              }
+                                            }}
+                                            className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-slate-600 dark:bg-slate-800 shrink-0 disabled:opacity-40"
+                                          />
+                                          {report.images && report.images.length > 0 ? (
+                                            <Image
+                                              src={report.images[0].imageUrl}
+                                              alt="waste photo"
+                                              width={36}
+                                              height={36}
+                                              unoptimized
+                                              className="w-9 h-9 object-cover rounded-lg border border-gray-200 dark:border-slate-700 shrink-0"
+                                            />
+                                          ) : (
+                                            <div className="w-9 h-9 bg-gray-100 dark:bg-slate-800 rounded-lg flex items-center justify-center shrink-0">
+                                              <FileText className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
+                                            </div>
+                                          )}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between gap-2">
+                                              <p className="text-xs font-bold text-gray-900 dark:text-slate-100 truncate">
+                                                {report.title}
+                                              </p>
+                                              {isAssignedToOther ? (
+                                                <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
+                                                  Already Scheduled
+                                                </span>
+                                              ) : isLinked ? (
+                                                <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50">
+                                                  Selected
+                                                </span>
+                                              ) : (
+                                                <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
+                                                  Available
+                                                </span>
+                                              )}
+                                            </div>
+                                            <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
+                                              <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
+                                              <span>{reportLoc}</span>
+                                              {distInfo && (
+                                                <>
+                                                  <span>•</span>
+                                                  <span className="text-indigo-600 dark:text-indigo-400 font-medium">
+                                                    {distInfo.distanceFromCenterMeters}m from center
+                                                  </span>
+                                                </>
+                                              )}
+                                            </p>
+                                          </div>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                                <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5">
-                                  <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
-                                  <span>{reportLoc}</span>
-                                  <span>•</span>
-                                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-                                    {report.status}
-                                  </span>
-                                </p>
-                              </div>
-                            </label>
-                          );
-                        })
-                      )}
-                    </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Standalone Reports Outside Radius */}
+                        {isolatedGroups.length > 0 && (
+                          <div className="space-y-2 pt-2">
+                            <div className="flex items-center justify-between text-xs font-bold text-gray-700 dark:text-slate-300">
+                              <span>📍 Standalone Reports Outside {groupingRadius}m Radius ({isolatedGroups.length})</span>
+                              <span className="text-[10px] text-gray-500 dark:text-slate-400 font-normal">
+                                Single reports with no nearby waste within {groupingRadius}m
+                              </span>
+                            </div>
+
+                            <div className="border border-gray-200 dark:border-slate-800 rounded-2xl divide-y dark:divide-slate-800 bg-white dark:bg-slate-900/40">
+                              {isolatedGroups.map((group) => {
+                                const report = group.reports[0];
+                                const isLinked = formData.reportIds.includes(report.id);
+                                const isAssignedToOther = Boolean(
+                                  report.cleanupScheduleId &&
+                                  (!isEditing || report.cleanupScheduleId !== initialData?.id),
+                                );
+                                const reportLoc = resolveLocationForReport(report) || "Location unavailable";
+
+                                return (
+                                  <label
+                                    key={report.id}
+                                    className={`flex items-center gap-3 p-3 transition-colors ${isAssignedToOther
+                                        ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
+                                        : isLinked
+                                          ? "bg-blue-50/40 dark:bg-slate-800/70 cursor-pointer hover:bg-white dark:hover:bg-slate-800/50"
+                                          : "hover:bg-gray-50/50 dark:hover:bg-slate-800/50 cursor-pointer"
+                                      }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isLinked}
+                                      disabled={isAssignedToOther}
+                                      onChange={() => {
+                                        if (!isAssignedToOther) {
+                                          handleReportToggle(report.id);
+                                        }
+                                      }}
+                                      className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-slate-600 dark:bg-slate-800 shrink-0 disabled:opacity-40"
+                                    />
+                                    {report.images && report.images.length > 0 ? (
+                                      <Image
+                                        src={report.images[0].imageUrl}
+                                        alt="waste photo"
+                                        width={38}
+                                        height={38}
+                                        unoptimized
+                                        className="w-9 h-9 object-cover rounded-lg border border-gray-200 dark:border-slate-700 shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="w-9 h-9 bg-gray-100 dark:bg-slate-800 rounded-lg flex items-center justify-center shrink-0">
+                                        <FileText className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-xs font-bold text-gray-900 dark:text-slate-100 truncate">
+                                          {report.title}
+                                        </p>
+                                        {isAssignedToOther ? (
+                                          <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
+                                            Already Scheduled
+                                          </span>
+                                        ) : isLinked ? (
+                                          <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50">
+                                            Selected
+                                          </span>
+                                        ) : (
+                                          <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
+                                            Available
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                                        <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
+                                        <span>{reportLoc}</span>
+                                        <span>•</span>
+                                        <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                                          {report.status}
+                                        </span>
+                                      </p>
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* FLAT MODE */
+                      <div className="border border-gray-200 dark:border-slate-800 rounded-2xl divide-y dark:divide-slate-800 max-h-60 overflow-y-auto bg-gray-50/30 dark:bg-slate-900/50">
+                        {displayedReports.length === 0 ? (
+                          <div className="p-4 text-xs text-gray-500 dark:text-slate-400 text-center">
+                            No eligible unassigned waste reports (VERIFIED) available.
+                          </div>
+                        ) : (
+                          displayedReports.map((report: any) => {
+                            const isLinked = formData.reportIds.includes(
+                              report.id,
+                            );
+                            const isAssignedToOther = Boolean(
+                              report.cleanupScheduleId &&
+                              (!isEditing || report.cleanupScheduleId !== initialData?.id),
+                            );
+                            const reportLoc =
+                              resolveLocationForReport(report) || "Location unavailable";
+                            return (
+                              <label
+                                key={report.id}
+                                className={`flex items-center gap-3 p-3 transition-colors ${isAssignedToOther
+                                    ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
+                                    : isLinked
+                                      ? "bg-blue-50/40 dark:bg-slate-800/70 cursor-pointer hover:bg-white dark:hover:bg-slate-800/50"
+                                      : "hover:bg-white dark:hover:bg-slate-800/50 cursor-pointer"
+                                  }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isLinked}
+                                  disabled={isAssignedToOther}
+                                  onChange={() => {
+                                    if (!isAssignedToOther) {
+                                      handleReportToggle(report.id);
+                                    }
+                                  }}
+                                  className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-slate-600 dark:bg-slate-800 shrink-0 disabled:opacity-40"
+                                />
+                                {report.images && report.images.length > 0 ? (
+                                  <Image
+                                    src={report.images[0].imageUrl}
+                                    alt="waste photo"
+                                    width={40}
+                                    height={40}
+                                    unoptimized
+                                    className="w-10 h-10 object-cover rounded-lg border border-gray-200 dark:border-slate-700 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 bg-gray-100 dark:bg-slate-800 rounded-lg flex items-center justify-center shrink-0">
+                                    <FileText className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-bold text-gray-900 dark:text-slate-100 truncate">
+                                      {report.title}
+                                    </p>
+                                    {isAssignedToOther ? (
+                                      <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
+                                        Already Scheduled
+                                      </span>
+                                    ) : isLinked ? (
+                                      <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50">
+                                        Selected
+                                      </span>
+                                    ) : (
+                                      <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
+                                        Available
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                                    <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
+                                    <span>{reportLoc}</span>
+                                    <span>•</span>
+                                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                                      {report.status}
+                                    </span>
+                                  </p>
+                                </div>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Deployment Date & Time (Panabo) */}
@@ -942,9 +1570,8 @@ export function ScheduleForm({
                           status: e.target.value as CleanupScheduleStatus,
                         }))
                       }
-                      className={`flex h-11 w-full rounded-xl border px-3 py-2 text-sm font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-                        SCHEDULE_STATUS_SELECT_STYLES[formData.status]
-                      }`}
+                      className={`flex h-11 w-full rounded-xl border px-3 py-2 text-sm font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${SCHEDULE_STATUS_SELECT_STYLES[formData.status]
+                        }`}
                     >
                       <option value="UPCOMING" className="dark:bg-slate-900 dark:text-slate-100">Upcoming (Scheduled)</option>
                       <option value="ONGOING" className="dark:bg-slate-900 dark:text-slate-100">Ongoing (In Progress)</option>
@@ -1010,25 +1637,22 @@ export function ScheduleForm({
                           key={item}
                           type="button"
                           onClick={() => handleEquipmentToggle(item)}
-                          className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
-                            isSelected
+                          className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${isSelected
                               ? "border-indigo-500 dark:border-indigo-500 bg-white dark:bg-slate-800 shadow-sm ring-1 ring-indigo-500/20"
                               : "border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"
-                          }`}
+                            }`}
                         >
                           <div
-                            className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${
-                              isSelected
+                            className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${isSelected
                                 ? "bg-indigo-600 border-indigo-600 text-white"
                                 : "border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800"
-                            }`}
+                              }`}
                           >
                             {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                           </div>
                           <span
-                            className={`text-xs font-semibold ${
-                              isSelected ? "text-indigo-900 dark:text-indigo-200" : "text-gray-700 dark:text-slate-300"
-                            }`}
+                            className={`text-xs font-semibold ${isSelected ? "text-indigo-900 dark:text-indigo-200" : "text-gray-700 dark:text-slate-300"
+                              }`}
                           >
                             {item}
                           </span>
@@ -1077,11 +1701,10 @@ export function ScheduleForm({
                           return (
                             <label
                               key={worker.id}
-                              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
-                                isAssigned
+                              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${isAssigned
                                   ? "bg-indigo-50/60 dark:bg-slate-800 border-indigo-300 dark:border-indigo-600 shadow-sm ring-1 ring-indigo-500/20"
                                   : "bg-white dark:bg-slate-800/40 border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 hover:bg-gray-50/60 dark:hover:bg-slate-800"
-                              }`}
+                                }`}
                             >
                               <input
                                 type="checkbox"
@@ -1124,33 +1747,30 @@ export function ScheduleForm({
           {/* Readiness Indicators */}
           <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-slate-400">
             <span
-              className={`inline-flex items-center gap-1 ${
-                formData.workerIds.length > 0
+              className={`inline-flex items-center gap-1 ${formData.workerIds.length > 0
                   ? "text-emerald-600 dark:text-emerald-400"
                   : "text-amber-600 dark:text-amber-400"
-              }`}
+                }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               {formData.workerIds.length} assigned
             </span>
             <span>•</span>
             <span
-              className={`inline-flex items-center gap-1 ${
-                formData.reportIds.length > 0
+              className={`inline-flex items-center gap-1 ${formData.reportIds.length > 0
                   ? "text-emerald-600 dark:text-emerald-400"
                   : "text-gray-400 dark:text-slate-500"
-              }`}
+                }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               {formData.reportIds.length} reports
             </span>
             <span>•</span>
             <span
-              className={`inline-flex items-center gap-1 ${
-                formData.equipment.length > 0
+              className={`inline-flex items-center gap-1 ${formData.equipment.length > 0
                   ? "text-emerald-600 dark:text-emerald-400"
                   : "text-amber-600 dark:text-amber-400"
-              }`}
+                }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               {formData.equipment.length} gear items
@@ -1164,8 +1784,8 @@ export function ScheduleForm({
                 {formData.equipment.length === 0 && formData.workerIds.length === 0
                   ? "Equipment & worker required"
                   : formData.equipment.length === 0
-                  ? "Equipment required"
-                  : "Worker required"}
+                    ? "Equipment required"
+                    : "Worker required"}
               </span>
             )}
             <Button

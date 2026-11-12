@@ -35,6 +35,12 @@ router.get(
   validate(mapFilterSchema, "query"),
   ReportController.getIncidentMapData,
 );
+// GPS 50-meter radius grouping for waste reports & cleanup scheduling
+router.get(
+  "/radius-groups",
+  optionalAuth,
+  ReportController.getRadiusGroups,
+);
 
 // Public / optional auth report creation routes
 router.post(
