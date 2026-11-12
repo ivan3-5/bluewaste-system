@@ -21,9 +21,11 @@ import {
   STATUS_COLORS,
 } from "@/types";
 import { timeAgo } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const WasteMap = dynamic(() => import("@/components/map/WasteMap"), {
   ssr: false,
+  loading: () => <Skeleton className="h-full w-full rounded-none" />,
 });
 
 const PANABO_CITY_CENTER: [number, number] = [7.3056, 125.6839];
@@ -72,12 +74,7 @@ export default function CitizenMapPage() {
       {/* Map container */}
       <div className="relative h-[calc(100vh-14rem)] min-h-[450px] overflow-hidden rounded-2xl border border-gray-200 shadow-md">
         {isLoading ? (
-          <div className="flex h-full items-center justify-center bg-gray-50">
-            <div className="flex flex-col items-center gap-3 text-gray-400">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
-              <span className="text-sm">Loading map data for Panabo City…</span>
-            </div>
-          </div>
+          <Skeleton className="h-full w-full rounded-none" />
         ) : (
           <WasteMap
             reports={filteredReports}

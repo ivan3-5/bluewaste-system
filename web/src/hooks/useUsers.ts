@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { PaginatedResponse } from "@/types";
 
@@ -37,6 +37,7 @@ export function useUsers(filters: UsersFilters = {}) {
       const { data } = await api.get(`/users?${params.toString()}`);
       return data;
     },
+    placeholderData: keepPreviousData,
   });
 }
 

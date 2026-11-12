@@ -19,6 +19,7 @@ import {
   MapPin,
 } from "lucide-react";
 import Image from "next/image";
+import { ProfilePageSkeleton } from "@/components/skeletons/page-skeletons";
 
 export default function FieldWorkerProfilePage() {
   const { user, updateUser } = useAuth();
@@ -108,7 +109,7 @@ export default function FieldWorkerProfilePage() {
     }
   };
 
-  if (!user) return null;
+  if (!user) return <ProfilePageSkeleton />;
 
   return (
     <div className="min-h-screen p-4 md:p-8">

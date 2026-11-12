@@ -34,7 +34,7 @@ export default function FieldWorkerNotificationsPage() {
   const pagination = data?.pagination;
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="space-y-6">
         <PageHeadingSkeleton />

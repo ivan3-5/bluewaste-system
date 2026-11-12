@@ -25,11 +25,7 @@ import {
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { cn, formatDateTime } from "@/lib/utils";
-import {
-  DataTableSkeleton,
-  FilterToolbarSkeleton,
-  PageHeadingSkeleton,
-} from "@/components/skeletons/page-skeletons";
+import { UsersPageSkeleton } from "@/components/skeletons/page-skeletons";
 import { useLiveNotifications } from "@/contexts/LiveNotificationContext";
 import { PaginationControls } from "@/components/ui/pagination";
 
@@ -120,14 +116,8 @@ export default function UsersPage() {
   const users = data?.data || [];
   const pagination = data?.pagination;
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <PageHeadingSkeleton />
-        <FilterToolbarSkeleton blocks={1} />
-        <DataTableSkeleton rows={8} cols={7} />
-      </div>
-    );
+  if (isLoading && !data) {
+    return <UsersPageSkeleton />;
   }
 
   const handleSearch = (value: string) => {

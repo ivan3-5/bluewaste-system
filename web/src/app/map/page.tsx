@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useMapData } from "@/hooks/useReports";
 import { Filter } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const WasteMap = dynamic(() => import("@/components/map/WasteMap"), {
   ssr: false,
+  loading: () => <Skeleton className="h-full w-full rounded-none" />,
 });
 
 export default function PublicMapPage() {
@@ -52,11 +54,8 @@ export default function PublicMapPage() {
       {/* Map container */}
       <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
         {isLoading ? (
-          <div className="flex h-96 items-center justify-center bg-gray-100">
-            <div className="flex flex-col items-center gap-3 text-gray-400">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
-              <span className="text-sm">Loading map data…</span>
-            </div>
+          <div className="h-96 md:h-[600px]">
+            <Skeleton className="h-full w-full rounded-none" />
           </div>
         ) : (
           <div className="h-96 md:h-[600px]">

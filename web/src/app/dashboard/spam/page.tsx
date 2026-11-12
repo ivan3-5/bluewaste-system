@@ -6,11 +6,7 @@ import { useReports, useDeleteSpamReport } from "@/hooks/useReports";
 import { Button } from "@/components/ui/button";
 import { WASTE_CATEGORY_LABELS } from "@/types";
 import { cn, formatDateTime } from "@/lib/utils";
-import {
-  DataTableSkeleton,
-  FilterToolbarSkeleton,
-  PageHeadingSkeleton,
-} from "@/components/skeletons/page-skeletons";
+import { SpamPageSkeleton } from "@/components/skeletons/page-skeletons";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PaginationControls } from "@/components/ui/pagination";
 
@@ -68,13 +64,7 @@ export default function SpamReportsPage() {
   );
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <PageHeadingSkeleton />
-        <FilterToolbarSkeleton blocks={2} />
-        <DataTableSkeleton rows={8} cols={7} />
-      </div>
-    );
+    return <SpamPageSkeleton />;
   }
 
   return (

@@ -12,10 +12,7 @@ import { formatDateTime } from "@/lib/utils";
 import { AnalysisSummary } from "@/components/AnalysisSummary";
 import { severityFromWasteCount } from "@/lib/severity";
 import type { WasteType } from "@/types";
-import {
-  ListCardsSkeleton,
-  PageHeadingSkeleton,
-} from "@/components/skeletons/page-skeletons";
+import { MyReportsCardsSkeleton } from "@/components/skeletons/page-skeletons";
 import { PaginationControls } from "@/components/ui/pagination";
 
 const WASTE_TYPE_STYLES: Record<WasteType, string> = {
@@ -77,10 +74,7 @@ export default function MyWasteReportsPage() {
 
         <div className="space-y-4">
           {isReportsLoading ? (
-            <div className="space-y-4">
-              <PageHeadingSkeleton withSubtitle={false} />
-              <ListCardsSkeleton rows={4} />
-            </div>
+            <MyReportsCardsSkeleton count={4} />
           ) : reports.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-gray-500">

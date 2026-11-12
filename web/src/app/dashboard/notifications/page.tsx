@@ -34,10 +34,7 @@ import {
   Layers,
   Clock,
 } from "lucide-react";
-import {
-  NotificationListSkeleton,
-  PageHeadingSkeleton,
-} from "@/components/skeletons/page-skeletons";
+import { DashboardNotificationsSkeleton } from "@/components/skeletons/page-skeletons";
 import { format } from "date-fns";
 
 /* ── Type Configuration & Visual Tokens ───────────────────────────────────────── */
@@ -195,12 +192,7 @@ export default function NotificationsPage() {
 
   /* ── Loading Skeleton ─────────────────────────────────────────────────────── */
   if (isLoading && !data) {
-    return (
-      <div className="space-y-6 max-w-[1600px] mx-auto pb-12 animate-in fade-in duration-300">
-        <PageHeadingSkeleton />
-        <NotificationListSkeleton rows={6} />
-      </div>
-    );
+    return <DashboardNotificationsSkeleton />;
   }
 
   return (
