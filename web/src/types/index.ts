@@ -164,6 +164,36 @@ export interface MapReport {
   images: { imageUrl: string }[];
 }
 
+export interface DistancePair {
+  fromId: string;
+  toId: string;
+  distanceMeters: number;
+  reportATitle?: string;
+  reportBTitle?: string;
+}
+
+export interface ReportDistanceInfo {
+  reportId: string;
+  distanceMeters: number;
+  distanceFromCenterMeters?: number;
+}
+
+export interface CleanupRadiusGroup<T = any> {
+  id: string;
+  center: { latitude: number; longitude: number };
+  radiusMeters: number;
+  reports: T[];
+  reportCount: number;
+  citizenCount: number;
+  isGrouped: boolean;
+  maxDistanceMeters: number;
+  maxSpreadMeters?: number;
+  averageDistanceMeters: number;
+  pairwiseDistances: DistancePair[];
+  distancesFromCenter: ReportDistanceInfo[];
+  barangay?: string;
+}
+
 export interface ZonePoint {
   lat: number;
   lng: number;

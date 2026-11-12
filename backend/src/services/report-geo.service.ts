@@ -2,6 +2,11 @@ import prisma from "../config/database";
 import { ReportStatus, WasteCategory, Severity, Prisma } from "@prisma/client";
 import { GeoCache } from "../utils/geo-cache";
 import { ReportSpamService } from "./report-spam.service";
+import {
+  groupReportsByRadius,
+  DEFAULT_RADIUS_METERS,
+  RadiusGroup,
+} from "../utils/geo-grouping";
 
 export type ReportMapData = {
   id: string;
@@ -265,5 +270,107 @@ export class ReportGeoService {
 
     await GeoCache.set(cacheKey, incidents);
     return incidents;
+  }
+
+  // ─── GPS Radius Grouping (Default: 50m) ────────────────────────────────────
+
+  /**
+   * Identifies nearby waste reports using their GPS coordinates and groups them
+   * into cleanup areas within a configurable radius (default: 50 meters).
+   *
+   * Avoids duplicate grouping, calculates accurate pairwise distances using the
+   * Haversine formula, and preserves all original citizen submission details.
+   */
+  static async getRadiusGroupedReports(filters?: {
+    status?: ReportStatus;
+    category?: WasteCategory;
+    radius?: string | number;
+    hasCleanupSchedule?: string | boolean;
+    limit?: string;
+  }) {
+    await ReportSpamService.purgeExpiredSpamIfDue();
+
+    const parsedRadius =
+      typeof filters?.radius === "number"
+        ? filters.radius
+        : Number.parseFloat(filters?.radius || "");
+    const radiusMeters =
+      Number.isFinite(parsedRadius) && parsedRadius > 0
+        ? parsedRadius
+        : DEFAULT_RADIUS_METERS;
+
+    const parsedLimit = Number.parseInt(filters?.limit || "", 10);
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 5000)
+      : 2000;
+
+    const where: Prisma.ReportWhereInput = {
+      isDeleted: false,
+      isSpam: false,
+    };
+
+    if (filters?.status) where.status = filters.status;
+    if (filters?.category) where.category = filters.category;
+
+    if (filters?.hasCleanupSchedule !== undefined) {
+      const hasSchedule =
+        String(filters.hasCleanupSchedule).toLowerCase() === "true";
+      where.cleanupScheduleId = hasSchedule ? { not: null } : null;
+    }
+
+    const reports = await prisma.report.findMany({
+      where,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        aiReason: true,
+        category: true,
+        status: true,
+        severity: true,
+        latitude: true,
+        longitude: true,
+        address: true,
+        isAnonymous: true,
+        reporterId: true,
+        reporter: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        cleanupScheduleId: true,
+        cleanupSchedule: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            scheduledAt: true,
+          },
+        },
+        createdAt: true,
+        updatedAt: true,
+        images: {
+          select: { id: true, imageUrl: true, type: true },
+          take: 5,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+
+    // Group reports by the specified radius (default: 50 meters)
+    const groups = groupReportsByRadius(reports as any[], radiusMeters);
+
+    return {
+      radiusMeters,
+      totalReports: reports.length,
+      totalGroups: groups.length,
+      groupedAreasCount: groups.filter((g) => g.isGrouped).length,
+      isolatedReportsCount: groups.filter((g) => !g.isGrouped).length,
+      groups,
+    };
   }
 }
