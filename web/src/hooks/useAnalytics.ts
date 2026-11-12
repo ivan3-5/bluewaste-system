@@ -50,6 +50,7 @@ export function useDashboardOverview(days = 30) {
       );
       return data;
     },
-    refetchInterval: 10000,
+    refetchInterval: 60000,
+    staleTime: 60000,
   });
 }

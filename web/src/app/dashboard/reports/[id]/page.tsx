@@ -1,6 +1,5 @@
 import { citizenComment } from "@/lib/utils";
 import { getDashboardReportById } from "@/lib/dashboard-reports";
-import MapView from "@/components/MapView";
 import Link from "next/link";
 import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
 import { getReverseGeocodedLocation } from "@/lib/utils";
@@ -24,6 +23,7 @@ import {
   CopyButton,
   StatusWorkflowStepper,
   ReportDetailActionHub,
+  ReportDetailMap,
 } from "@/components/ReportDetailClient";
 
 export const dynamic = "force-dynamic";
@@ -460,31 +460,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner">
-          <MapView
-            reports={[
-              {
-                id: report.id,
-                imageUrl: report.imageUrl,
-                images: report.images,
-                category: report.category,
-                wasteCount: report.wasteCount,
-                latitude: report.latitude,
-                longitude: report.longitude,
-                locationName: displayLocationName,
-                description: citizenComment(report.description, report.aiReason),
-                status: report.status,
-                reportedAt: report.reportedAt,
-                updatedAt: report.updatedAt,
-              },
-            ]}
-            center={[report.latitude, report.longitude]}
-            zoom={16}
-            hideControls
-            showLegend={false}
-            mapHeightClassName="h-[320px] sm:h-[380px] lg:h-[420px]"
-          />
-        </div>
+        <ReportDetailMap
+          lat={report.latitude}
+          lng={report.longitude}
+        />
       </section>
     </div>
   );

@@ -31,6 +31,7 @@ const nextConfig: NextConfig = {
     tsconfigPath: "./tsconfig.json",
   },
   experimental: {
+    optimizePackageImports: ["lucide-react", "date-fns"],
     serverActions: {
       allowedOrigins: [
         "localhost:3000",

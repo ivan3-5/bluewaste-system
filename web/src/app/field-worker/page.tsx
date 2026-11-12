@@ -58,8 +58,7 @@ export default function FieldWorkerDashboard() {
       const res = await api.get("/schedules/my-schedules?limit=50");
       return (res.data.data as CleanupSchedule[]) || [];
     },
-    refetchInterval: 5000,
-    refetchIntervalInBackground: true,
+    staleTime: 30000,
   });
 
   const allReports = useMemo(() => allData?.data || [], [allData?.data]);

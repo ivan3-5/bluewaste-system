@@ -1,14 +1,13 @@
 "use client";
 
 import React, { Suspense, useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CleanupSchedule } from "@/types";
 import api from "@/lib/api";
-import { ScheduleCalendar } from "@/components/schedules/ScheduleCalendar";
 import { ScheduleList } from "@/components/schedules/ScheduleList";
-import { ScheduleForm, type ScheduleWorkerOption } from "@/components/schedules/ScheduleForm";
-import { ScheduleDetail } from "@/components/schedules/ScheduleDetail";
+import type { ScheduleWorkerOption } from "@/components/schedules/ScheduleForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,6 +32,30 @@ import {
   ScheduleCalendarSkeleton,
   ScheduleListSkeleton,
 } from "@/components/skeletons/page-skeletons";
+
+const ScheduleCalendar = dynamic(
+  () =>
+    import("@/components/schedules/ScheduleCalendar").then(
+      (mod) => mod.ScheduleCalendar,
+    ),
+  { ssr: false, loading: () => <ScheduleCalendarSkeleton /> },
+);
+
+const ScheduleForm = dynamic(
+  () =>
+    import("@/components/schedules/ScheduleForm").then(
+      (mod) => mod.ScheduleForm,
+    ),
+  { ssr: false },
+);
+
+const ScheduleDetail = dynamic(
+  () =>
+    import("@/components/schedules/ScheduleDetail").then(
+      (mod) => mod.ScheduleDetail,
+    ),
+  { ssr: false },
+);
 
 
 export default function SchedulesPage() {
@@ -108,8 +131,7 @@ function SchedulesDashboard() {
       const res = await api.get("/schedules?limit=1000");
       return res.data.data as CleanupSchedule[];
     },
-    refetchInterval: 5000,
-    refetchIntervalInBackground: true,
+    staleTime: 30000,
   });
 
   const activeSchedule = useMemo(() => {
