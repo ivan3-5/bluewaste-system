@@ -180,7 +180,7 @@ export class ReportController {
     try {
       const { id } = req.params;
       const files = req.files as Express.Multer.File[] | undefined;
-      const images = await ReportImageService.addImagesToReport(id, files, req.user, req.body.type);
+      const images = await ReportImageService.addImagesToReport(id, files, req.user, req.body.type, req.body.clientUploadId);
       res.status(201).json(images);
     } catch (error) {
       if (error instanceof Error && error.message === REPORT_PHOTO_LIMIT_MESSAGE) {

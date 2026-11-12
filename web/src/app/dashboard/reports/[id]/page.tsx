@@ -20,6 +20,7 @@ import {
   Users,
 } from "lucide-react";
 import {
+  CombinedReportButton,
   CopyButton,
   StatusWorkflowStepper,
   ReportDetailActionHub,
@@ -185,6 +186,12 @@ export default async function ReportDetailPage({ params }: PageProps) {
             <GenerateReportButton
               report={{ ...report, locationName: displayLocationName }}
             />
+            {report.combinedCleanupScheduleId && (
+              <CombinedReportButton
+                key={report.combinedCleanupScheduleId}
+                scheduleId={report.combinedCleanupScheduleId}
+              />
+            )}
           </ReportDetailActionHub>
         </div>
 

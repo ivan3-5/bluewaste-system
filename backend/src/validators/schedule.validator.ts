@@ -1,12 +1,13 @@
 import { z } from "zod";
 
 export const createScheduleSchema = z.object({
-  title: z.string().min(3, "Title must be at least 3 characters").max(200),
+  title: z.string().trim().min(3, "Title must be at least 3 characters").max(200),
   description: z
     .string()
+    .trim()
     .min(10, "Description must be at least 10 characters")
     .max(2000),
-  barangay: z.string().min(1, "Barangay/Location is required").max(300),
+  barangay: z.string().trim().min(1, "Barangay/Location is required").max(300),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   scheduledAt: z.string().refine((val) => !isNaN(Date.parse(val)), {
@@ -20,9 +21,9 @@ export const createScheduleSchema = z.object({
 });
 
 export const updateScheduleSchema = z.object({
-  title: z.string().min(3).max(200).optional(),
-  description: z.string().min(10).max(2000).optional(),
-  barangay: z.string().min(1).max(300).optional(),
+  title: z.string().trim().min(3).max(200).optional(),
+  description: z.string().trim().min(10).max(2000).optional(),
+  barangay: z.string().trim().min(1).max(300).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   scheduledAt: z

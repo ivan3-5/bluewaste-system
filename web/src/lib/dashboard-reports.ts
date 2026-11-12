@@ -283,7 +283,9 @@ export async function getDashboardReports(limit: number) {
 }
 
 export async function getDashboardReportById(id: string) {
-  const reports = await prisma.$queryRaw<DashboardReportRow[]>`
+  const reports = await prisma.$queryRaw<
+    (DashboardReportRow & { combinedCleanupScheduleId: string | null })[]
+  >`
     SELECT
       r.id,
       (SELECT cs."scheduledAt" FROM "CleanupSchedule" cs WHERE cs.id = r."cleanupScheduleId") AS "cleanupScheduledAt",
@@ -306,6 +308,16 @@ export async function getDashboardReportById(id: string) {
       r."aiProcessingMs",
       r."aiGeminiMs",
       r."cleanupScheduleId",
+      CASE
+        WHEN NOT r."isDeleted" AND EXISTS (
+          SELECT 1
+          FROM "Report" linked
+          WHERE linked."cleanupScheduleId" = r."cleanupScheduleId"
+            AND linked.id <> r.id
+            AND linked."isDeleted" = false
+        )
+        THEN r."cleanupScheduleId"
+      END AS "combinedCleanupScheduleId",
       COALESCE(image."imageUrl", null) AS "imageUrl",
       COALESCE(images.images, '[]'::json) AS images,
       r."reporterId",
@@ -385,7 +397,10 @@ export async function getDashboardReportById(id: string) {
     LIMIT 1
   `;
 
-  return reports[0] ? mapDashboardReport(reports[0]) : null;
+  const report = reports[0];
+  return report
+    ? { ...mapDashboardReport(report), combinedCleanupScheduleId: report.combinedCleanupScheduleId }
+    : null;
 }
 
 export async function getDashboardStats() {
@@ -599,7 +614,7 @@ async function tryAutoCompleteCleanupSchedule(
             "updatedAt" = NOW(),
             "verifiedAt" = COALESCE("verifiedAt", NOW()),
             notes = CASE
-              WHEN notes IS NULL OR notes = '' THEN 'Automatically completed: all associated waste reports have been cleaned.'
+              WHEN notes IS NULL OR notes = '' THEN 'All associated waste reports have been cleaned.'
               ELSE notes
             END
         WHERE id = ${cleanupScheduleId}
@@ -615,7 +630,7 @@ async function tryAutoCompleteCleanupSchedule(
         "updatedAt" = NOW(),
         "verifiedAt" = COALESCE("verifiedAt", NOW()),
         notes = CASE 
-          WHEN notes IS NULL OR notes = '' THEN 'Automatically completed: all associated waste reports have been cleaned.'
+          WHEN notes IS NULL OR notes = '' THEN 'All associated waste reports have been cleaned.'
           ELSE notes
         END
     WHERE cs.status IN ('UPCOMING', 'ONGOING')

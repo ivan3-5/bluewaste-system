@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Check, Copy, ExternalLink, MapPin, CheckCircle2, Circle, AlertCircle, CalendarDays } from "lucide-react";
+import { Check, Copy, ExternalLink, MapPin, CheckCircle2, Circle, AlertCircle, CalendarDays, FileText } from "lucide-react";
 import type { AdminReportStatus } from "@/lib/admin-report";
 import { ReportStatusUpdater } from "@/components/ReportStatusUpdater";
+import { CombinedReportButton } from "@/components/GenerateReportButton";
+
+export { CombinedReportButton };
 
 export function CopyButton({
   text,
@@ -223,7 +226,7 @@ export function ScheduleCleanupButton({
   }
 
   const scheduleHref = reportId
-    ? `/dashboard/schedules?scheduleReports=${encodeURIComponent(reportId)}${latitude ? `&lat=${latitude}` : ""}${longitude ? `&lng=${longitude}` : ""}${locationName ? `&barangay=${encodeURIComponent(locationName)}&locationName=${encodeURIComponent(locationName)}` : ""}`
+    ? `/dashboard/schedules?scheduleReports=${encodeURIComponent(reportId)}&reportId=${encodeURIComponent(reportId)}${latitude ? `&lat=${latitude}` : ""}${longitude ? `&lng=${longitude}` : ""}${locationName ? `&barangay=${encodeURIComponent(locationName)}&locationName=${encodeURIComponent(locationName)}` : ""}`
     : "/dashboard/schedules";
 
   return (

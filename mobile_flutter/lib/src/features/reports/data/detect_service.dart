@@ -6,6 +6,7 @@ import "../../../core/config/app_env.dart";
 import "../../../core/network/api_exception.dart";
 import "../domain/report_models.dart";
 import "tflite_service.dart";
+import "photo_upload.dart";
 
 // ── Severity levels from the AI pipeline ────────────────────────────────────
 enum WasteSeverity {
@@ -321,7 +322,7 @@ class DetectService {
 
     try {
       final form = FormData.fromMap({
-        "image": await MultipartFile.fromFile(imageFile.path),
+        "image": await prepareUploadPhoto(imageFile.path, allowGif: false),
         "latitude": latitude.toString(),
         "longitude": longitude.toString(),
         if (description != null) "description": description,

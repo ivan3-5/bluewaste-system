@@ -10,6 +10,7 @@ import {
   buildPaginatedResponse,
 } from "../utils/pagination";
 import { NotificationService } from "./notification.service";
+import { logger } from "../utils/logger";
 
 const scheduleInclude = {
   createdBy: {
@@ -39,15 +40,15 @@ const scheduleInclude = {
   },
 } satisfies Prisma.CleanupScheduleInclude;
 
+const scheduleDateFormatter = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Asia/Manila",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 export function isSameCalendarDay(d1: Date, d2: Date): boolean {
-  return (
-    (d1.getUTCFullYear() === d2.getUTCFullYear() &&
-      d1.getUTCMonth() === d2.getUTCMonth() &&
-      d1.getUTCDate() === d2.getUTCDate()) ||
-    (d1.getFullYear() === d2.getFullYear() &&
-      d1.getMonth() === d2.getMonth() &&
-      d1.getDate() === d2.getDate())
-  );
+  return scheduleDateFormatter.format(d1) === scheduleDateFormatter.format(d2);
 }
 
 export class ScheduleService {
@@ -79,270 +80,131 @@ export class ScheduleService {
       throw new Error("One or more worker IDs are invalid");
     }
 
-    const scheduledDateObj = new Date(data.scheduledAt);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (scheduledDateObj < today) {
+    const scheduledAt = new Date(data.scheduledAt);
+    if (!Number.isFinite(scheduledAt.getTime())) throw new Error("Cannot create schedule: Invalid deployment date and time");
+    const scheduleDay = scheduleDateFormatter.format(scheduledAt);
+    if (scheduleDay < scheduleDateFormatter.format(new Date())) {
       throw new Error("Cannot create schedule for a past date");
     }
+    const dayStart = new Date(`${scheduleDay}T00:00:00+08:00`);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    const reportIds = [...new Set(data.reportIds ?? [])];
 
-    // Deduplicate requested report IDs to avoid duplicate assignment in the request
-    const requestedReportIds = data.reportIds ? Array.from(new Set(data.reportIds)) : [];
-
-    // Search for an existing active cleanup schedule on the same calendar date
-    const windowStart = new Date(scheduledDateObj.getTime() - 24 * 3600 * 1000);
-    const windowEnd = new Date(scheduledDateObj.getTime() + 24 * 3600 * 1000);
-
-    const existingSameDaySchedules = await prisma.cleanupSchedule.findMany({
-      where: {
-        scheduledAt: { gte: windowStart, lte: windowEnd },
-        status: { in: [CleanupScheduleStatus.UPCOMING, CleanupScheduleStatus.ONGOING] },
-      },
-      include: {
-        reports: {
-          select: { id: true },
-        },
-        workers: {
-          select: { workerId: true },
-        },
-      },
-      orderBy: { scheduledAt: "asc" },
-    });
-
-    const targetSameDaySchedule = existingSameDaySchedules.find((s) =>
-      isSameCalendarDay(s.scheduledAt, scheduledDateObj),
-    );
-
-    // Validate waste reports if provided
-    if (requestedReportIds.length > 0) {
-      const existingReports = await prisma.report.findMany({
+    const { schedule, newWorkerIds, consolidated } = await prisma.$transaction(async (tx) => {
+      // Serialize same-day consolidation and protect linked reports from concurrent assignments.
+      await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtext(${`cleanup-schedule:${scheduleDay}`}), 0)`;
+      await tx.$queryRaw`
+        SELECT id FROM "CleanupSchedule"
+        WHERE "scheduledAt" >= ${dayStart} AND "scheduledAt" < ${dayEnd}
+          AND status IN ('UPCOMING', 'ONGOING')
+        ORDER BY id FOR UPDATE
+      `;
+      const candidates = await tx.cleanupSchedule.findMany({
         where: {
-          id: { in: requestedReportIds },
-          isDeleted: false,
-          isSpam: false,
+          scheduledAt: { gte: dayStart, lt: dayEnd },
+          status: { in: [CleanupScheduleStatus.UPCOMING, CleanupScheduleStatus.ONGOING] },
         },
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          cleanupScheduleId: true,
-          cleanupSchedule: {
-            select: { id: true, title: true, scheduledAt: true },
+        include: { workers: { orderBy: { assignedAt: "asc" }, select: { workerId: true } } },
+        orderBy: [{ scheduledAt: "asc" }, { id: "asc" }],
+        take: 1,
+      });
+      const existing = candidates[0];
+
+      let newReportIds = reportIds;
+      if (reportIds.length > 0) {
+        await tx.$queryRaw`
+          SELECT id FROM "Report" WHERE id IN (${Prisma.join(reportIds)}) ORDER BY id FOR UPDATE
+        `;
+        const reports = await tx.report.findMany({
+          where: { id: { in: reportIds }, isDeleted: false, isSpam: false },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            cleanupScheduleId: true,
+            cleanupSchedule: { select: { title: true } },
           },
-        },
-      });
-
-      if (existingReports.length !== requestedReportIds.length) {
-        throw new Error("One or more selected waste reports do not exist or were deleted");
-      }
-
-      // Check for invalid status
-      const invalidStatusReports = existingReports.filter(
-        (r) => r.status === "REJECTED" || r.status === "CLEANED",
-      );
-      if (invalidStatusReports.length > 0) {
-        const invalidTitles = invalidStatusReports
-          .map((r) => `"${r.title}" (${r.status})`)
-          .join(", ");
-        throw new Error(
-          `Cannot schedule report(s) that are already completed or rejected: ${invalidTitles}`,
-        );
-      }
-
-      // Check if any report is already assigned to a schedule on a DIFFERENT date
-      const assignedToOtherDate = existingReports.filter((r) => {
-        if (!r.cleanupScheduleId) return false;
-        // If this report belongs to the same-day schedule we are consolidating into, allow it
-        if (targetSameDaySchedule && r.cleanupScheduleId === targetSameDaySchedule.id) {
-          return false;
+        });
+        if (reports.length !== reportIds.length) {
+          throw new Error("One or more selected waste reports do not exist or were deleted");
         }
-        // If assigned to a schedule on another date, reject
-        if (r.cleanupSchedule?.scheduledAt) {
-          const isSameDay = isSameCalendarDay(r.cleanupSchedule.scheduledAt, scheduledDateObj);
-          return !isSameDay;
+        const invalid = reports.filter((report) => report.status === "REJECTED" || report.status === "CLEANED");
+        if (invalid.length > 0) {
+          const titles = invalid.map((report) => `"${report.title}" (${report.status})`).join(", ");
+          throw new Error(`Cannot schedule report(s) that are already completed or rejected: ${titles}`);
         }
-        return true;
-      });
-
-      if (assignedToOtherDate.length > 0) {
-        const conflictTitles = assignedToOtherDate
-          .map(
-            (r) =>
-              `"${r.title}" (already in "${r.cleanupSchedule?.title || r.status}")`,
-          )
-          .join(", ");
-        throw new Error(
-          `Cannot create schedule: Waste report(s) already assigned to a cleanup schedule on another date: ${conflictTitles}`,
-        );
+        const conflicting = reports.filter((report) => report.cleanupScheduleId && report.cleanupScheduleId !== existing?.id);
+        if (conflicting.length > 0) {
+          const titles = conflicting.map((report) => `"${report.title}" (already in "${report.cleanupSchedule?.title ?? report.status}")`).join(", ");
+          throw new Error(`Cannot create schedule: Waste report(s) already assigned to a different cleanup schedule: ${titles}`);
+        }
+        newReportIds = reports.filter((report) => !report.cleanupScheduleId).map((report) => report.id);
       }
-    }
 
-    // ── AUTOMATIC CONSOLIDATION: Append to existing schedule on the same date ──
-    if (targetSameDaySchedule) {
-      const scheduleId = targetSameDaySchedule.id;
-      const existingReportIds = targetSameDaySchedule.reports.map((r) => r.id);
-      const newReportIds = requestedReportIds.filter(
-        (id) => !existingReportIds.includes(id),
-      );
+      const existingWorkerIds = existing?.workers.map((worker) => worker.workerId) ?? [];
+      const newWorkerIds = data.workerIds.filter((id) => !existingWorkerIds.includes(id));
+      const workerIds = [...existingWorkerIds, ...newWorkerIds];
+      const equipment = [...new Set([...(existing?.equipment ?? []), ...(data.equipment ?? [])])];
 
-      const existingWorkerIds = targetSameDaySchedule.workers.map((w) => w.workerId);
-      const newWorkerIds = data.workerIds.filter(
-        (wId) => !existingWorkerIds.includes(wId),
-      );
-      const allWorkerIds = Array.from(new Set([...existingWorkerIds, ...data.workerIds]));
-
-      const existingEquipment = targetSameDaySchedule.equipment || [];
-      const combinedEquipment = Array.from(
-        new Set([...existingEquipment, ...(data.equipment || [])]),
-      );
-
-      // Execute consolidation within a database transaction
-      await prisma.$transaction(async (tx) => {
-        // Link new reports to the existing schedule
-        if (newReportIds.length > 0) {
-          await tx.cleanupSchedule.update({
-            where: { id: scheduleId },
+      const schedule = existing
+        ? await tx.cleanupSchedule.update({
+            where: { id: existing.id },
             data: {
-              reports: {
-                connect: newReportIds.map((id) => ({ id })),
-              },
-              equipment: combinedEquipment,
+              equipment,
+              workers: { create: newWorkerIds.map((workerId) => ({ workerId })) },
+            },
+          })
+        : await tx.cleanupSchedule.create({
+            data: {
+              title: data.title,
+              description: data.description,
+              barangay: data.barangay,
+              latitude: data.latitude,
+              longitude: data.longitude,
+              scheduledAt,
+              createdById: adminId,
+              equipment,
+              workers: { create: workerIds.map((workerId) => ({ workerId })) },
             },
           });
 
-          await tx.report.updateMany({
-            where: { id: { in: newReportIds } },
-            data: {
-              status: "CLEANUP_SCHEDULED",
-              cleanupScheduleId: scheduleId,
-              assignedToId: allWorkerIds[0] || null,
-            },
-          });
-
-          const historyData = newReportIds.map((id) => ({
-            reportId: id,
-            newStatus: "CLEANUP_SCHEDULED" as const,
-            notes: `Consolidated into Cleanup Schedule: "${targetSameDaySchedule.title}" on ${scheduledDateObj.toLocaleDateString("en-US")}`,
+      if (newReportIds.length > 0) {
+        const status = existing?.status === CleanupScheduleStatus.ONGOING
+          ? ReportStatus.IN_PROGRESS
+          : ReportStatus.CLEANUP_SCHEDULED;
+        await tx.report.updateMany({
+          where: { id: { in: newReportIds } },
+          data: { status, cleanupScheduleId: schedule.id, assignedToId: workerIds[0] },
+        });
+        await tx.statusHistory.createMany({
+          data: newReportIds.map((reportId) => ({
+            reportId,
+            newStatus: status,
+            notes: `Assigned to Cleanup Schedule: ${schedule.title}`,
             changedById: adminId,
-          }));
-          await tx.statusHistory.createMany({ data: historyData });
-        } else {
-          // Update equipment if any new gear was specified
-          if (data.equipment && data.equipment.length > 0) {
-            await tx.cleanupSchedule.update({
-              where: { id: scheduleId },
-              data: { equipment: combinedEquipment },
-            });
-          }
-        }
-
-        // Add any newly assigned workers
-        if (newWorkerIds.length > 0) {
-          await tx.cleanupScheduleWorker.createMany({
-            data: newWorkerIds.map((workerId) => ({
-              scheduleId,
-              workerId,
-            })),
-            skipDuplicates: true,
-          });
-        }
-      });
-
-      // Notify newly assigned workers
-      if (newWorkerIds.length > 0) {
-        const scheduledDate = scheduledDateObj.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        });
-        await Promise.all(
-          newWorkerIds.map((workerId) =>
-            NotificationService.create({
-              userId: workerId,
-              title: "Consolidated Cleanup Schedule Assigned",
-              message: `You have been assigned to consolidated cleanup "${targetSameDaySchedule.title}" at ${targetSameDaySchedule.barangay} on ${scheduledDate}.`,
-              type: "CLEANUP_SCHEDULE",
-            }),
-          ),
-        );
-      }
-
-      // Return fully hydrated consolidated schedule
-      const consolidated = await prisma.cleanupSchedule.findUnique({
-        where: { id: scheduleId },
-        include: scheduleInclude,
-      });
-
-      return consolidated!;
-    }
-
-    // ── NEW SCHEDULE: Create a brand new consolidated schedule ──────────────
-    const schedule = await prisma.cleanupSchedule.create({
-      data: {
-        title: data.title,
-        description: data.description,
-        barangay: data.barangay,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        scheduledAt: scheduledDateObj,
-        createdById: adminId,
-        equipment: data.equipment || [],
-        workers: {
-          create: data.workerIds.map((workerId) => ({
-            workerId,
           })),
-        },
-        reports:
-          requestedReportIds.length > 0
-            ? {
-                connect: requestedReportIds.map((id) => ({ id })),
-              }
-            : undefined,
-      },
-      include: scheduleInclude,
-    });
-
-    if (requestedReportIds.length > 0) {
-      await prisma.report.updateMany({
-        where: { id: { in: requestedReportIds } },
-        data: { status: "CLEANUP_SCHEDULED" },
-      });
-
-      // Add status history
-      const historyData = requestedReportIds.map((id) => ({
-        reportId: id,
-        newStatus: "CLEANUP_SCHEDULED" as const,
-        notes: `Assigned to Cleanup Schedule: ${data.title}`,
-        changedById: adminId,
-      }));
-      await prisma.statusHistory.createMany({ data: historyData });
-
-      // Sync assignedToId on linked reports so Report Management shows the worker
-      if (data.workerIds.length > 0) {
-        const primaryWorkerId = data.workerIds[0];
-        await prisma.report.updateMany({
-          where: { id: { in: requestedReportIds } },
-          data: { assignedToId: primaryWorkerId },
         });
       }
-    }
 
-    // Notify assigned workers
-    const scheduledDate = scheduledDateObj.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    await Promise.all(
-      data.workerIds.map((workerId) =>
-        NotificationService.create({
-          userId: workerId,
-          title: "New Cleanup Schedule Assigned",
-          message: `You have been assigned to "${data.title}" at ${data.barangay} on ${scheduledDate}.`,
-          type: "CLEANUP_SCHEDULE",
+      return {
+        schedule: await tx.cleanupSchedule.findUniqueOrThrow({
+          where: { id: schedule.id },
+          include: scheduleInclude,
         }),
-      ),
-    );
+        newWorkerIds,
+        consolidated: Boolean(existing),
+      };
+    });
+
+    const date = scheduleDateFormatter.format(schedule.scheduledAt);
+    await Promise.all(newWorkerIds.map((workerId) =>
+      NotificationService.create({
+        userId: workerId,
+        title: consolidated ? "Consolidated Cleanup Schedule Assigned" : "New Cleanup Schedule Assigned",
+        message: `You have been assigned to "${schedule.title}" at ${schedule.barangay} on ${date}.`,
+        type: "CLEANUP_SCHEDULE",
+      }).catch((error) => logger.warn({ err: error, scheduleId: schedule.id, workerId }, "Could not notify schedule worker")),
+    ));
 
     return schedule;
   }
@@ -584,103 +446,94 @@ export class ScheduleService {
 
   static async updateStatus(
     id: string,
-    status: string,
+    status: CleanupScheduleStatus,
     userId: string,
     notes?: string,
+    isWorker = false,
   ) {
-    const existing = await prisma.cleanupSchedule.findUnique({
-      where: { id },
-      include: {
-        workers: { select: { workerId: true } },
-      },
-    });
-
-    if (!existing) {
-      throw new Error("Schedule not found");
-    }
-
-    const updateData: Prisma.CleanupScheduleUpdateInput = {
-      status: status as CleanupScheduleStatus,
-    };
-
-    if (notes !== undefined) {
-      updateData.notes = notes;
-    }
-
-    // If admin verifies as completed, record the verifier
-    if (status === "COMPLETED") {
-      const reports = await prisma.report.findMany({
-        where: { cleanupScheduleId: id, isDeleted: false },
-        select: { id: true, status: true },
+    const { schedule, workerIds, changed } = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "CleanupSchedule" WHERE id = ${id} FOR UPDATE`;
+      const existing = await tx.cleanupSchedule.findUnique({
+        where: { id },
+        include: { workers: { select: { workerId: true } } },
       });
+      if (!existing) throw new Error("Schedule not found");
 
-      if (reports.length > 0) {
-        const uncleanedReports = reports.filter(
-          (r) => r.status !== ReportStatus.CLEANED,
-        );
-        if (uncleanedReports.length > 0) {
+      const workerIds = existing.workers.map((worker) => worker.workerId);
+      if (isWorker && !workerIds.includes(userId)) {
+        throw new Error("Insufficient permissions.");
+      }
+      if (isWorker && status !== existing.status &&
+          !(existing.status === "UPCOMING" && status === "ONGOING") &&
+          !(existing.status === "ONGOING" && status === "COMPLETED")) {
+        throw new Error("This schedule status has changed. Refresh and try again.");
+      }
+      if (status === existing.status && notes === undefined) {
+        return {
+          schedule: await tx.cleanupSchedule.findUniqueOrThrow({ where: { id }, include: scheduleInclude }),
+          workerIds,
+          changed: false,
+        };
+      }
+
+      const updateData: Prisma.CleanupScheduleUpdateInput = {
+        status,
+        ...(notes !== undefined ? { notes } : {}),
+      };
+      if (status === "COMPLETED") {
+        const reports = await tx.report.findMany({
+          where: { cleanupScheduleId: id, isDeleted: false },
+          select: { status: true },
+        });
+        const uncleaned = reports.filter((report) => report.status !== ReportStatus.CLEANED).length;
+        if (uncleaned > 0) {
           throw new Error(
-            `Cannot mark cleanup schedule as completed: ${uncleanedReports.length} of ${reports.length} report location(s) are not yet cleaned. All associated locations must be cleaned first.`,
+            `Cannot mark cleanup schedule as completed: ${uncleaned} of ${reports.length} report location(s) are not yet cleaned. All associated locations must be cleaned first.`,
           );
+        }
+        if (existing.status !== "COMPLETED") {
+          updateData.verifiedBy = { connect: { id: userId } };
+          updateData.verifiedAt = new Date();
+        }
+      } else if (existing.status === "COMPLETED") {
+        updateData.verifiedBy = { disconnect: true };
+        updateData.verifiedAt = null;
+      }
+
+      if (status === "ONGOING" || status === "CANCELLED") {
+        const reportStatus = status === "ONGOING" ? ReportStatus.IN_PROGRESS : ReportStatus.VERIFIED;
+        const where: Prisma.ReportWhereInput = {
+          cleanupScheduleId: id,
+          ...(status === "ONGOING" ? { isDeleted: false, status: ReportStatus.CLEANUP_SCHEDULED } : {}),
+        };
+        const reports = await tx.report.updateManyAndReturn({
+          where,
+          data: { status: reportStatus, ...(status === "CANCELLED" ? { cleanupScheduleId: null } : {}) },
+          select: { id: true },
+        });
+        if (reports.length > 0) {
+          await tx.statusHistory.createMany({
+            data: reports.map(({ id: reportId }) => ({
+              reportId,
+              newStatus: reportStatus,
+              notes: status === "ONGOING"
+                ? `Cleanup operation started for schedule "${existing.title}".`
+                : `Cleanup schedule cancelled (${notes || "No reason specified"}). Report returned to verified pool.`,
+              changedById: userId,
+            })),
+          });
         }
       }
 
-      updateData.verifiedBy = { connect: { id: userId } };
-      updateData.verifiedAt = new Date();
-    }
-
-    const schedule = await prisma.cleanupSchedule.update({
-      where: { id },
-      data: updateData,
-      include: scheduleInclude,
+      const schedule = await tx.cleanupSchedule.update({
+        where: { id },
+        data: updateData,
+        include: scheduleInclude,
+      });
+      return { schedule, workerIds, changed: status !== existing.status };
     });
 
-    if (status === "ONGOING") {
-      const pendingReports = await prisma.report.findMany({
-        where: {
-          cleanupScheduleId: id,
-          status: ReportStatus.CLEANUP_SCHEDULED,
-          isDeleted: false,
-        },
-        select: { id: true },
-      });
-
-      if (pendingReports.length > 0) {
-        const reportIds = pendingReports.map((r) => r.id);
-        await prisma.report.updateMany({
-          where: { id: { in: reportIds } },
-          data: { status: ReportStatus.IN_PROGRESS },
-        });
-
-        const historyData = reportIds.map((reportId) => ({
-          reportId,
-          newStatus: ReportStatus.IN_PROGRESS,
-          notes: `Cleanup operation started for schedule "${existing.title}".`,
-          changedById: userId,
-        }));
-        await prisma.statusHistory.createMany({ data: historyData });
-      }
-    } else if (status === "CANCELLED") {
-      const reports = await prisma.report.findMany({
-        where: { cleanupScheduleId: id },
-      });
-
-      if (reports.length > 0) {
-        await prisma.report.updateMany({
-          where: { cleanupScheduleId: id },
-          data: { status: "VERIFIED", cleanupScheduleId: null },
-        });
-
-        const historyData = reports.map((r) => ({
-          reportId: r.id,
-          newStatus: "VERIFIED" as const,
-          notes: `Cleanup Schedule cancelled (${notes || "No reason specified"}). Report returned to verified pool.`,
-          changedById: userId,
-        }));
-        await prisma.statusHistory.createMany({ data: historyData });
-      }
-    }
-
+    if (!changed) return schedule;
     // Notify assigned workers about status change
     const statusLabels: Record<string, string> = {
       UPCOMING: "Upcoming",
@@ -690,13 +543,13 @@ export class ScheduleService {
     };
 
     await Promise.all(
-      existing.workers.map((w) =>
+      workerIds.map((workerId) =>
         NotificationService.create({
-          userId: w.workerId,
+          userId: workerId,
           title: "Cleanup Schedule Updated",
-          message: `"${existing.title}" status changed to ${statusLabels[status] || status}.`,
+          message: `"${schedule.title}" status changed to ${statusLabels[status] || status}.`,
           type: "CLEANUP_SCHEDULE",
-        }),
+        }).catch(() => {}),
       ),
     );
 
@@ -776,7 +629,7 @@ export class ScheduleService {
           verifiedAt: schedule.verifiedAt ?? new Date(),
           notes: schedule.notes
             ? schedule.notes
-            : "Automatically completed: all associated waste reports have been cleaned.",
+            : "All associated waste reports have been cleaned.",
         };
 
         if (verifierId) {
@@ -784,7 +637,14 @@ export class ScheduleService {
         }
 
         const updated = await prisma.cleanupSchedule.update({
-          where: { id: scheduleId },
+          where: {
+            id: scheduleId,
+            status: { in: ["UPCOMING", "ONGOING"] },
+            reports: {
+              some: { isDeleted: false },
+              none: { isDeleted: false, status: { not: ReportStatus.CLEANED } },
+            },
+          },
           data: updateData,
           include: scheduleInclude,
         });
@@ -814,7 +674,7 @@ export class ScheduleService {
         )
       ) {
         const updated = await prisma.cleanupSchedule.update({
-          where: { id: scheduleId },
+          where: { id: scheduleId, status: "UPCOMING" },
           data: { status: "ONGOING" },
           include: scheduleInclude,
         });
@@ -858,17 +718,27 @@ export class ScheduleService {
 
       if (toComplete.length === 0) return 0;
 
+      let completed = 0;
       for (const schedule of toComplete) {
-        await prisma.cleanupSchedule.update({
-          where: { id: schedule.id },
+        const update = await prisma.cleanupSchedule.updateMany({
+          where: {
+            id: schedule.id,
+            status: { in: ["UPCOMING", "ONGOING"] },
+            reports: {
+              some: { isDeleted: false },
+              none: { isDeleted: false, status: { not: ReportStatus.CLEANED } },
+            },
+          },
           data: {
             status: "COMPLETED",
             verifiedAt: schedule.verifiedAt ?? new Date(),
             notes:
               schedule.notes ||
-              "Automatically completed: all associated waste reports have been cleaned.",
+              "All associated waste reports have been cleaned.",
           },
         });
+        if (update.count === 0) continue;
+        completed++;
 
         // Notify workers
         await Promise.all(
@@ -883,7 +753,7 @@ export class ScheduleService {
         );
       }
 
-      return toComplete.length;
+      return completed;
     } catch (error) {
       console.warn("Failed to reconcile cleanup schedules:", error);
       return 0;
@@ -953,8 +823,10 @@ export class ScheduleService {
     const now = new Date();
     const schedules = await prisma.cleanupSchedule.findMany({
       where: {
-        status: { in: ["UPCOMING", "ONGOING"] },
-        scheduledAt: { gte: now },
+        OR: [
+          { status: "UPCOMING", scheduledAt: { gte: now } },
+          { status: "ONGOING" },
+        ],
       },
       include: {
         createdBy: {
@@ -1110,6 +982,13 @@ export class ScheduleService {
       updatedAt: r.updatedAt.toISOString(),
     }));
 
+    const cleanedNotes = schedule.notes
+      ? schedule.notes.replace(/^Automatically completed:\s*/i, "").trim()
+      : schedule.notes;
+    const finalNotes = cleanedNotes
+      ? cleanedNotes.charAt(0).toUpperCase() + cleanedNotes.slice(1)
+      : cleanedNotes;
+
     return {
       scheduleId: schedule.id,
       scheduleTitle: schedule.title,
@@ -1117,7 +996,7 @@ export class ScheduleService {
       barangay: schedule.barangay,
       scheduledAt: schedule.scheduledAt.toISOString(),
       overallStatus: schedule.status,
-      notes: schedule.notes,
+      notes: finalNotes,
       completionInfo: {
         completedAt:
           schedule.status === "COMPLETED"
@@ -1130,7 +1009,7 @@ export class ScheduleService {
               name: `${schedule.verifiedBy.firstName} ${schedule.verifiedBy.lastName}`,
             }
           : null,
-        notes: schedule.notes,
+        notes: finalNotes,
       },
       summary: {
         totalReports,

@@ -25,6 +25,15 @@ beforeEach(() => {
 });
 
 describe("report photos", () => {
+  it("returns the already stored cleanup photo on retry even when the task is full", async () => {
+    prismaMock.reportImage.findUnique.mockResolvedValue({ id: "saved" } as never);
+
+    await expect(ReportImageService.addImagesToReport("report", [file], worker, "CLEANUP", "queue-0"))
+      .resolves.toEqual([{ id: "saved" }]);
+
+    expect(prismaMock.reportImage.count).not.toHaveBeenCalled();
+    expect(CloudinaryService.uploadImage).not.toHaveBeenCalled();
+  });
   it("accepts a fifth cleanup photo without rerunning waste analysis", async () => {
     prismaMock.reportImage.count.mockResolvedValue(4);
     prismaMock.reportImage.create.mockResolvedValue({ id: "photo" } as never);

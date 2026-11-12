@@ -2,6 +2,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { prismaMock } from "../../src/__mocks__/prisma";
 import { ScheduleService, isSameCalendarDay } from "../../src/services/schedule.service";
 import { CleanupScheduleStatus, ReportStatus, WasteCategory, Severity } from "@prisma/client";
+import fs from "node:fs";
+import { validate } from "../../src/middleware/validate";
+import { createScheduleSchema } from "../../src/validators/schedule.validator";
+import { NotificationService } from "../../src/services/notification.service";
 
 vi.mock("../../src/services/notification.service", () => ({
   NotificationService: {
@@ -88,10 +92,34 @@ describe("Schedule Consolidation Service", () => {
       const d2 = new Date("2027-01-16T08:00:00Z");
       expect(isSameCalendarDay(d1, d2)).toBe(false);
     });
+
+    it("splits dates at Panabo midnight even within the same UTC date", () => {
+      expect(isSameCalendarDay(new Date("2027-01-15T15:59:00Z"), new Date("2027-01-15T16:00:00Z"))).toBe(false);
+    });
+  });
+
+  it("returns schedule field errors without writing to a serverless filesystem", () => {
+    const write = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {
+      throw Object.assign(new Error("Read-only file system"), { code: "EROFS" });
+    });
+    try {
+      const json = vi.fn();
+      const status = vi.fn().mockReturnValue({ json });
+      const next = vi.fn();
+      validate(createScheduleSchema)({ body: { description: "  short  " } } as never, { status } as never, next);
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledWith(expect.objectContaining({
+        details: expect.arrayContaining([{ field: "description", message: "Description must be at least 10 characters" }]),
+      }));
+      expect(write).not.toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalled();
+    } finally {
+      write.mockRestore();
+    }
   });
 
   describe("1. Multiple Citizens & Reports Scheduling", () => {
-    it("groups multiple reports from different citizens into one cleanup schedule", async () => {
+    it("saves and links reports in one transaction even if a worker notification fails", async () => {
       prismaMock.user.findMany.mockResolvedValue([worker1] as never);
       prismaMock.cleanupSchedule.findMany.mockResolvedValue([]); // No existing schedule on this date
       prismaMock.report.findMany.mockResolvedValue([report1, report2] as never);
@@ -113,8 +141,10 @@ describe("Schedule Consolidation Service", () => {
       };
 
       prismaMock.cleanupSchedule.create.mockResolvedValue(createdSchedule as never);
+      prismaMock.cleanupSchedule.findUniqueOrThrow.mockResolvedValue(createdSchedule as never);
       prismaMock.report.updateMany.mockResolvedValue({ count: 2 });
       prismaMock.statusHistory.createMany.mockResolvedValue({ count: 2 });
+      vi.mocked(NotificationService.create).mockRejectedValueOnce(new Error("Notification unavailable"));
 
       const result = await ScheduleService.create(
         {
@@ -132,9 +162,10 @@ describe("Schedule Consolidation Service", () => {
       );
 
       expect(prismaMock.cleanupSchedule.create).toHaveBeenCalled();
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
       expect(prismaMock.report.updateMany).toHaveBeenCalledWith({
         where: { id: { in: [report1.id, report2.id] } },
-        data: { status: "CLEANUP_SCHEDULED" },
+        data: { status: "CLEANUP_SCHEDULED", cleanupScheduleId: createdSchedule.id, assignedToId: worker1.id },
       });
       expect(result.id).toBe("schedule-uuid-1");
       expect(result.reports).toHaveLength(2);
@@ -180,7 +211,7 @@ describe("Schedule Consolidation Service", () => {
         reports: [report1, report2],
         equipment: ["Garbage Bags", "Trash Pickers"],
       };
-      prismaMock.cleanupSchedule.findUnique.mockResolvedValue(consolidatedFull as never);
+      prismaMock.cleanupSchedule.findUniqueOrThrow.mockResolvedValue(consolidatedFull as never);
 
       const result = await ScheduleService.create(
         {
@@ -236,7 +267,7 @@ describe("Schedule Consolidation Service", () => {
           },
           "admin-1",
         ),
-      ).rejects.toThrow("already assigned to a cleanup schedule on another date");
+      ).rejects.toThrow("already assigned to a different cleanup schedule");
     });
 
     it("rejects scheduling reports that are already marked as CLEANED or REJECTED", async () => {
@@ -274,15 +305,15 @@ describe("Schedule Consolidation Service", () => {
       };
       prismaMock.cleanupSchedule.findUnique.mockResolvedValue(existing as never);
       prismaMock.cleanupSchedule.update.mockResolvedValue({ ...existing, status: CleanupScheduleStatus.ONGOING } as never);
-      prismaMock.report.findMany.mockResolvedValue([{ id: report1.id }, { id: report2.id }] as never);
-      prismaMock.report.updateMany.mockResolvedValue({ count: 2 });
+      prismaMock.report.updateManyAndReturn.mockResolvedValue([{ id: report1.id }, { id: report2.id }] as never);
       prismaMock.statusHistory.createMany.mockResolvedValue({ count: 2 });
 
       await ScheduleService.updateStatus("sched-1", "ONGOING", "worker-1");
 
-      expect(prismaMock.report.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: [report1.id, report2.id] } },
+      expect(prismaMock.report.updateManyAndReturn).toHaveBeenCalledWith({
+        where: { cleanupScheduleId: "sched-1", isDeleted: false, status: ReportStatus.CLEANUP_SCHEDULED },
         data: { status: ReportStatus.IN_PROGRESS },
+        select: { id: true },
       });
     });
 
@@ -351,7 +382,7 @@ describe("Schedule Consolidation Service", () => {
 
       expect(prismaMock.cleanupSchedule.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: "sched-1" },
+          where: expect.objectContaining({ id: "sched-1", status: { in: ["UPCOMING", "ONGOING"] } }),
           data: expect.objectContaining({
             status: "COMPLETED",
           }),

@@ -36,12 +36,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { CleanupSchedule, SCHEDULE_STATUS_COLORS, SCHEDULE_STATUS_LABELS } from "@/types";
 import { ScheduleDetail } from "@/components/schedules/ScheduleDetail";
-import { ConsolidatedReportModal } from "@/components/schedules/ConsolidatedReportModal";
 
 export default function FieldWorkerDashboard() {
   const [selectedSchedule, setSelectedSchedule] = useState<CleanupSchedule | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [reportModalScheduleId, setReportModalScheduleId] = useState<string | null>(null);
   const [expandedSchedules, setExpandedSchedules] = useState<Record<string, boolean>>({});
 
   const toggleScheduleExpand = (id: string) => {
@@ -408,15 +406,6 @@ export default function FieldWorkerDashboard() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setReportModalScheduleId(sched.id)}
-                          className="rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-xs font-bold h-9 px-3 gap-1.5"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                          Combined Report
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
                           onClick={() => {
                             setSelectedSchedule(sched);
                             setIsDetailOpen(true);
@@ -594,15 +583,6 @@ export default function FieldWorkerDashboard() {
           onEdit={() => {}}
           onDelete={async () => {}}
           isAdmin={false}
-        />
-      )}
-
-      {/* Consolidated Mission Report Modal */}
-      {reportModalScheduleId && (
-        <ConsolidatedReportModal
-          scheduleId={reportModalScheduleId}
-          isOpen={Boolean(reportModalScheduleId)}
-          onClose={() => setReportModalScheduleId(null)}
         />
       )}
     </div>

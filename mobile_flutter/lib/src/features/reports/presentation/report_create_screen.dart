@@ -6,15 +6,14 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:geolocator/geolocator.dart";
 import "package:image_picker/image_picker.dart";
 import "package:latlong2/latlong.dart";
-import "package:dio/dio.dart";
 
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
-import "../../../core/config/app_env.dart";
 import "../../../core/network/api_exception.dart";
 import "../../../core/providers.dart";
 import "../data/report_service.dart";
+import "../data/reporting_zones.dart";
 import "../data/offline_service.dart";
 import "../data/detect_service.dart";
 import "../domain/report_models.dart";
@@ -49,9 +48,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
   // ── AI analysis state ───────────────────────────────────────────────────
   bool _isDetecting = false;
-  int? _detectedWasteCount; // null = not yet run; 0 = no waste
-  bool _isSpamFlagged = false;
-  bool _detectionFailed = false; // true = server unreachable
+  String? _detectionError;
+  int _analysisRequest = 0;
+  int _locationRequest = 0;
   DetectResult? _detectResult; // full pipeline result (set after detect runs)
   // Submission result card state
   bool _showResultCard = false;
@@ -64,14 +63,15 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   bool get _hasLocation => _latitude != null && _longitude != null;
 
   /// Detection must have run successfully before submission is allowed.
-  bool get _detectionReady => _detectedWasteCount != null && !_detectionFailed;
+  bool get _detectionReady => _detectResult != null;
+  bool get _isSpamFlagged => _detectResult?.isSpam == true;
   // ── helpers ───────────────────────────────────────────────────────────────
 
   /// Resets all detection state to pristine (call when image is removed).
   void _resetDetection() {
-    _detectedWasteCount = null;
-    _isSpamFlagged = false;
-    _detectionFailed = false;
+    _analysisRequest++;
+    _isDetecting = false;
+    _detectionError = null;
     _detectResult = null;
     _category = "with_waste";
   }
@@ -91,15 +91,13 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
   // ── Detection ─────────────────────────────────────────────────────────────
 
-  /// Calls the backend /ai/analyze-report endpoint and handles the result in-place.
-  /// Always called after a new image is picked.
   Future<void> _runDetection(XFile pickedFile) async {
-    if (!mounted) return;
+    if (!mounted || _images.isEmpty || _images.first != pickedFile) return;
+    final request = ++_analysisRequest;
     setState(() {
       _isDetecting = true;
-      _detectionFailed = false;
-      _detectedWasteCount = null;
-      _isSpamFlagged = false;
+      _detectionError = null;
+      _detectResult = null;
     });
 
     DetectResult? result;
@@ -125,29 +123,24 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       errorMessage = "Photo analysis failed unexpectedly. Please try again.";
     }
 
-    if (!mounted) return;
+    if (!mounted || request != _analysisRequest) return;
 
-    if (errorMessage != null) {
-      // Server error/unreachable — remove the image and block submission.
+    if (errorMessage != null || result?.severity == WasteSeverity.unknown || result == null) {
       setState(() {
-        _images.clear();
         _isDetecting = false;
-        _detectionFailed = true;
+        _detectionError = errorMessage ?? "Could not analyze this photo.";
       });
-      _showMessage("❌ Analysis error: $errorMessage");
       return;
     }
 
-    final detectedResult = result!;
+    final detectedResult = result;
     final detectedCategory = detectedResult.hasWaste
         ? "with_waste"
         : "no_waste";
     setState(() {
       _isDetecting = false;
-      _detectedWasteCount = detectedResult.wasteCount;
       _detectResult = detectedResult;
       _category = detectedCategory;
-      _isSpamFlagged = false; // may be updated by dialog below
     });
 
     if (!detectedResult.hasWaste || detectedResult.isSpam) {
@@ -177,7 +170,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.destructive,
             ),
-            child: const Text("Submit Anyway"),
+            child: const Text("Continue Anyway"),
           ),
         ],
       ),
@@ -187,13 +180,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
     if (action == _NoWasteAction.retake || action == null) {
       setState(() {
-        _images.clear();
+        _images.removeAt(0);
         _resetDetection();
       });
-    } else {
-      // Submit Anyway — mark as spam flagged and submit directly quickly
-      setState(() => _isSpamFlagged = true);
-      await _submitReport(isDirectSpamSubmit: true);
+      if (_images.isNotEmpty) await _runDetection(_images.first);
     }
   }
 
@@ -204,9 +194,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       source: ImageSource.camera,
       imageQuality: 75,
     );
-    if (picked == null) {
-      return;
-    }
+    if (!mounted || picked == null || _images.length >= 5 || _isSubmitting) return;
 
     setState(() {
       _images.add(picked);
@@ -227,7 +215,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       source: ImageSource.gallery,
       imageQuality: 75,
     );
-    if (picked == null) return;
+    if (!mounted || picked == null || _images.length >= 5 || _isSubmitting) return;
 
     setState(() {
       _images.add(picked);
@@ -242,6 +230,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
+    final request = ++_locationRequest;
     final enabled = await Geolocator.isLocationServiceEnabled();
     if (!enabled) {
       // Offer to open location settings so the user can enable services.
@@ -283,37 +272,32 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       return;
     }
 
-    final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 10),
-    );
-
-    // Validate against active reporting zones
-    final outside = await _checkOutsideZones(
-      position.latitude,
-      position.longitude,
-    );
-
-    if (!mounted) return;
-
-    if (outside) {
-      // Reports are only allowed inside admin-defined zones; keep the old
-      // location (if any) and ask the user to mark one on the map instead.
-      if (!_hasLocation) setState(() => _isOutsideZone = true);
-      _showMessage(
-        "Your current location is outside the reporting zones. Use \"Mark on Map\" to pick a spot inside a zone.",
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
       );
-      return;
+      final zones = await ReportingZones().load();
+      if (!mounted || request != _locationRequest) return;
+      final point = LatLng(position.latitude, position.longitude);
+      if (!isInsideReportingZones(point, zones)) {
+        if (!_hasLocation) setState(() => _isOutsideZone = true);
+        _showMessage('Your current location is outside the reporting zones. Use "Mark on Map" to choose a spot inside a zone.');
+        return;
+      }
+      setState(() {
+        _latitude = point.latitude;
+        _longitude = point.longitude;
+        _isOutsideZone = false;
+      });
+    } catch (error) {
+      if (!mounted || request != _locationRequest) return;
+      _showMessage(error is ApiException ? error.message : 'Could not get your current location. Use "Mark on Map" to choose it.');
     }
-
-    setState(() {
-      _latitude = position.latitude;
-      _longitude = position.longitude;
-      _isOutsideZone = false;
-    });
   }
 
   Future<void> _markLocationOnMap() async {
+    _locationRequest++;
     final picked = await Navigator.of(context).push<LatLng>(
       MaterialPageRoute(
         builder: (_) => LocationPickerScreen(
@@ -331,70 +315,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     });
   }
 
-  /// Returns true if [lat]/[lng] is NOT inside any active reporting zone.
-  /// Treated as outside when zones can't be loaded or none are active, since
-  /// reporting is only allowed inside admin-defined zones.
-  Future<bool> _checkOutsideZones(double lat, double lng) async {
-    try {
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: AppEnv.apiBaseUrl,
-          connectTimeout: const Duration(seconds: 6),
-          receiveTimeout: const Duration(seconds: 6),
-        ),
-      );
-      final response = await dio.get<List<dynamic>>(
-        "/reporting-zones",
-        queryParameters: <String, dynamic>{"activeOnly": "true"},
-      );
-      final zones = response.data;
-      if (zones == null || zones.isEmpty) return true;
-      for (final zone in zones) {
-        final coords = (zone["coordinates"] as List<dynamic>)
-            .map(
-              (c) => <String, double>{
-                "lat": (c["lat"] as num).toDouble(),
-                "lng": (c["lng"] as num).toDouble(),
-              },
-            )
-            .toList();
-        if (_pointInPolygon(lat, lng, coords)) return false;
-      }
-      return true;
-    } catch (_) {
-      return true;
-    }
-  }
-
-  /// Ray-casting point-in-polygon test.
-  bool _pointInPolygon(
-    double lat,
-    double lng,
-    List<Map<String, double>> polygon,
-  ) {
-    bool inside = false;
-    final n = polygon.length;
-    int j = n - 1;
-    for (int i = 0; i < n; i++) {
-      final xi = polygon[i]["lng"]!;
-      final yi = polygon[i]["lat"]!;
-      final xj = polygon[j]["lng"]!;
-      final yj = polygon[j]["lat"]!;
-      final intersect =
-          ((yi > lat) != (yj > lat)) &&
-          (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
-      if (intersect) inside = !inside;
-      j = i;
-    }
-    return inside;
-  }
-
-  Future<void> _submitReport({bool isDirectSpamSubmit = false}) async {
+  Future<void> _submitReport() async {
+    if (_isSubmitting || _isDetecting) return;
     final rawDescription = _descriptionController.text.trim();
 
-    if (!isDirectSpamSubmit &&
-        rawDescription.isNotEmpty &&
-        rawDescription.length < 10) {
+    if (rawDescription.isNotEmpty && rawDescription.length < 10) {
       _showMessage("Comment must be at least 10 characters when provided.");
       return;
     }
@@ -409,7 +334,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       return;
     }
 
-    if (!_detectionReady && !isDirectSpamSubmit) {
+    if (!_detectionReady) {
       _showMessage(
         "Please wait for detection to complete or retake the photo.",
       );
@@ -428,8 +353,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       final reportService = ref.read(reportServiceProvider);
       final offlineService = ref.read(offlineServiceProvider);
 
-      final effectiveCategory = isDirectSpamSubmit ? "no_waste" : _category;
-      final effectiveIsSpam = isDirectSpamSubmit || _isSpamFlagged;
+      final result = _detectResult!;
+      final effectiveCategory = _category;
+      final effectiveIsSpam = result.isSpam;
       final categoryLabel =
           wasteCategoryLabels[effectiveCategory] ??
           (effectiveCategory == "with_waste" ? "With Waste" : "No Waste");
@@ -452,25 +378,16 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               ? (_detectResult?.spamReason ??
                     "No visible waste detected during photo analysis")
               : null,
-          "severity": isDirectSpamSubmit
-              ? "SPAM"
-              : _detectResult?.severity.dbValue,
-          "analysisStatus": isDirectSpamSubmit
-              ? "CLEAN"
-              : (_detectResult?.hasWaste == true ? "DIRTY" : "CLEAN"),
-          "analysisWasteCount":
-              (_detectResult?.hasWaste == true && !isDirectSpamSubmit)
-              ? (_detectResult?.wasteCount ?? 1)
-              : 0,
-          "aiModel": _detectResult?.model,
-          "aiCategories": _detectResult?.categories.isNotEmpty == true
-              ? _detectResult!.categories
-              : (_detectResult?.labels.map((l) => l.label).toList() ?? []),
-          "aiReason": _detectResult?.severity.summary(
-            _detectResult?.hasWaste == true,
-          ),
+          "severity": result.severity.dbValue,
+          "analysisStatus": result.hasWaste ? "DIRTY" : "CLEAN",
+          "analysisWasteCount": result.wasteCount,
+          "aiModel": result.model,
+          "aiCategories": result.categories.isNotEmpty
+              ? result.categories
+              : result.labels.map((label) => label.label).toList(),
+          "aiReason": result.severity.summary(result.hasWaste),
         },
-        images: _images,
+        images: List.of(_images),
         offlineService: offlineService,
       );
 
@@ -479,32 +396,20 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
         ref.read(notificationsListProvider.notifier).refresh();
       } catch (_) {}
 
+      if (!mounted) return;
       _descriptionController.clear();
-
-      final submittedResult = _detectResult;
       setState(() {
         _images.clear();
         _submittedComment = rawDescription;
         _isAnonymous = false;
-        _category = "with_waste";
-        _isSpamFlagged = false;
         _resetDetection();
-        if (isDirectSpamSubmit) {
-          _showResultCard = false;
-          _submittedResult = null;
-        } else {
-          _showResultCard = submittedResult != null;
-          _submittedResult = submittedResult;
-        }
+        _showResultCard = true;
+        _submittedResult = result;
       });
 
       if (report == null) {
         _showMessage(
           "Report saved on this phone. It will finish uploading automatically once you're online.",
-        );
-      } else if (isDirectSpamSubmit) {
-        _showMessage(
-          "Spam report submitted directly. Screen refreshed so you can submit again.",
         );
       } else {
         _startSuccessCountdown();
@@ -761,7 +666,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   width: double.infinity,
                   height: 52,
                   child: FilledButton.icon(
-                    onPressed: _isDetecting ? null : _pickFromCamera,
+                    onPressed: (_isDetecting || _isSubmitting) ? null : _pickFromCamera,
                     icon: const Icon(Icons.photo_camera_rounded, size: 22),
                     label: const Text(
                       "Take a Photo",
@@ -777,7 +682,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton.icon(
-                    onPressed: _isDetecting ? null : _pickFromGallery,
+                    onPressed: (_isDetecting || _isSubmitting) ? null : _pickFromGallery,
                     icon: const Icon(Icons.photo_library_rounded, size: 22),
                     label: const Text(
                       "Choose from Gallery",
@@ -1016,7 +921,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                               top: 10,
                               right: 10,
                               child: InkWell(
-                                onTap: () async {
+                                onTap: _isSubmitting ? null : () async {
                                   final wasPrimary = index == 0;
                                   setState(() {
                                     _images.removeAt(index);
@@ -1051,7 +956,15 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   },
                 ),
               ),
-              if (_detectedWasteCount != null) ...[
+              if (_detectionError case final error?) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(error, style: const TextStyle(color: AppColors.destructive)),
+                TextButton(
+                  onPressed: () => _runDetection(_images.first),
+                  child: const Text("Retry Analysis"),
+                ),
+              ],
+              if (_detectResult != null) ...[
                 const SizedBox(height: AppSpacing.sm),
                 WasteAnalysisSummary(
                   hasWaste: _detectResult?.hasWaste == true,
@@ -1064,7 +977,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _isDetecting ? null : _pickFromCamera,
+                        onPressed: (_isDetecting || _isSubmitting) ? null : _pickFromCamera,
                         icon: const Icon(Icons.add_a_photo_outlined, size: 18),
                         label: const Text("Angle (Camera)"),
                       ),
@@ -1072,7 +985,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _isDetecting ? null : _pickFromGallery,
+                        onPressed: (_isDetecting || _isSubmitting) ? null : _pickFromGallery,
                         icon: const Icon(
                           Icons.add_photo_alternate_outlined,
                           size: 18,
@@ -1111,7 +1024,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                       ),
                     )
                     .toList(growable: false),
-                onChanged: (_detectResult?.hasWaste == true || _isDetecting)
+                onChanged: (_detectResult != null || _isDetecting || _isSubmitting)
                     ? null
                     : (value) {
                         if (value != null) {

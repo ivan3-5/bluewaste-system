@@ -21,6 +21,7 @@ class OfflineReportPayload {
     required this.data,
     required this.imagePaths,
     this.userId,
+    this.photoType = "REPORT",
     this.remoteReportId,
     this.uploadedCount = 0,
     this.attempts = 0,
@@ -35,6 +36,7 @@ class OfflineReportPayload {
 
   /// Owner of the report; entries are only synced for the signed-in user.
   final String? userId;
+  final String photoType;
 
   /// Set once the report exists on the server, so a retry only uploads images.
   final String? remoteReportId;
@@ -70,6 +72,7 @@ class OfflineReportPayload {
       data: data,
       imagePaths: imagePaths ?? this.imagePaths,
       userId: userId,
+      photoType: photoType,
       remoteReportId: remoteReportId ?? this.remoteReportId,
       uploadedCount: uploadedCount ?? this.uploadedCount,
       attempts: attempts ?? this.attempts,
@@ -84,6 +87,7 @@ class OfflineReportPayload {
     "data": data,
     "imagePaths": imagePaths,
     "userId": userId,
+    "photoType": photoType,
     "remoteReportId": remoteReportId,
     "uploadedCount": uploadedCount,
     "attempts": attempts,
@@ -98,6 +102,7 @@ class OfflineReportPayload {
       data: Map<String, dynamic>.from(json["data"] as Map),
       imagePaths: List<String>.from(json["imagePaths"] as List),
       userId: json["userId"] as String?,
+      photoType: json["photoType"] as String? ?? "REPORT",
       remoteReportId: json["remoteReportId"] as String?,
       uploadedCount: json["uploadedCount"] as int? ?? 0,
       attempts: json["attempts"] as int? ?? 0,
@@ -157,34 +162,50 @@ class OfflineService {
 
   /// Persists the report and copies its images out of the picker's cache,
   /// which the OS may clear before connectivity returns.
-  Future<void> queueReport({
+  Future<String> queueReport({
     required Map<String, dynamic> data,
     required List<String> imagePaths,
     String? remoteReportId,
     int uploadedCount = 0,
     bool maybeCreated = false,
     String? lastError,
+    String photoType = "REPORT",
   }) async {
     final id = DateTime.now().microsecondsSinceEpoch.toString();
     final userJson = await _storage.readUserJson();
     _stagingIds.add(id);
     try {
-      final durablePaths = await _copyImages(id, imagePaths);
+      final durablePaths = await _copyImages(id, imagePaths, requireDurable: photoType == "CLEANUP");
       await _save(
         OfflineReportPayload(
           id: id,
           data: data,
           imagePaths: durablePaths,
           userId: userJson?["id"]?.toString(),
+          photoType: photoType,
           remoteReportId: remoteReportId,
           uploadedCount: uploadedCount,
           maybeCreated: maybeCreated,
           lastError: lastError,
         ),
       );
+      return id;
     } finally {
       _stagingIds.remove(id);
     }
+  }
+
+  Future<String> queueCleanupPhotos(String reportId, List<String> paths) async {
+    final userId = (await _storage.readUserJson())?["id"]?.toString();
+    if (userId == null || userId.isEmpty) {
+      throw ApiException("Sign in to upload cleanup photos.");
+    }
+    final queued = await getQueuedReports();
+    if (queued.any((entry) => entry.userId == userId &&
+        entry.photoType == "CLEANUP" && entry.remoteReportId == reportId)) {
+      throw ApiException("This task already has saved cleanup photos. Sync those photos first.");
+    }
+    return queueReport(data: {}, imagePaths: paths, remoteReportId: reportId, photoType: "CLEANUP");
   }
 
   Future<void> _save(OfflineReportPayload payload) async {
@@ -197,7 +218,7 @@ class OfflineService {
     return Directory("${root.path}/offline_reports/$id");
   }
 
-  Future<List<String>> _copyImages(String id, List<String> sourcePaths) async {
+  Future<List<String>> _copyImages(String id, List<String> sourcePaths, {required bool requireDurable}) async {
     final dir = await _reportDir(id);
     await dir.create(recursive: true);
 
@@ -210,6 +231,9 @@ class OfflineService {
         await File(source).copy(target);
         copied.add(target);
       } catch (e) {
+        if (requireDurable) {
+          throw ApiException("Could not save the cleanup photos on this phone.");
+        }
         debugPrint("[OfflineService] Could not copy $source: $e");
         copied.add(source);
       }
@@ -276,7 +300,7 @@ class OfflineService {
 
   /// Puts every failed report back in the queue and syncs again.
   Future<SyncResult> retryFailed() async {
-    for (final report in await getQueuedReports()) {
+    for (final report in await _currentUserReports()) {
       if (report.failed) {
         await _save(
           report.copyWith(failed: false, attempts: 0, clearError: true),
@@ -288,7 +312,7 @@ class OfflineService {
 
   /// Discards reports that could not be uploaded.
   Future<void> discardFailed() async {
-    for (final report in await getQueuedReports()) {
+    for (final report in await _currentUserReports()) {
       if (report.failed) await removeQueuedReport(report.id);
     }
   }
@@ -303,6 +327,14 @@ class OfflineService {
         status == 401 ||
         status == 408 ||
         status == 429;
+  }
+
+  Future<List<OfflineReportPayload>> _currentUserReports() async {
+    final userId = (await _storage.readUserJson())?["id"]?.toString();
+    if (userId == null || userId.isEmpty) return [];
+    return (await getQueuedReports())
+        .where((entry) => entry.userId == null || entry.userId == userId)
+        .toList();
   }
 
   /// Finds a report the server already created for [payload] when the create
@@ -387,6 +419,22 @@ class OfflineService {
 
         var current = queued;
         try {
+          if (current.photoType == "CLEANUP") {
+            while (current.uploadedCount < current.imagePaths.length) {
+              final index = current.uploadedCount;
+              await _reportService.uploadQueuedImages(
+                reportId: current.remoteReportId!,
+                imagePaths: [current.imagePaths[index]],
+                type: "CLEANUP",
+                clientUploadId: "${current.id}-$index",
+              );
+              current = current.copyWith(uploadedCount: index + 1);
+              await _save(current);
+            }
+            await removeQueuedReport(current.id);
+            uploaded++;
+            continue;
+          }
           ReportRecord? remote;
           // 1. Make sure the report exists on the server.
           if (current.remoteReportId == null) {
@@ -514,7 +562,7 @@ class OfflineService {
       report.images.where((image) => image.type != "CLEANUP").length;
 
   Future<QueueSummary> queueSummary() async {
-    final reports = await getQueuedReports();
+    final reports = await _currentUserReports();
     final failed = reports.where((r) => r.failed).toList();
     return QueueSummary(
       pending: reports.length - failed.length,

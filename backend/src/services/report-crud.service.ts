@@ -404,7 +404,7 @@ export class ReportCrudService {
     }
 
     // ── Automatic Cleanup Schedule Status Synchronization ───────────────────
-    if (status === ReportStatus.CLEANED) {
+    if (status === ReportStatus.CLEANED || status === ReportStatus.IN_PROGRESS) {
       try {
         const candidateReportIds = [reportId];
         if (incidentId) {

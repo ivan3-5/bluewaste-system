@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { Suspense, useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CleanupSchedule, User } from "@/types";
+import { CleanupSchedule } from "@/types";
 import api from "@/lib/api";
 import { ScheduleCalendar } from "@/components/schedules/ScheduleCalendar";
 import { ScheduleList } from "@/components/schedules/ScheduleList";
-import { ScheduleForm } from "@/components/schedules/ScheduleForm";
+import { ScheduleForm, type ScheduleWorkerOption } from "@/components/schedules/ScheduleForm";
 import { ScheduleDetail } from "@/components/schedules/ScheduleDetail";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,16 @@ import { SchedulePageSkeleton } from "@/components/skeletons/page-skeletons";
 
 
 export default function SchedulesPage() {
+  return (
+    <Suspense fallback={<SchedulePageSkeleton />}>
+      <SchedulesDashboard />
+    </Suspense>
+  );
+}
+
+function SchedulesDashboard() {
+  const router = useRouter();
+  const reportId = useSearchParams().get("reportId");
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -38,7 +49,7 @@ export default function SchedulesPage() {
   const [view, setView] = useState<"calendar" | "list">("calendar");
 
   // Modals state
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(Boolean(reportId));
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] =
     useState<CleanupSchedule | null>(null);
@@ -106,23 +117,28 @@ export default function SchedulesPage() {
   }, [selectedSchedule, schedulesData]);
 
   const { data: workers = [] } = useQuery({
-    queryKey: ["workers"],
+    queryKey: ["workers", "schedule-options"],
     queryFn: async () => {
-      const res = await api.get("/users?role=FIELD_WORKER&limit=100");
-      return res.data.data as User[];
+      const res = await api.get<ScheduleWorkerOption[]>("/users/field-workers");
+      return res.data;
     },
   });
 
   // Mutations
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      await api.post("/schedules", data);
+      const response = await api.post<CleanupSchedule>("/schedules", data);
+      return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["schedules"] });
-      queryClient.invalidateQueries({
-        queryKey: ["reports", "eligible-for-schedule"],
-      });
+    onSuccess: (schedule) => {
+      queryClient.setQueryData<CleanupSchedule[]>(["schedules"], (previous) => [
+        schedule,
+        ...(previous ?? []).filter((item) => item.id !== schedule.id),
+      ]);
+      void queryClient.invalidateQueries({ queryKey: ["schedules"] });
+      void queryClient.invalidateQueries({ queryKey: ["reports"] });
+      setSelectedSchedule(schedule);
+      setIsDetailOpen(true);
     },
   });
 
@@ -644,8 +660,10 @@ export default function SchedulesPage() {
           onClose={() => {
             setIsFormOpen(false);
             setEditingSchedule(null);
+            if (reportId) router.replace("/dashboard/schedules", { scroll: false });
           }}
           onSubmit={handleFormSubmit}
+          initialReportId={editingSchedule ? undefined : reportId ?? undefined}
           initialData={editingSchedule}
           workers={workers}
           isEditing={!!editingSchedule && !!editingSchedule.id}

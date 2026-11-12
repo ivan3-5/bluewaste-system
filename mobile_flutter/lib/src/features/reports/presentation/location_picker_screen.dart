@@ -1,9 +1,9 @@
-import "package:dio/dio.dart";
 import "package:flutter/material.dart";
 import "package:flutter_map/flutter_map.dart";
 import "package:latlong2/latlong.dart";
 
-import "../../../core/config/app_env.dart";
+import "../../../core/network/api_exception.dart";
+import "../data/reporting_zones.dart";
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 
@@ -46,44 +46,26 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _error = null;
     });
     try {
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: AppEnv.apiBaseUrl,
-          connectTimeout: const Duration(seconds: 8),
-          receiveTimeout: const Duration(seconds: 8),
-        ),
-      );
-      final response = await dio.get<List<dynamic>>("/reporting-zones");
-      final zones = <List<LatLng>>[];
-      for (final zone in response.data ?? const <dynamic>[]) {
-        final raw = zone["coordinates"];
-        if (raw is! List) continue;
-        final ring = <LatLng>[
-          for (final c in raw)
-            if (c is Map && c["lat"] is num && c["lng"] is num)
-              LatLng(
-                (c["lat"] as num).toDouble(),
-                (c["lng"] as num).toDouble(),
-              ),
-        ];
-        if (ring.length >= 3) zones.add(ring);
-      }
+      final zones = await ReportingZones().load();
       if (!mounted) return;
       setState(() {
         _zones = zones;
         _loading = false;
         final initial = widget.initialLocation;
-        if (initial != null && _isInsideAnyZone(initial)) _selected = initial;
+        final candidate = _selected ?? initial;
+        _selected = candidate != null && _isInsideAnyZone(candidate) ? candidate : null;
         if (zones.isEmpty) {
           _error = "No active reporting zones are available right now.";
         }
       });
       _focusZones();
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = "Could not load reporting zones. Check your connection.";
+        _zones = [];
+        _selected = null;
+        _error = error is ApiException ? error.message : "Could not load reporting zones.";
       });
     }
   }
@@ -103,27 +85,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     });
   }
 
-  bool _isInsideAnyZone(LatLng point) =>
-      _zones.any((ring) => _pointInPolygon(point, ring));
-
-  /// Ray-casting point-in-polygon test.
-  bool _pointInPolygon(LatLng point, List<LatLng> polygon) {
-    var inside = false;
-    var j = polygon.length - 1;
-    for (var i = 0; i < polygon.length; i++) {
-      final xi = polygon[i].longitude;
-      final yi = polygon[i].latitude;
-      final xj = polygon[j].longitude;
-      final yj = polygon[j].latitude;
-      final intersect =
-          ((yi > point.latitude) != (yj > point.latitude)) &&
-          (point.longitude <
-              (xj - xi) * (point.latitude - yi) / (yj - yi) + xi);
-      if (intersect) inside = !inside;
-      j = i;
-    }
-    return inside;
-  }
+  bool _isInsideAnyZone(LatLng point) => isInsideReportingZones(point, _zones);
 
   void _onTap(TapPosition _, LatLng point) {
     if (_zones.isEmpty) return;
