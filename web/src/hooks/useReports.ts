@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { MAX_REPORT_PHOTOS } from "@/lib/report-photos";
 import {
@@ -35,6 +35,7 @@ export function useReports(filters: ReportFilters = {}) {
       const { data } = await api.get(`/reports?${params.toString()}`);
       return data;
     },
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -64,6 +65,7 @@ export function useMyReports(
       );
       return data;
     },
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -250,6 +252,7 @@ export function useAssignedReports(
       const { data } = await api.get(`/reports/assigned?${params.toString()}`);
       return data;
     },
+    placeholderData: keepPreviousData,
   });
 }
 

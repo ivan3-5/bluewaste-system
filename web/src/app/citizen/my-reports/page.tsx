@@ -14,7 +14,7 @@ import {
 import { timeAgo } from "@/lib/utils";
 import Link from "next/link";
 import { X, ChevronLeft, ChevronRight, ImageIcon, EyeOff } from "lucide-react";
-import { ListCardsSkeleton } from "@/components/skeletons/page-skeletons";
+import { MyReportsCardsSkeleton } from "@/components/skeletons/page-skeletons";
 import { PaginationControls } from "@/components/ui/pagination";
 
 interface LightboxState {
@@ -225,7 +225,7 @@ export default function MyReportsPage() {
       {/* Reports List */}
       <div className="space-y-4">
         {isLoading ? (
-          <ListCardsSkeleton rows={4} />
+          <MyReportsCardsSkeleton count={4} />
         ) : reports.length === 0 ? (
           <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-white/60 p-12 text-center shadow-lg shadow-blue-900/5 backdrop-blur-md transition-all">
             <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-300/20 blur-3xl" />

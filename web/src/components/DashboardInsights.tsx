@@ -14,6 +14,7 @@ import {
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import { Calendar, Inbox, Loader2 } from "lucide-react";
+import { ChartBarsSkeleton } from "@/components/skeletons/page-skeletons";
 import type {
   MonthlyTrendPoint,
   MonthlyTrendRange,
@@ -341,17 +342,8 @@ export function DashboardInsights({
 
         {/* Chart Area */}
         <div className="relative min-h-[260px] h-64 sm:h-72 w-full">
-          {!isMounted ? (
-            <div className="flex h-full w-full items-center justify-center">
-              <div className="h-full w-full animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
-            </div>
-          ) : isLoading ? (
-            <div role="status" className="flex h-full items-center justify-center">
-              <div className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-700">
-                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                Loading report data…
-              </div>
-            </div>
+          {!isMounted || isLoading ? (
+            <ChartBarsSkeleton />
           ) : hasTrendError ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-sm">
               <p role="alert" className="text-slate-700 dark:text-slate-200">

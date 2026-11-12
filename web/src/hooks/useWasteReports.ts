@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { PaginatedResponse, WasteReport } from "@/types";
 
@@ -20,5 +20,6 @@ export function useMyWasteReports(
       );
       return data;
     },
+    placeholderData: keepPreviousData,
   });
 }

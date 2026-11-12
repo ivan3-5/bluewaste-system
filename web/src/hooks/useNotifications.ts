@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useEffect } from "react";
 import api from "@/lib/api";
 import { PaginatedResponse, Notification } from "@/types";
@@ -29,6 +29,7 @@ export function useNotifications(page: number = 1, limit: number = 10) {
     refetchInterval: 5000, // Poll every 5 seconds for real-time feel
     refetchIntervalInBackground: true, // Keep polling even when window is not focused
     staleTime: 2000, // Consider data stale after 2 seconds
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -8,6 +8,10 @@ import { ScheduleCalendar } from "@/components/schedules/ScheduleCalendar";
 import { ScheduleList } from "@/components/schedules/ScheduleList";
 import { ScheduleDetail } from "@/components/schedules/ScheduleDetail";
 import { Calendar, List } from "lucide-react";
+import {
+  ScheduleCalendarSkeleton,
+  ScheduleListSkeleton,
+} from "@/components/skeletons/page-skeletons";
 
 export default function WorkerSchedulesPage() {
   const queryClient = useQueryClient();
@@ -78,9 +82,11 @@ export default function WorkerSchedulesPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-64 text-gray-500 dark:text-slate-400">
-          Loading schedules...
-        </div>
+        view === "list" ? (
+          <ScheduleListSkeleton count={5} />
+        ) : (
+          <ScheduleCalendarSkeleton />
+        )
       ) : (
         <>
           {view === "list" && (

@@ -28,7 +28,11 @@ import {
   Radio,
 } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
-import { SchedulePageSkeleton } from "@/components/skeletons/page-skeletons";
+import {
+  SchedulePageSkeleton,
+  ScheduleCalendarSkeleton,
+  ScheduleListSkeleton,
+} from "@/components/skeletons/page-skeletons";
 
 
 export default function SchedulesPage() {
@@ -617,7 +621,11 @@ function SchedulesDashboard() {
 
       {/* ── Content View Area ─────────────────────────────────────── */}
       {isLoading ? (
-        <SchedulePageSkeleton />
+        view === "calendar" ? (
+          <ScheduleCalendarSkeleton />
+        ) : (
+          <ScheduleListSkeleton count={5} />
+        )
       ) : (
         <div className="animate-in fade-in duration-300">
           {view === "calendar" && (

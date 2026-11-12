@@ -9,6 +9,7 @@ import Image from "next/image";
 import { Menu, X, LogOut, User, Bell } from "lucide-react";
 import { LiveNotificationProvider } from "@/contexts/LiveNotificationContext";
 import { LiveNotificationPanel } from "@/components/LiveNotificationPanel";
+import { CitizenLayoutSkeleton } from "@/components/skeletons/page-skeletons";
 
 const citizenLinks = [
   { href: "/citizen/report", label: "Submit Report", icon: "📝" },
@@ -36,11 +37,7 @@ export default function CitizenLayout({
   }, [user, isLoading, router]);
 
   if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-      </div>
-    );
+    return <CitizenLayoutSkeleton />;
   }
 
   if (!user) return null;
