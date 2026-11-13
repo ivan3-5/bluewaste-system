@@ -1,10 +1,10 @@
-import MapView from "@/components/MapView";
+import { DashboardMapClient } from "@/components/map/DashboardMapClient";
 import { getDashboardReports } from "@/lib/dashboard-reports";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardMapPage() {
-  const adminReports = await getDashboardReports(2000);
+  const adminReports = await getDashboardReports(1000);
 
-  return <MapView reports={adminReports} />;
+  return <DashboardMapClient reports={adminReports} />;
 }

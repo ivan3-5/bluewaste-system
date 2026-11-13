@@ -75,11 +75,21 @@ export function ReportsTable({
   const [savingStatusReportId, setSavingStatusReportId] = useState<
     string | null
   >(null);
+  const [optimisticStatuses, setOptimisticStatuses] = useState<
+    Record<string, AdminReportStatus>
+  >({});
 
   const isLGUAdmin = user?.role === "LGU_ADMIN";
 
+  const localReports = useMemo(() => {
+    return reports.map((report) => {
+      const override = optimisticStatuses[report.id];
+      return override ? { ...report, status: override } : report;
+    });
+  }, [reports, optimisticStatuses]);
+
   const visibleReports = useMemo(() => {
-    return reports.filter((report) => {
+    return localReports.filter((report) => {
       // SPAM severity reports are automatically routed to /dashboard/spam
       if (report.severity === "SPAM") return false;
 
@@ -104,7 +114,7 @@ export function ReportsTable({
 
       return true;
     });
-  }, [reports, searchQuery, statusFilter]);
+  }, [localReports, searchQuery, statusFilter]);
 
   const pagination = useClientPagination(visibleReports, 10);
   const { resetPage } = pagination;
@@ -136,6 +146,13 @@ export function ReportsTable({
         throw new Error(payload?.message || "Failed to update status.");
       }
 
+      setOptimisticStatuses((prev) => ({ ...prev, [report.id]: nextStatus }));
+      setStatusDrafts((current) => {
+        const next = { ...current };
+        delete next[report.id];
+        return next;
+      });
+
       pushToast({
         id: `status-${report.id}-${Date.now()}`,
         title: "Status Updated",
@@ -148,6 +165,11 @@ export function ReportsTable({
 
       router.refresh();
     } catch (error) {
+      setOptimisticStatuses((prev) => {
+        const next = { ...prev };
+        delete next[report.id];
+        return next;
+      });
       pushToast({
         id: `status-err-${report.id}-${Date.now()}`,
         title: "Update Failed",

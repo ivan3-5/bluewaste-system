@@ -441,6 +441,7 @@ export async function getDashboardTrend(days = 30) {
       FROM "Report" r
       WHERE r."isDeleted" = false
         AND r."isSpam" = false
+        AND r."createdAt" >= CURRENT_DATE - (${days}::int - 1) * interval '1 day'
       GROUP BY 1
     )
     SELECT

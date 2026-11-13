@@ -20,11 +20,8 @@ function getPrismaClient() {
     errorFormat: "pretty",
   });
 
-  // In development, cache the Prisma Client in global to prevent
-  // creating multiple instances
-  if (isDevelopment) {
-    globalForPrisma.prisma = client;
-  }
+  // Cache the Prisma Client on globalThis to prevent creating multiple connection pools
+  globalForPrisma.prisma = client;
 
   return client;
 }

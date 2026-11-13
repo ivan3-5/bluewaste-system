@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 interface ReadOnlyMapProps {
   lat: number;
   lng: number;
+  className?: string;
 }
 
 function buildMarkerIcon() {
@@ -26,7 +27,7 @@ function buildMarkerIcon() {
   });
 }
 
-export default function ReadOnlyMap({ lat, lng }: ReadOnlyMapProps) {
+export default function ReadOnlyMap({ lat, lng, className }: ReadOnlyMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -60,5 +61,5 @@ export default function ReadOnlyMap({ lat, lng }: ReadOnlyMapProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return <div ref={containerRef} className={className || "h-full w-full"} />;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Check, Copy, ExternalLink, MapPin, CheckCircle2, Circle, AlertCircle, CalendarDays, FileText } from "lucide-react";
 import type { AdminReportStatus } from "@/lib/admin-report";
@@ -290,3 +291,21 @@ export function ReportDetailActionHub({
     </div>
   );
 }
+
+const ReadOnlyMap = dynamic(() => import("@/components/map/ReadOnlyMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[320px] sm:h-[380px] lg:h-[420px] w-full bg-slate-100 dark:bg-slate-800 animate-pulse flex items-center justify-center text-xs text-slate-400">
+      Loading map...
+    </div>
+  ),
+});
+
+export function ReportDetailMap({ lat, lng }: { lat: number; lng: number }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner h-[320px] sm:h-[380px] lg:h-[420px]">
+      <ReadOnlyMap lat={lat} lng={lng} />
+    </div>
+  );
+}
+

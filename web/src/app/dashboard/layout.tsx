@@ -55,7 +55,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         router.push("/citizen/report");
       }
     }
-  }, [user, isLoading, router, pathname]);
+  }, [user, isLoading, router]);
 
   if (isLoading) {
     const isAdminOverviewRoute = pathname === "/dashboard";

@@ -137,6 +137,9 @@ function InternalPoller({
     let active = true;
 
     const poll = async () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
       try {
         // Only poll if a user session is active
         const token = localStorage.getItem("bluewaste_token");
@@ -157,11 +160,19 @@ function InternalPoller({
     };
 
     poll(); // immediate first run
-    const interval = setInterval(poll, 3000);
+    const interval = setInterval(poll, 20000); // Poll every 20s when tab is active
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        poll();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       active = false;
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
 
