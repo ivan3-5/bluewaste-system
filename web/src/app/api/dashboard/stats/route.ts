@@ -18,9 +18,26 @@ export async function GET() {
     pendingCount,
     resolvedCount,
   ] = await Promise.all([
-    prisma.report.count({ where: baseWhere }),
-    prisma.report.count({ where: { ...baseWhere, category: "with_waste" } }),
-    prisma.report.count({ where: { ...baseWhere, category: "no_waste" } }),
+    prisma.report.count({ where: { isDeleted: false } }),
+    prisma.report.count({
+      where: {
+        isDeleted: false,
+        isSpam: false,
+        category: "with_waste",
+        NOT: { analysisStatus: "CLEAN" },
+      },
+    }),
+    prisma.report.count({
+      where: {
+        isDeleted: false,
+        OR: [
+          { isSpam: true },
+          { category: "no_waste" },
+          { analysisStatus: "CLEAN" },
+          { severity: "SPAM" },
+        ],
+      },
+    }),
     prisma.report.count({ where: { ...baseWhere, status: "PENDING" } }),
     prisma.report.count({ where: { ...baseWhere, status: "CLEANED" } }),
   ]);

@@ -64,6 +64,11 @@ export class NotificationService {
         type: data.type as NotificationType,
         reportId: data.reportId,
       },
+      include: {
+        report: {
+          select: { id: true, title: true, status: true, isSpam: true },
+        },
+      },
     });
 
     // Push to any open SSE connections for this user
@@ -86,7 +91,7 @@ export class NotificationService {
         where: { userId },
         include: {
           report: {
-            select: { id: true, title: true, status: true },
+            select: { id: true, title: true, status: true, isSpam: true },
           },
         },
         orderBy: { createdAt: "desc" },

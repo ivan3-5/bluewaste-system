@@ -34,7 +34,7 @@ export class AnalyticsService {
         }),
         prisma.report.groupBy({
           by: ["category"],
-          where: baseWhere,
+          where: { isDeleted: false },
           _count: { _all: true },
         }),
         prisma.report.count({ where: baseWhere }),

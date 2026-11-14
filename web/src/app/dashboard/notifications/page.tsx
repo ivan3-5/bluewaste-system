@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { DashboardNotificationsSkeleton } from "@/components/skeletons/page-skeletons";
 import { format } from "date-fns";
+import { getNotificationReportHref } from "@/lib/notifications";
 
 /* ── Type Configuration & Visual Tokens ───────────────────────────────────────── */
 const typeConfig: Record<
@@ -711,17 +712,22 @@ export default function NotificationsPage() {
 
                           {/* Right: Quick Action Controls */}
                           <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                            {n.reportId && (
-                              <Link href={`/dashboard/reports/${n.reportId}`}>
-                                <Button
-                                  size="sm"
-                                  className="h-8 rounded-xl text-xs font-bold gap-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white shadow-2xs shadow-blue-500/20 active:scale-95 transition-all"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                  View Report
-                                </Button>
-                              </Link>
-                            )}
+                            {(() => {
+                              const reportHref = getNotificationReportHref(n);
+                              if (!reportHref) return null;
+
+                              return (
+                                <Link href={reportHref}>
+                                  <Button
+                                    size="sm"
+                                    className="h-8 rounded-xl text-xs font-bold gap-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white shadow-2xs shadow-blue-500/20 active:scale-95 transition-all"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    View Report
+                                  </Button>
+                                </Link>
+                              );
+                            })()}
 
                             {!n.isRead && (
                               <Button

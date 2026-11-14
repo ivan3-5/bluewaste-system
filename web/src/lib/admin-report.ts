@@ -16,6 +16,7 @@ export interface AdminReport {
   locationName: string;
   description: string | null;
   status: AdminReportStatus;
+  isSpam?: boolean;
   /** Severity from the hybrid YOLOv8 + Cloud Vision pipeline */
   severity?: "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM" | null;
   reporterName?: string | null;
