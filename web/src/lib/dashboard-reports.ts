@@ -15,6 +15,7 @@ type DashboardReportRow = {
   description: string;
   category: string;
   status: string;
+  isSpam?: boolean | null;
   latitude: number;
   longitude: number;
   address: string | null;
@@ -152,6 +153,7 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
     locationName: row.address?.trim() || row.title || "Unknown location",
     description: row.description?.trim() || null,
     status: mapDashboardStatus(row.status) as AdminReport["status"],
+    isSpam: Boolean(row.isSpam) || row.severity === "SPAM",
     severity: (row.severity as AdminReport["severity"]) ?? null,
     reporterName: row.reporterName ?? null,
     reporterEmail: row.reporterEmail ?? null,
@@ -178,6 +180,7 @@ export async function getDashboardReports(limit: number) {
   const reports = await prisma.$queryRaw<DashboardReportRow[]>`
     SELECT
       r.id,
+      r."isSpam",
       (SELECT cs."scheduledAt" FROM "CleanupSchedule" cs WHERE cs.id = r."cleanupScheduleId") AS "cleanupScheduledAt",
       r.title,
       r.description,
@@ -288,6 +291,7 @@ export async function getDashboardReportById(id: string) {
   >`
     SELECT
       r.id,
+      r."isSpam",
       (SELECT cs."scheduledAt" FROM "CleanupSchedule" cs WHERE cs.id = r."cleanupScheduleId") AS "cleanupScheduledAt",
       r.title,
       r.description,
@@ -537,13 +541,16 @@ export async function getDashboardCategoryDistribution() {
     WITH bucketed AS (
       SELECT
         CASE
-          WHEN COALESCE(r."analysisStatus", 'DIRTY') = 'CLEAN' THEN 'no_waste'
+          WHEN r."isSpam" = true
+            OR r.category = 'no_waste'
+            OR COALESCE(r."analysisStatus", 'DIRTY') = 'CLEAN'
+            OR r.severity = 'SPAM'
+            THEN 'no_waste'
           ELSE 'with_waste'
         END AS bucket,
         COUNT(*)::bigint AS count
       FROM "Report" r
       WHERE r."isDeleted" = false
-        AND r."isSpam" = false
       GROUP BY 1
     )
     SELECT

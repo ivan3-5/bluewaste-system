@@ -301,10 +301,28 @@ const ReadOnlyMap = dynamic(() => import("@/components/map/ReadOnlyMap"), {
   ),
 });
 
-export function ReportDetailMap({ lat, lng }: { lat: number; lng: number }) {
+export function ReportDetailMap({
+  lat,
+  lng,
+  status,
+  radius = 50,
+  locationName,
+}: {
+  lat: number;
+  lng: number;
+  status?: string;
+  radius?: number;
+  locationName?: string;
+}) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner h-[320px] sm:h-[380px] lg:h-[420px]">
-      <ReadOnlyMap lat={lat} lng={lng} />
+    <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner h-[320px] sm:h-[380px] lg:h-[420px] relative">
+      <ReadOnlyMap
+        lat={lat}
+        lng={lng}
+        status={status}
+        radius={radius}
+        locationName={locationName}
+      />
     </div>
   );
 }

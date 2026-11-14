@@ -144,7 +144,7 @@ export interface Notification {
   type: "NEW_REPORT" | "STATUS_CHANGE" | "ASSIGNMENT" | "SYSTEM";
   isRead: boolean;
   reportId?: string;
-  report?: { id: string; title: string; status: string };
+  report?: { id: string; title: string; status: string; isSpam?: boolean };
   createdAt: string;
 }
 

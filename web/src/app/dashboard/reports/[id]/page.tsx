@@ -1,6 +1,7 @@
 import { citizenComment } from "@/lib/utils";
 import { getDashboardReportById } from "@/lib/dashboard-reports";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CleanupPhotoCarousel } from "@/components/CleanupPhotoCarousel";
 import { getReverseGeocodedLocation } from "@/lib/utils";
 import { AiAnalysisPanel } from "@/components/AiAnalysisPanel";
@@ -40,6 +41,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
     report = await getDashboardReportById(id);
   } catch {
     report = null;
+  }
+
+  if (report && (report.isSpam || report.severity === "SPAM")) {
+    redirect("/dashboard/spam");
   }
 
   if (!report) {
@@ -463,6 +468,9 @@ export default async function ReportDetailPage({ params }: PageProps) {
         <ReportDetailMap
           lat={report.latitude}
           lng={report.longitude}
+          status={report.status}
+          radius={50}
+          locationName={displayLocationName}
         />
       </section>
     </div>
