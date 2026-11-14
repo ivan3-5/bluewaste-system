@@ -372,8 +372,8 @@ export default function MapView({
   const [isDrawingZone, setIsDrawingZone] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [groupedMode, setGroupedMode] = useState(true); // default: 50m radius-grouped view
-  const [radiusMeters, setRadiusMeters] = useState<number>(50); // default: 50 meters
+  const [groupedMode] = useState(true); // default: 50m radius-grouped view
+  const [radiusMeters] = useState<number>(50); // default: 50 meters
   const [showRadiusCircles, setShowRadiusCircles] = useState<boolean>(true);
   const [showMapLegend, setShowMapLegend] = useState<boolean>(
     showLegend !== undefined ? showLegend : !hideControls,
@@ -1012,42 +1012,6 @@ export default function MapView({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* Grouping View Toggle */}
-              <button
-                id="incident-group-toggle"
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${groupedMode
-                    ? "bg-[hsl(var(--primary))] text-white shadow-md"
-                    : "border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-                  }`}
-                onClick={() => setGroupedMode((v) => !v)}
-                title={
-                  groupedMode
-                    ? `Currently in ${radiusMeters}m radius grouping view. Click to switch to raw reports view.`
-                    : "Currently showing all individual reports. Click to switch to radius grouped view."
-                }
-              >
-                <span>👥</span>
-                <span>{groupedMode ? `${radiusMeters}m Radius Groups` : "Raw Reports"}</span>
-              </button>
-
-              {/* Radius Configuration Selector */}
-              {groupedMode && (
-                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs">
-                  <span className="font-semibold text-slate-600 dark:text-slate-400">Radius:</span>
-                  <select
-                    value={radiusMeters}
-                    onChange={(e) => setRadiusMeters(Number(e.target.value))}
-                    className="bg-transparent font-bold text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer"
-                  >
-                    <option value={20}>20m</option>
-                    <option value={30}>30m</option>
-                    <option value={50}>50m (Default)</option>
-                    <option value={75}>75m</option>
-                    <option value={100}>100m</option>
-                  </select>
-                </div>
-              )}
-
               {/* Radius Circles Toggle */}
               {groupedMode && (
                 <button
