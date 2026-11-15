@@ -18,10 +18,17 @@ import { useAuth } from "@/providers/AuthProvider";
 import api from "@/lib/api";
 import { cn, formatDateTime } from "@/lib/utils";
 import {
-  groupReportsByRadius,
   formatDistance,
   DEFAULT_RADIUS_METERS,
+  isValidCoordinate,
 } from "@/lib/geo-grouping";
+import {
+  DEFAULT_WASTE_MAP_STATUS,
+  filterWasteMapReports,
+  groupWasteMapReports,
+  WASTE_MAP_STATUS_OPTIONS,
+  type WasteMapStatusFilter,
+} from "@/lib/waste-map-reports";
 import {
   Dialog,
   DialogContent,
@@ -53,10 +60,11 @@ type MapViewProps = {
 
 const DEFAULT_CENTER: [number, number] = [7.3132, 125.6844];
 const PLACEHOLDER_IMAGE = "https://placehold.co/400x300?text=No+Image";
+const MAP_SELECT_CLASS = "w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus:ring-sky-900/30";
 
 // ─── Icon builders ────────────────────────────────────────────────────────────
 
-function buildIcon(color: string) {
+function buildIcon(color: string, offsetX = 0) {
   return L.divIcon({
     className: "incident-marker-icon",
     html: `
@@ -70,8 +78,8 @@ function buildIcon(color: string) {
       </div>
     `,
     iconSize: [34, 44],
-    iconAnchor: [17, 43],
-    popupAnchor: [0, -42],
+    iconAnchor: [17 - offsetX, 43],
+    popupAnchor: [offsetX, -42],
   });
 }
 
@@ -96,9 +104,9 @@ function buildSmallMemberIcon(color: string) {
  * Incident icon — location pin + badge when count > 1.
  * Single-contributor incidents look identical to regular report icons.
  */
-function buildIncidentIcon(color: string, count: number) {
+function buildIncidentIcon(color: string, count: number, offsetX: number) {
   if (count <= 1) {
-    return buildIcon(color);
+    return buildIcon(color, offsetX);
   }
 
   const badgeCount = count > 99 ? "99+" : String(count);
@@ -133,8 +141,8 @@ function buildIncidentIcon(color: string, count: number) {
       </div>
     `,
     iconSize: [38, 48],
-    iconAnchor: [19, 47],
-    popupAnchor: [0, -46],
+    iconAnchor: [19 - offsetX, 47],
+    popupAnchor: [offsetX, -46],
   });
 }
 
@@ -390,6 +398,7 @@ export default function MapView({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [groupedMode] = useState(true); // default: 50m radius-grouped view
+  const [statusFilter, setStatusFilter] = useState<WasteMapStatusFilter>(DEFAULT_WASTE_MAP_STATUS);
   const [radiusMeters] = useState<number>(50); // default: 50 meters
   const [showRadiusCircles, setShowRadiusCircles] = useState<boolean>(true);
   const [showMapLegend, setShowMapLegend] = useState<boolean>(
@@ -511,12 +520,12 @@ export default function MapView({
   // ── Filtered data ────────────────────────────────────────────────────────────
 
   const filteredReports = useMemo(() => {
-    return reports;
-  }, [reports]);
+    return filterWasteMapReports(reports, statusFilter);
+  }, [reports, statusFilter]);
 
   // ── 50-Meter Radius Grouping ─────────────────────────────────────────────────
   const radiusGroups = useMemo(() => {
-    return groupReportsByRadius(filteredReports, radiusMeters);
+    return groupWasteMapReports(filteredReports, radiusMeters);
   }, [filteredReports, radiusMeters]);
 
   const groupedAreasCount = useMemo(
@@ -820,11 +829,22 @@ export default function MapView({
     const positions: [number, number][] = [];
 
     if (groupedMode) {
+      // Separate the pins when active and cleaned areas share the same GPS center.
+      const centerKey = ({ latitude, longitude }: CleanupRadiusGroup<AdminReport>["center"]) =>
+        `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+      const seenCenters = new Set<string>();
+      const sharedCenters = new Set<string>();
+      for (const { center } of radiusGroups) {
+        const key = centerKey(center);
+        if (seenCenters.has(key)) sharedCenters.add(key);
+        seenCenters.add(key);
+      }
       // ── 50-Meter Radius Grouped View Mode ──────────────────────────────────
       radiusGroups.forEach((group) => {
         const isMulti = group.isGrouped;
         const primaryReport = group.reports[0];
-        const color = getStatusColor(primaryReport?.status || "VERIFIED");
+        const color = getStatusColor(primaryReport.status);
+        const isCleaned = primaryReport.status === "CLEANED";
 
         positions.push([group.center.latitude, group.center.longitude]);
 
@@ -894,33 +914,15 @@ export default function MapView({
             subMarker.bindPopup(buildPopupHtml(report), { maxWidth: 260 });
             markersLayer.addLayer(subMarker);
           });
-
-          // C. Draw primary Group Cluster Pin at centroid with report count badge
-          const groupMarker = L.marker(
-            [group.center.latitude, group.center.longitude],
-            {
-              icon: buildIncidentIcon(color, group.reportCount),
-              zIndexOffset: 500,
-            },
-          );
-          groupMarker.bindPopup(buildRadiusGroupPopupHtml(group), {
-            maxWidth: 300,
-          });
-          markersLayer.addLayer(groupMarker);
-        } else {
-          // 3. Isolated Single Report outside radius
-          const singleReport = group.reports[0];
-          const singleMarker = L.marker(
-            [singleReport.latitude, singleReport.longitude],
-            {
-              icon: buildIcon(color),
-            },
-          );
-          singleMarker.bindPopup(buildRadiusGroupPopupHtml(group), {
-            maxWidth: 290,
-          });
-          markersLayer.addLayer(singleMarker);
         }
+        const offsetX = sharedCenters.has(centerKey(group.center)) ? (isCleaned ? 22 : -22) : 0;
+        const areaMarker = L.marker([group.center.latitude, group.center.longitude], {
+          icon: buildIncidentIcon(color, group.reportCount, offsetX),
+          title: isCleaned ? "Cleaned area" : "Cleanup area",
+          zIndexOffset: isMulti || offsetX !== 0 ? 500 : 0,
+        });
+        areaMarker.bindPopup(buildRadiusGroupPopupHtml(group), { maxWidth: isMulti ? 300 : 290 });
+        markersLayer.addLayer(areaMarker);
       });
     } else {
       // ── Raw Individual Reports Mode ─────────────────────────────────────────
@@ -992,7 +994,7 @@ export default function MapView({
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  const activeCount = groupedMode ? radiusGroups.length : filteredReports.length;
+  const visibleCount = groupedMode ? radiusGroups.length : filteredReports.length;
 
   return (
     <div
@@ -1015,13 +1017,33 @@ export default function MapView({
                 </label>
                 <select
                   id="coastal-zone-select"
-                  className="w-full appearance-none rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:focus:ring-sky-900/30 [&::-ms-expand]:hidden"
+                  className={MAP_SELECT_CLASS}
                   value={selectedZoneId || ""}
                   onChange={(e) => setSelectedZoneId(e.target.value)}
                 >
                   {zones.map((z: any) => (
                     <option key={z.id} value={z.id} className="dark:bg-slate-900 dark:text-slate-200">
                       {z.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-full sm:w-36">
+                <label
+                  htmlFor="waste-map-status-select"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400"
+                >
+                  Report Status
+                </label>
+                <select
+                  id="waste-map-status-select"
+                  className={MAP_SELECT_CLASS}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as WasteMapStatusFilter)}
+                >
+                  {Object.entries(WASTE_MAP_STATUS_OPTIONS).map(([value, label]) => (
+                    <option key={value} value={value} className="dark:bg-slate-900 dark:text-slate-200">
+                      {label}
                     </option>
                   ))}
                 </select>
@@ -1108,7 +1130,10 @@ export default function MapView({
                   setSelectedZoneId(panaboZone ? panaboZone.id : zones[0]?.id || null);
                   setIsEditingZone(false);
                   setIsDrawingZone(false);
-                  const positions = filteredReports.map((r) => [r.latitude, r.longitude] as [number, number]);
+                  setStatusFilter(DEFAULT_WASTE_MAP_STATUS);
+                  const positions = filterWasteMapReports(reports, DEFAULT_WASTE_MAP_STATUS)
+                    .filter((r) => isValidCoordinate(r.latitude, r.longitude))
+                    .map((r) => [r.latitude, r.longitude] as [number, number]);
                   if (positions.length > 0) {
                     const bounds = L.latLngBounds(positions);
                     if (bounds.isValid()) {
@@ -1122,14 +1147,16 @@ export default function MapView({
             </div>
           </div>
 
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          <p role="status" className="mt-2 text-xs text-slate-500 dark:text-slate-400">
             {isDrawingZone
               ? "Drawing mode enabled: click to plot polygon vertices on the map."
               : isEditingZone
                 ? "Editing mode enabled: drag vertices to adjust the selected zone boundary."
-                : groupedMode
-                  ? `50m Radius Grouping Active: ${filteredReports.length} reports organized into ${radiusGroups.length} cleanup areas (${groupedAreasCount} grouped areas, ${isolatedReportsCount} isolated reports).`
-                  : `Showing ${activeCount} individual report locations.`}
+                : visibleCount === 0
+                  ? "No report locations match this status."
+                  : groupedMode
+                    ? `Showing ${filteredReports.length} report${filteredReports.length === 1 ? "" : "s"} across ${visibleCount} cleanup area${visibleCount === 1 ? "" : "s"} (${groupedAreasCount} grouped, ${isolatedReportsCount} isolated).`
+                    : `Showing ${visibleCount} individual report location${visibleCount === 1 ? "" : "s"}.`}
           </p>
         </div>
       )}

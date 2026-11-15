@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { getStatusColor, REPORT_STATUS_LABELS } from "../src/types";
+import {
+  DEFAULT_WASTE_MAP_STATUS,
+  filterWasteMapReports,
+  groupWasteMapReports,
+} from "../src/lib/waste-map-reports";
 
 describe("Report Detail Location Coordinates Map logic", () => {
   it("maps report status CLEANED to green color token", () => {
@@ -49,5 +54,39 @@ describe("Report Detail Location Coordinates Map logic", () => {
   it("uses standard 50-meter cleanup radius", () => {
     const defaultRadius = 50;
     expect(defaultRadius).toBe(50);
+  });
+});
+
+describe("Waste Map status filters", () => {
+  const reports = ([
+    ["pending", "PENDING"],
+    ["verified", "VERIFIED"],
+    ["scheduled", "CLEANUP_SCHEDULED"],
+    ["ongoing", "IN_PROGRESS"],
+    ["cleaned", "CLEANED"],
+    ["rejected", "REJECTED"],
+  ] as const).map(([id, status]) => ({ id, status, latitude: 7.31, longitude: 125.68 }));
+
+  it("defaults to Active and excludes only cleaned reports", () => {
+    expect(DEFAULT_WASTE_MAP_STATUS).toBe("ACTIVE");
+    expect(filterWasteMapReports(reports, DEFAULT_WASTE_MAP_STATUS).map(({ id }) => id))
+      .toEqual(["pending", "verified", "scheduled", "ongoing", "rejected"]);
+  });
+
+  it("shows all reports or matches the chosen status exactly", () => {
+    expect(filterWasteMapReports(reports, "ALL")).toEqual(reports);
+    expect(filterWasteMapReports(reports, "CLEANUP_SCHEDULED").map(({ id }) => id)).toEqual(["scheduled"]);
+    expect(filterWasteMapReports(reports, "IN_PROGRESS").map(({ id }) => id)).toEqual(["ongoing"]);
+    expect(filterWasteMapReports(reports, "CLEANED").map(({ id }) => id)).toEqual(["cleaned"]);
+  });
+
+  it("keeps cleaned reports in a separate area in All, even at identical coordinates", () => {
+    const groups = groupWasteMapReports(filterWasteMapReports(reports, "ALL"), 50);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].reports.map(({ id }) => id).sort())
+      .toEqual(["ongoing", "pending", "rejected", "scheduled", "verified"]);
+    expect(groups[1].reports.map(({ id }) => id)).toEqual(["cleaned"]);
+    expect(groups[0].center.latitude).toBeCloseTo(groups[1].center.latitude, 6);
+    expect(groups[0].center.longitude).toBeCloseTo(groups[1].center.longitude, 6);
   });
 });
