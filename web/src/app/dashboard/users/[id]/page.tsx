@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/reports/StatusBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { DataTableSkeleton, PageHeadingSkeleton } from "@/components/skeletons/page-skeletons";
 import { UserRoleBadge, UserStatusBadge } from "@/components/users/UserBadges";
+import { UserAvatar } from "@/components/users/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "@/components/ui/pagination";
@@ -283,7 +284,10 @@ export default function UserHistoryPage() {
           ) : user && (
             <>
               <section aria-labelledby="account-heading" className={`${panel} p-4 sm:p-5`}>
-                <h2 id="account-heading" className={heading}>Account Information</h2>
+                <div className="flex items-center gap-3">
+                  <UserAvatar user={user} />
+                  <h2 id="account-heading" className={heading}>Account Information</h2>
+                </div>
                 <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <Metadata label="Email">{user.email}</Metadata>
                   <Metadata label="Role"><UserRoleBadge role={user.role} /></Metadata>
