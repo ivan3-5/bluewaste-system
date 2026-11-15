@@ -36,6 +36,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { CleanupSchedule, SCHEDULE_STATUS_COLORS, SCHEDULE_STATUS_LABELS } from "@/types";
 import { ScheduleDetail } from "@/components/schedules/ScheduleDetail";
+import {
+  TaskActivityAnalytics,
+  TaskActivitySkeleton,
+} from "@/components/TaskActivityAnalytics";
 
 export default function FieldWorkerDashboard() {
   const [selectedSchedule, setSelectedSchedule] = useState<CleanupSchedule | null>(null);
@@ -46,7 +50,9 @@ export default function FieldWorkerDashboard() {
     setExpandedSchedules((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const { data: allData, isLoading: loadingAll } = useAssignedReports({});
+  const { data: allData, isLoading: loadingAll } = useAssignedReports({
+    limit: 100,
+  });
   const { data: inProgressData } = useAssignedReports({
     status: "IN_PROGRESS",
   });
@@ -61,8 +67,21 @@ export default function FieldWorkerDashboard() {
     staleTime: 30000,
   });
 
-  const allReports = useMemo(() => allData?.data || [], [allData?.data]);
-  const totalAssigned = allData?.pagination?.total || 0;
+  const allReports = useMemo(() => {
+    const list = allData?.data ? [...allData.data] : [];
+    const idSet = new Set(list.map((r) => r.id));
+    mySchedules.forEach((s) => {
+      (s.reports || []).forEach((r) => {
+        if (!idSet.has(r.id)) {
+          idSet.add(r.id);
+          list.push(r);
+        }
+      });
+    });
+    return list;
+  }, [allData?.data, mySchedules]);
+
+  const totalAssigned = Math.max(allData?.pagination?.total || 0, allReports.length);
   const inProgressCount = inProgressData?.pagination?.total || 0;
   const completedCount = allReports.filter(
     (r) => r.status === "CLEANED",
@@ -119,24 +138,6 @@ export default function FieldWorkerDashboard() {
     ? `conic-gradient(#3b82f6 0deg ${(statusCounts.VERIFIED / statusTotal) * 360}deg, #8b5cf6 ${(statusCounts.VERIFIED / statusTotal) * 360}deg ${((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED) / statusTotal) * 360}deg, #f97316 ${((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED) / statusTotal) * 360}deg ${((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED + statusCounts.IN_PROGRESS) / statusTotal) * 360}deg, #10b981 ${((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED + statusCounts.IN_PROGRESS) / statusTotal) * 360}deg ${((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED + statusCounts.IN_PROGRESS + statusCounts.CLEANED) / statusTotal) * 360}deg, #f43f5e ${((statusCounts.VERIFIED + statusCounts.CLEANUP_SCHEDULED + statusCounts.IN_PROGRESS + statusCounts.CLEANED) / statusTotal) * 360}deg 360deg)`
     : `conic-gradient(#3b82f6 0deg 360deg)`;
 
-  const trendBuckets = useMemo(() => {
-    const buckets = Array.from({ length: 12 }, () => 0);
-    const now = Date.now();
-
-    allReports.forEach((report) => {
-      const createdAt = new Date(report.createdAt).getTime();
-      if (!Number.isFinite(createdAt)) return;
-      const diffDays = Math.floor((now - createdAt) / 86400000);
-      if (diffDays >= 0 && diffDays < buckets.length) {
-        buckets[buckets.length - 1 - diffDays] += 1;
-      }
-    });
-
-    return buckets;
-  }, [allReports]);
-
-  const trendMax = Math.max(...trendBuckets, 1);
-  const hasTrendData = trendBuckets.some((value) => value > 0);
   const unreadCount = unreadData?.count || 0;
 
   const statCards = [
@@ -220,11 +221,7 @@ export default function FieldWorkerDashboard() {
           </div>
         </div>
         <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4 shadow-sm">
-            <Skeleton className="h-5 w-44" />
-            <Skeleton className="h-3 w-32" />
-            <Skeleton className="h-44 w-full rounded-xl" />
-          </div>
+          <TaskActivitySkeleton />
           <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4 shadow-sm">
             <Skeleton className="h-5 w-48" />
             <Skeleton className="h-3 w-36" />
@@ -508,45 +505,7 @@ export default function FieldWorkerDashboard() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:shadow-none">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  Task Activity (Last 12 Days)
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Assignments received over time
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                <TrendingUp className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                {totalAssigned > 0 ? "Active flow" : "No recent activity"}
-              </div>
-            </div>
-
-            <div className="relative mt-6 h-56 overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.16)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.16)_1px,transparent_1px)] bg-[size:36px_36px]" />
-              <div className="absolute inset-x-6 bottom-6 flex h-40 items-end gap-3">
-                {trendBuckets.map((value, idx) => (
-                  <div
-                    key={`bar-${idx}`}
-                    className="flex-1 rounded-full bg-gradient-to-t from-blue-500 via-blue-400 to-cyan-300 shadow-[0_6px_14px_rgba(37,99,235,0.25)]"
-                    style={{
-                      height: `${Math.round((value / trendMax) * 100)}%`,
-                    }}
-                  />
-                ))}
-              </div>
-              {!hasTrendData && (
-                <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-slate-400 dark:text-slate-500">
-                  No activity yet
-                </div>
-              )}
-              <div className="absolute left-6 top-4 text-xs font-medium text-slate-400 dark:text-slate-500">
-                12 days
-              </div>
-            </div>
-          </div>
+          <TaskActivityAnalytics reports={allReports} isLoading={loadingAll} />
 
           <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:shadow-none">
             <div>
