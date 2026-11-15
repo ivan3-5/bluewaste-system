@@ -178,7 +178,7 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
   };
 }
 
-export async function getDashboardReports(limit: number) {
+export async function getDashboardReports(limit: number, period?: DashboardPeriod) {
   const reports = await prisma.$queryRaw<DashboardReportRow[]>`
     SELECT
       r.id,
@@ -280,6 +280,7 @@ export async function getDashboardReports(limit: number) {
     ) cleaned_by ON TRUE
     WHERE r."isDeleted" = false
       AND r."isSpam" = false
+      ${reportPeriodCondition(period)}
     ORDER BY r."createdAt" DESC
     LIMIT ${limit}
   `;
