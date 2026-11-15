@@ -282,17 +282,6 @@ export function ScheduleDetail({
                   </div>
                 )}
               </div>
-              {hasCombinedReports && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowReportModal(true)}
-                  className="gap-1.5 rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-xs font-bold shrink-0 mt-1"
-                >
-                  <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  Combined Report
-                </Button>
-              )}
             </div>
 
             {/* Quick Metadata Grid */}
