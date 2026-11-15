@@ -13,12 +13,9 @@ import {
   type ChartData,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
-import { Calendar, Inbox, Loader2 } from "lucide-react";
+import { Inbox } from "lucide-react";
 import { ChartBarsSkeleton } from "@/components/skeletons/page-skeletons";
-import type {
-  MonthlyTrendPoint,
-  MonthlyTrendRange,
-} from "@/lib/dashboard-reports";
+import type { MonthlyTrendPoint } from "@/lib/dashboard-reports";
 
 ChartJS.register(
   CategoryScale,
@@ -29,11 +26,6 @@ ChartJS.register(
   Legend,
 );
 
-type TrendPoint = {
-  day: Date;
-  count: number;
-};
-
 type CategoryPoint = {
   key: string;
   label: string;
@@ -41,20 +33,12 @@ type CategoryPoint = {
 };
 
 type DashboardInsightsProps = {
-  initialMonthlyTrend?: MonthlyTrendPoint[];
-  trend?: TrendPoint[];
+  trendData: MonthlyTrendPoint[];
   categories: CategoryPoint[];
+  showDaily: boolean;
 };
 
 const CATEGORY_COLORS = ["#3b82f6", "#84cc16"];
-
-const RANGE_OPTIONS: Array<{ value: MonthlyTrendRange; label: string }> = [
-  { value: "thisYear", label: "This Year" },
-  { value: "thisMonth", label: "This Month" },
-  { value: "6months", label: "Last 6 Months" },
-  { value: "12months", label: "Last 12 Months" },
-];
-const EMPTY_TREND: MonthlyTrendPoint[] = [];
 
 function toDonutGradient(categories: CategoryPoint[]) {
   const total = categories.reduce((sum, item) => sum + item.count, 0);
@@ -74,23 +58,12 @@ function toDonutGradient(categories: CategoryPoint[]) {
 }
 
 export function DashboardInsights({
-  initialMonthlyTrend = [],
+  trendData,
   categories,
+  showDaily,
 }: DashboardInsightsProps) {
-  const [selectedRange, setSelectedRange] =
-    useState<MonthlyTrendRange>("thisYear");
-  const [hasTrendError, setHasTrendError] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isDark, setIsDark] = useState(false);
-  const [cache, setCache] = useState<
-    Partial<Record<MonthlyTrendRange, MonthlyTrendPoint[]>>
-  >(
-    () => (initialMonthlyTrend.length > 0 ? { thisYear: initialMonthlyTrend } : {}),
-  );
-  const selectedData = cache[selectedRange];
-  const trendData = selectedData ?? EMPTY_TREND;
-  const isLoading = !selectedData && !hasTrendError;
-  const showDaily = selectedRange === "thisMonth";
 
   // Watch for theme changes and client mounting
   useEffect(() => {
@@ -109,29 +82,6 @@ export function DashboardInsights({
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (selectedData || hasTrendError) return;
-
-    const controller = new AbortController();
-    const loadTrend = async () => {
-      try {
-        const res = await fetch(`/api/dashboard/trend?range=${selectedRange}`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error("Failed to fetch report data");
-        const data: MonthlyTrendPoint[] = await res.json();
-        if (!controller.signal.aborted) {
-          setCache((prev) => ({ ...prev, [selectedRange]: data }));
-        }
-      } catch {
-        if (!controller.signal.aborted) setHasTrendError(true);
-      }
-    };
-
-    void loadTrend();
-    return () => controller.abort();
-  }, [selectedRange, selectedData, hasTrendError]);
-
   const totalReports = categories.reduce((sum, item) => sum + item.count, 0);
   const donutGradient = toDonutGradient(categories);
 
@@ -143,7 +93,7 @@ export function DashboardInsights({
   const chartData: ChartData<"bar"> = useMemo(() => {
     return {
       labels: trendData.map((item) =>
-        showDaily ? String(item.dayOfMonth) : item.monthName,
+        showDaily ? `${item.monthName.slice(0, 3)} ${item.dayOfMonth}` : item.monthName,
       ),
       datasets: [
         {
@@ -300,63 +250,19 @@ export function DashboardInsights({
     <div className="grid gap-6 lg:grid-cols-2">
       {/* Waste Reports by Date */}
       <section className="flex flex-col justify-between rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
-        <div>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
-                Waste Reports by Date
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {showDaily
-                  ? "Daily breakdown by report status"
-                  : "Monthly breakdown by report status"}
-              </p>
-            </div>
-
-            {/* Date-range Filter */}
-            <div className="flex items-center gap-2">
-              <label htmlFor="trend-range-select" className="sr-only">
-                Filter date range
-              </label>
-              <div className="relative inline-flex items-center">
-                <Calendar className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-                <select
-                  id="trend-range-select"
-                  value={selectedRange}
-                  onChange={(e) => {
-                    setSelectedRange(e.target.value as MonthlyTrendRange);
-                    setHasTrendError(false);
-                  }}
-                  className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-1.5 pl-8 pr-8 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm transition hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
-                >
-                  {RANGE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+        <div className="mb-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
+            Waste Reports by Date
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {showDaily ? "Daily breakdown by report status" : "Monthly breakdown by report status"}
+          </p>
         </div>
 
         {/* Chart Area */}
         <div className="relative min-h-[260px] h-64 sm:h-72 w-full">
-          {!isMounted || isLoading ? (
+          {!isMounted ? (
             <ChartBarsSkeleton />
-          ) : hasTrendError ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-sm">
-              <p role="alert" className="text-slate-700 dark:text-slate-200">
-                Couldn’t load reports for this date range.
-              </p>
-              <button
-                type="button"
-                className="font-semibold text-blue-600 hover:underline dark:text-blue-400"
-                onClick={() => setHasTrendError(false)}
-              >
-                Try again
-              </button>
-            </div>
           ) : totalInPeriod === 0 ? (
             <div className="flex h-full w-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 p-6 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
@@ -423,9 +329,9 @@ export function DashboardInsights({
                   </div>
                 );
               })}
-              {categories.length === 0 && (
+              {totalReports === 0 && (
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  No reports yet for distribution.
+                  No reports for the selected date range.
                 </p>
               )}
             </div>

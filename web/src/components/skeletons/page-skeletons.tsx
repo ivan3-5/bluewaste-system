@@ -383,9 +383,20 @@ export function AdminOverviewSkeleton() {
           <Skeleton className="h-9 w-64" />
           <Skeleton className="h-4 w-80 max-w-full" />
         </div>
-        <Skeleton className="h-8 w-32 rounded-full" />
+        <div className="flex items-end gap-3">
+          <Skeleton className="h-9 w-40 rounded-xl" />
+          <Skeleton className="h-8 w-32 rounded-full" />
+        </div>
       </div>
 
+      <AdminOverviewDataSkeleton />
+    </div>
+  );
+}
+
+export function AdminOverviewDataSkeleton() {
+  return (
+    <div className="space-y-8" role="status" aria-label="Loading dashboard data">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, idx) => (
           <div
@@ -405,12 +416,9 @@ export function AdminOverviewSkeleton() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Trend Bar Chart */}
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Skeleton className="h-6 w-52" />
-              <Skeleton className="h-3 w-40" />
-            </div>
-            <Skeleton className="h-8 w-32 rounded-xl" />
+          <div className="space-y-1">
+            <Skeleton className="h-6 w-52" />
+            <Skeleton className="h-3 w-40" />
           </div>
           <ChartBarsSkeleton />
         </div>
