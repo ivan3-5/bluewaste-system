@@ -7,6 +7,8 @@ import {
   createUserSchema,
   updateUserSchema,
   userIdParamSchema,
+  userReportHistorySchema,
+  userScheduleHistorySchema,
 } from "../validators/user.validator";
 
 const router = Router();
@@ -46,6 +48,29 @@ router.put(
   validate(userIdParamSchema, "params"),
   validate(updateUserSchema),
   UserController.updateUser,
+);
+router.get(
+  "/:id",
+  authenticate,
+  authorize("LGU_ADMIN"),
+  validate(userIdParamSchema, "params"),
+  UserController.getUserById,
+);
+router.get(
+  "/:id/reports",
+  authenticate,
+  authorize("LGU_ADMIN"),
+  validate(userIdParamSchema, "params"),
+  validate(userReportHistorySchema, "query"),
+  UserController.getReportHistory,
+);
+router.get(
+  "/:id/schedules",
+  authenticate,
+  authorize("LGU_ADMIN"),
+  validate(userIdParamSchema, "params"),
+  validate(userScheduleHistorySchema, "query"),
+  UserController.getScheduleHistory,
 );
 router.delete(
   "/:id",
