@@ -96,11 +96,14 @@ function SchedulesDashboard() {
 
   // Open the form when a report or map selection is supplied, including client navigation.
   React.useEffect(() => {
-    if (reportId) {
+    if (scheduleId) {
+      setIsFormOpen(false);
+      setEditingSchedule(null);
+    } else if (reportId) {
       setEditingSchedule(null);
       setIsFormOpen(true);
     } else if (scheduleReportsParam) {
-      const reportIds = scheduleReportsParam.split(",").filter(Boolean);
+      const reportIds = [...new Set(scheduleReportsParam.split(",").filter(Boolean))];
       if (reportIds.length > 0) {
         const lat = parseFloat(params.get("lat") || "") || 7.3032;
         const lng = parseFloat(params.get("lng") || "") || 125.6811;
@@ -122,7 +125,7 @@ function SchedulesDashboard() {
         setIsFormOpen(true);
       }
     }
-  }, [params, reportId, scheduleReportsParam]);
+  }, [params, reportId, scheduleReportsParam, scheduleId]);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -205,9 +208,7 @@ function SchedulesDashboard() {
     },
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["schedules"] });
-      queryClient.invalidateQueries({
-        queryKey: ["reports", "eligible-for-schedule"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       setSelectedSchedule(updated);
       setIsDetailOpen(true);
       setIsFormOpen(false);
@@ -732,8 +733,9 @@ function SchedulesDashboard() {
       )}
 
       {/* ── Create / Edit Schedule Modal ──────────────────────────── */}
-      {isFormOpen && (
+      {isFormOpen && !scheduleId && (
         <ScheduleForm
+          key={reportId ?? scheduleReportsParam ?? editingSchedule?.id ?? "new"}
           isOpen={isFormOpen}
           onClose={() => {
             setIsFormOpen(false);

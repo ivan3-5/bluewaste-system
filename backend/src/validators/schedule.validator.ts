@@ -37,10 +37,14 @@ export const updateScheduleSchema = z.object({
     .min(1, "At least one worker must be assigned")
     .optional(),
   reportIds: z.array(z.string().uuid()).optional(),
+  addReportIds: z.array(z.string().uuid()).min(1).optional(),
   status: z
     .enum(["UPCOMING", "ONGOING", "COMPLETED", "CANCELLED"])
     .optional(),
   equipment: z.array(z.string()).optional(),
+}).refine(({ reportIds, addReportIds }) => reportIds === undefined || addReportIds === undefined, {
+  path: ["addReportIds"],
+  message: "Choose either adding or replacing linked reports.",
 });
 
 export const updateScheduleStatusSchema = z.object({

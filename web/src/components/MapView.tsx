@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { canScheduleReport } from "@/lib/schedule-reports";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 // leaflet-draw is imported dynamically inside the map useEffect (client-only)
@@ -15,7 +16,7 @@ import {
 import { getStatusColor, CleanupRadiusGroup } from "@/types";
 import { useAuth } from "@/providers/AuthProvider";
 import api from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import {
   groupReportsByRadius,
   formatDistance,
@@ -175,11 +176,24 @@ function getStatusPill(status: AdminReport["status"]) {
   return pills[status] || `<span style="font-size:11px;">${status}</span>`;
 }
 
+function getReportPopupAction(report: AdminReport) {
+  if (report.cleanupScheduleId && report.status !== "PENDING") {
+    return {
+      href: `/dashboard/schedules?scheduleId=${encodeURIComponent(report.cleanupScheduleId)}`,
+      label: "View Schedule",
+    };
+  }
+  return {
+    href: `/dashboard/reports/${encodeURIComponent(report.id)}`,
+    label: report.status === "PENDING" ? "Review Report" : "Details",
+  };
+}
+
 function buildPopupHtml(report: AdminReport) {
   const imageUrl = escapeHtml(report.imageUrl || PLACEHOLDER_IMAGE);
-  const detailHref = `/dashboard/reports/${encodeURIComponent(report.id)}`;
-  const scheduleHref = `/dashboard/schedules?scheduleReports=${encodeURIComponent(report.id)}&lat=${report.latitude}&lng=${report.longitude}&barangay=${encodeURIComponent(report.locationName || "")}`;
-  const isSchedulable = report.status !== "CLEANED" && report.status !== "REJECTED";
+  const action = getReportPopupAction(report);
+  const scheduleHref = `/dashboard/schedules?reportId=${encodeURIComponent(report.id)}&locationName=${encodeURIComponent(report.locationName || "")}`;
+  const isSchedulable = canScheduleReport(report);
 
   return `
     <div style="display:flex;flex-direction:column;gap:10px;min-width:220px;max-width:260px;font-family:system-ui,-apple-system,sans-serif;">
@@ -192,7 +206,7 @@ function buildPopupHtml(report: AdminReport) {
         </div>
         <p style="margin:0;font-size:11px;color:#64748b;line-height:1.3;">📍 ${report.latitude.toFixed(4)}, ${report.longitude.toFixed(4)}</p>
         <div style="display:flex;gap:6px;margin-top:4px;">
-          <a href="${detailHref}" style="${isSchedulable ? "flex:1" : "width:100%"};display:inline-flex;align-items:center;justify-content:center;height:32px;border-radius:8px;background:#f1f5f9;color:#334155;font-size:11px;font-weight:700;text-decoration:none;">Details</a>
+          <a href="${action.href}" style="${isSchedulable ? "flex:1" : "width:100%"};display:inline-flex;align-items:center;justify-content:center;height:32px;border-radius:8px;background:#f1f5f9;color:#334155;font-size:11px;font-weight:700;text-decoration:none;">${action.label}</a>
           ${isSchedulable ? `
           <a href="${scheduleHref}" style="flex:1;display:inline-flex;align-items:center;justify-content:center;height:32px;border-radius:8px;background:hsl(var(--primary));color:#ffffff;font-size:11px;font-weight:700;text-decoration:none;">Schedule</a>
           ` : ""}
@@ -208,11 +222,10 @@ function buildRadiusGroupPopupHtml(group: CleanupRadiusGroup<AdminReport>) {
   const firstReport = group.reports[0];
   const imageUrl = escapeHtml(firstReport?.imageUrl || PLACEHOLDER_IMAGE);
   const locationLabel = group.barangay || firstReport?.locationName || "Panabo Coastal Zone";
-  const reportIds = group.reports.map((r) => r.id).join(",");
+  const ready = group.reports.filter(canScheduleReport);
+  const pendingCount = group.reports.filter((report) => report.status === "PENDING").length;
+  const reportIds = ready.map((report) => report.id).join(",");
   const scheduleHref = `/dashboard/schedules?scheduleReports=${encodeURIComponent(reportIds)}&lat=${group.center.latitude}&lng=${group.center.longitude}&barangay=${encodeURIComponent(locationLabel)}`;
-  const hasSchedulableReports = group.reports.some(
-    (r) => r.status !== "CLEANED" && r.status !== "REJECTED",
-  );
 
   // Pairwise distance breakdown
   let distanceHtml = "";
@@ -246,18 +259,22 @@ function buildRadiusGroupPopupHtml(group: CleanupRadiusGroup<AdminReport>) {
     `;
   }
 
-  // Reports mini-list
-  const reportsList = group.reports
-    .slice(0, 3)
-    .map((r) => {
-      const distInfo = group.distancesFromCenter.find((d) => d.reportId === r.id);
-      const distStr = distInfo ? ` • ${distInfo.distanceMeters}m from center` : "";
-      return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;padding:3.5px 0;border-bottom:1px dashed #e2e8f0;">
-        <span style="font-weight:600;color:#1e293b;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.locationName || r.description || "Report")}</span>
-        <span style="color:#64748b;font-size:10px;white-space:nowrap;">${getStatusPill(r.status)}${distStr}</span>
-      </div>`;
-    })
-    .join("");
+  const distanceByReport = new Map(group.distancesFromCenter.map((entry) => [entry.reportId, entry.distanceMeters]));
+  const reportsList = group.reports.map((report) => {
+    const distance = distanceByReport.get(report.id);
+    const distStr = distance === undefined ? "" : ` • ${distance}m from center`;
+    const action = getReportPopupAction(report);
+    const name = escapeHtml(report.locationName || report.description || "Waste Report");
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed #e2e8f0;">
+      <div style="min-width:0;display:grid;gap:3px;">
+        <a href="/dashboard/reports/${encodeURIComponent(report.id)}" title="${name}" style="font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</a>
+            <span style="color:#64748b;font-size:10px;">${getStatusPill(report.status)}${distStr}</span>
+            ${report.status === "PENDING" ? `<span style="color:#475569;font-size:10px;">Submitted ${formatDateTime(report.reportedAt)}</span>` : ""}
+            ${report.status === "CLEANED" && report.cleanedAt ? `<span style="color:#475569;font-size:10px;">Cleaned ${formatDateTime(report.cleanedAt)}</span>` : ""}
+      </div>
+      ${action.label === "Details" ? "" : `<a href="${action.href}" aria-label="${action.label} for ${name}" style="white-space:nowrap;border-radius:8px;padding:6px 8px;background:#f1f5f9;color:#334155;font-size:11px;font-weight:700;text-decoration:none;">${action.label}</a>`}
+    </div>`;
+  }).join("");
 
   return `
     <div style="display:flex;flex-direction:column;gap:10px;min-width:260px;max-width:300px;font-family:system-ui,-apple-system,sans-serif;">
@@ -285,13 +302,13 @@ function buildRadiusGroupPopupHtml(group: CleanupRadiusGroup<AdminReport>) {
 
         <div style="margin-top:4px;">
           <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:2px;">Contained Waste Reports:</div>
-          ${reportsList}
-          ${group.reportCount > 3 ? `<div style="font-size:10px;color:#64748b;margin-top:2px;">+ ${group.reportCount - 3} more reports in this 50m area</div>` : ""}
+          <p style="font-size:11px;color:#475569;margin:4px 0;">${ready.length} ready to schedule${pendingCount ? ` · ${pendingCount} awaiting verification` : ""}</p>
+          <div style="max-height:150px;overflow-y:auto;">${reportsList}</div>
         </div>
 
-        ${hasSchedulableReports ? `
+        ${ready.length > 0 ? `
         <a href="${scheduleHref}" style="display:flex;align-items:center;justify-content:center;gap:6px;height:38px;margin-top:6px;padding:0 14px;border-radius:10px;background:linear-gradient(to right,#2563eb,#4f46e5);color:#ffffff;font-size:12px;font-weight:700;text-decoration:none;box-shadow:0 4px 12px rgba(79,70,229,0.3);">
-          <span>📅 Schedule ${isMulti ? "Grouped" : ""} Cleanup Operation →</span>
+          <span>Schedule Cleanup (${ready.length})</span>
         </a>
         ` : ""}
       </div>

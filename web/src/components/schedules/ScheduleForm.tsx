@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { canScheduleReport } from "@/lib/schedule-reports";
 import {
   Dialog,
   DialogContent,
@@ -162,7 +164,7 @@ export function ScheduleForm({
         "/reports?status=VERIFIED&hasCleanupSchedule=false&limit=100",
       );
       const list = (res.data.data as Report[]) || [];
-      return list.filter((r) => !r.cleanupScheduleId);
+      return list.filter(canScheduleReport);
     },
     enabled: isOpen,
   });
@@ -183,8 +185,7 @@ export function ScheduleForm({
     enabled: isOpen && !isEditing && Boolean(initialReportId) && !reportInList,
   });
   const reportFromLink = reportInList ?? initialReportQuery.data;
-  const initialReport = reportFromLink?.status === "VERIFIED" &&
-    !reportFromLink.cleanupScheduleId && !reportFromLink.isSpam
+  const initialReport = reportFromLink && canScheduleReport(reportFromLink)
     ? reportFromLink : undefined;
 
   const { data: allSchedules = [] } = useQuery({
@@ -205,89 +206,37 @@ export function ScheduleForm({
     });
   }, [formData.scheduledAt, allSchedules, isEditing]);
 
-  const [extraReports, setExtraReports] = useState<Report[]>([]);
-
-  // If preselected report IDs are provided via initialData, ensure they exist in displayedReports
-  useEffect(() => {
-    if (!isOpen || !initialData) return;
-    const targetIds: string[] =
-      Array.isArray(initialData.reportIds) && initialData.reportIds.length > 0
-        ? initialData.reportIds
-        : Array.isArray(initialData.reports) && initialData.reports.length > 0
-          ? initialData.reports.map((r: any) => r.id)
-          : [];
-
-    if (targetIds.length === 0) return;
-
-    const missingIds = targetIds.filter(
-      (id) =>
-        !eligibleReports.some((r) => r.id === id) &&
-        !extraReports.some((r) => r.id === id) &&
-        !(initialData.reports && initialData.reports.some((r: any) => r.id === id)),
-    );
-
-    if (missingIds.length > 0) {
-      Promise.all(
-        missingIds.map((id) =>
-          api
-            .get(`/reports/${id}`)
-            .then((res) => (res.data?.data || res.data) as Report)
-            .catch(() => null),
-        ),
-      ).then((fetched) => {
-        const valid = fetched.filter(Boolean) as Report[];
-        if (valid.length > 0) {
-          setExtraReports((prev) => {
-            const next = [...prev];
-            valid.forEach((v) => {
-              if (!next.some((n) => n.id === v.id)) next.push(v);
-            });
-            return next;
-          });
-        }
-      });
-    }
-  }, [isOpen, initialData, eligibleReports, extraReports]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setExtraReports([]);
-    }
-  }, [isOpen]);
+  const preselectedIds: string[] | undefined = initialData?.reportIds;
+  const groupSelection = useQuery({
+    queryKey: ["reports", "schedule-selection", preselectedIds],
+    enabled: isOpen && !isEditing && Boolean(preselectedIds?.length),
+    queryFn: async ({ signal }) => {
+      const results = await Promise.allSettled(preselectedIds!.map(async (id) => {
+        const { data } = await api.get<Report & { locationName?: string }>(
+          `/reports/${encodeURIComponent(id)}`, { signal },
+        );
+        return { ...data, title: data.title ?? "Waste report", address: data.address ?? data.locationName };
+      }));
+      return results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+    },
+  });
+  const groupApplied = useRef<string | null>(null);
+  const groupKey = preselectedIds?.join(",") ?? "";
 
   const displayedReports = useMemo(() => {
-    let baseList: Report[] = [];
-    if (isEditing && initialData?.reports) {
-      const currentReports = (initialData.reports as Report[]) || [];
-      const unassigned = eligibleReports.filter(
-        (er) =>
-          !er.cleanupScheduleId &&
-          !currentReports.some((cr: any) => cr.id === er.id),
-      );
-      baseList = [...currentReports, ...unassigned];
-    } else {
-      baseList = eligibleReports.filter((r) => !r.cleanupScheduleId);
+    const current = isEditing ? (initialData?.reports as Report[] | undefined) ?? [] : [];
+    const lookedUpReports = groupSelection.data ?? [];
+    const found = new Map<string, Report>();
+    for (const report of [...current, ...eligibleReports, ...lookedUpReports, ...(reportFromLink ? [reportFromLink] : [])]) {
+      found.set(report.id, report);
     }
-    const merged = [...baseList];
-    if (initialReport && !merged.some((m) => m.id === initialReport.id)) {
-      merged.unshift(initialReport);
-    }
-    if (extraReports.length > 0) {
-      extraReports.forEach((extra) => {
-        if (!merged.some((m) => m.id === extra.id)) {
-          merged.unshift(extra);
-        }
-      });
-    }
-    return merged;
-  }, [
-    isEditing,
-    initialData?.reports,
-    eligibleReports,
-    extraReports,
-    initialReport,
-    reportInList,
-  ]);
+    const retainedIds = new Set(current.map(({ id }) => id));
+    return [...found.values()].filter((report) => retainedIds.has(report.id) || canScheduleReport(report));
+  }, [isEditing, initialData?.reports, eligibleReports, groupSelection.data, reportFromLink]);
+
+  const unavailableSelection = (groupSelection.data ?? []).filter((report) => !canScheduleReport(report));
+  const missingSelectionCount = groupSelection.data
+    ? (preselectedIds?.length ?? 0) - groupSelection.data.length : 0;
 
   const selectedCitizenCount = useMemo(() => {
     const selected = displayedReports.filter((r: any) =>
@@ -416,12 +365,9 @@ export function ScheduleForm({
         detectBarangayFromLocation(initialLocation) ||
         "";
 
-      const initialReportIds: string[] =
-        Array.isArray(initialData.reportIds) && initialData.reportIds.length > 0
-          ? initialData.reportIds
-          : Array.isArray(initialData.reports) && initialData.reports.length > 0
-            ? initialData.reports.map((r: any) => r.id)
-            : [];
+      const initialReportIds: string[] = isEditing
+        ? (initialData.reports as Report[] | undefined)?.map(({ id }) => id) ?? []
+        : [];
 
       const initialEquipment: string[] =
         Array.isArray(initialData.equipment) && initialData.equipment.length > 0
@@ -481,6 +427,20 @@ export function ScheduleForm({
       };
     });
   }, [isOpen, isEditing, initialReport]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      groupApplied.current = null;
+      return;
+    }
+    if (isEditing || !groupKey || !groupSelection.data || groupApplied.current === groupKey) return;
+    groupApplied.current = groupKey;
+    const reports = groupSelection.data.filter(canScheduleReport);
+    setFormData((previous) => ({
+      ...previous,
+      reportIds: [...new Set([...previous.reportIds, ...reports.map(({ id }) => id)])],
+    }));
+  }, [groupKey, groupSelection.data, isEditing, isOpen]);
 
   // Synchronize location info if reports were preselected but location was empty or default
   useEffect(() => {
@@ -790,8 +750,14 @@ export function ScheduleForm({
     }
     if (formData.reportIds.length === 0) {
       setErrorMessage(
-        "Please link at least one waste report to this cleanup operation.",
+        "Select at least one verified report for this cleanup operation.",
       );
+      setActiveTab("details");
+      return;
+    }
+
+    if (formData.reportIds.some((id) => !displayedReports.some((report) => report.id === id))) {
+      setErrorMessage("A selected report is no longer available. Review your report selection.");
       setActiveTab("details");
       return;
     }
@@ -1059,11 +1025,38 @@ export function ScheduleForm({
                       </span>
                     </div>
 
+                    {groupKey && groupSelection.isPending && (
+                      <p role="status" className="text-xs text-slate-600 dark:text-slate-300">Checking which reports are ready to schedule…</p>
+                    )}
+                    {(unavailableSelection.length > 0 || missingSelectionCount > 0) && (
+                      <div role="status" className="space-y-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                        <p>Only verified, unassigned reports were selected.</p>
+                        {unavailableSelection.map((report) => (
+                          <p key={report.id}>
+                            <Link href={report.cleanupScheduleId
+                              ? `/dashboard/schedules?scheduleId=${encodeURIComponent(report.cleanupScheduleId)}`
+                              : `/dashboard/reports/${encodeURIComponent(report.id)}`} className="font-semibold underline underline-offset-2">
+                              {report.cleanupScheduleId ? "View Schedule" : "Review Report"}
+                            </Link>
+                            {" · "}{report.title}
+                          </p>
+                        ))}
+                        {missingSelectionCount > 0 && <p>{missingSelectionCount} report(s) could not be loaded.</p>}
+                      </div>
+                    )}
                     {initialReportId && !initialReport && (
                       <p role="status" className="text-xs text-slate-600 dark:text-slate-300">
                         {initialReportQuery.isLoading
                           ? "Loading the selected report…"
-                          : "The selected report could not be loaded or is no longer available for scheduling."}
+                          : reportFromLink?.status === "PENDING"
+                            ? "This report needs verification before it can be scheduled."
+                            : "The selected report could not be loaded or is no longer available for scheduling."}
+                        {reportFromLink?.status === "PENDING" && (
+                          <>{" "}<Link href={`/dashboard/reports/${encodeURIComponent(reportFromLink.id)}`} className="font-semibold underline underline-offset-2">Review Report</Link></>
+                        )}
+                        {reportFromLink?.cleanupScheduleId && (
+                          <>{" "}<Link href={`/dashboard/schedules?scheduleId=${encodeURIComponent(reportFromLink.cleanupScheduleId)}`} className="font-semibold underline underline-offset-2">View Schedule</Link></>
+                        )}
                       </p>
                     )}
 
