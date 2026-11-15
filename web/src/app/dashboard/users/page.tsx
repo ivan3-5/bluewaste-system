@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import {
   useUsers,
@@ -29,17 +30,7 @@ import { UsersPageSkeleton } from "@/components/skeletons/page-skeletons";
 import { useLiveNotifications } from "@/contexts/LiveNotificationContext";
 import { PaginationControls } from "@/components/ui/pagination";
 
-const ROLE_LABELS: Record<string, string> = {
-  LGU_ADMIN: "Admin",
-  FIELD_WORKER: "Field Worker",
-  CITIZEN: "Citizen",
-};
-
-const ROLE_BADGE_CLASSES: Record<string, string> = {
-  LGU_ADMIN: "bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300",
-  FIELD_WORKER: "bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300",
-  CITIZEN: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
-};
+import { ROLE_LABELS, UserRoleBadge, UserStatusBadge } from "@/components/users/UserBadges";
 
 const ROLE_DOT_COLORS: Record<string, string> = {
   LGU_ADMIN: "bg-blue-500",
@@ -504,59 +495,47 @@ export default function UsersPage() {
                       {user.email}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={cn(
-                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                          ROLE_BADGE_CLASSES[user.role] ?? ROLE_BADGE_CLASSES.CITIZEN,
-                        )}
-                      >
-                        {ROLE_LABELS[user.role] ?? user.role}
-                      </span>
+                      <UserRoleBadge role={user.role} />
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
                       {user.phone || "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
-                          user.isActive
-                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300"
-                            : "bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300",
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "h-1.5 w-1.5 rounded-full",
-                            user.isActive ? "bg-emerald-500" : "bg-red-500",
-                          )}
-                        />
-                        {user.isActive ? "Active" : "Inactive"}
-                      </span>
+                      <UserStatusBadge isActive={user.isActive} />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
                       {formatDateTime(user.createdAt)}
                     </td>
                     <td className="px-4 py-3">
-                      {user.role === "CITIZEN" ? (
-                        <button
-                          type="button"
-                          disabled
-                          aria-disabled="true"
-                          className="inline-flex items-center justify-center h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-400 dark:text-slate-500 opacity-40 cursor-not-allowed select-none shadow-none"
-                          title="Citizen accounts cannot be edited by administrators"
-                        >
-                          Edit
-                        </button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          className="rounded-lg font-semibold cursor-pointer"
-                          onClick={() => openEdit(user)}
-                        >
-                          Edit
+                      <div className="flex items-center gap-2">
+                        <Button asChild variant="outline" size="sm" className="rounded-lg font-semibold">
+                          <Link
+                            href={`/dashboard/users/${encodeURIComponent(user.id)}`}
+                            aria-label={`View ${user.firstName} ${user.lastName}`}
+                          >
+                            View
+                          </Link>
                         </Button>
-                      )}
+                        {user.role === "CITIZEN" ? (
+                          <button
+                            type="button"
+                            disabled
+                            aria-disabled="true"
+                            className="inline-flex items-center justify-center h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-400 dark:text-slate-500 opacity-40 cursor-not-allowed select-none shadow-none"
+                            title="Citizen accounts cannot be edited by administrators"
+                          >
+                            Edit
+                          </button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="rounded-lg font-semibold cursor-pointer"
+                            onClick={() => openEdit(user)}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

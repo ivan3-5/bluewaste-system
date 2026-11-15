@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ADMIN_REPORT_STATUS_LABELS,
   type AdminReportStatus,
@@ -58,6 +59,7 @@ export function ReportStatusUpdater({
   onStatusChange?: (nextStatus: AdminReportStatus) => void;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { pushToast } = useLiveNotifications();
   const [status, setStatus] = useState<AdminReportStatus>(initialStatus);
   const [isSaving, setIsSaving] = useState(false);
@@ -104,6 +106,8 @@ export function ReportStatusUpdater({
         isRead: true,
         createdAt: new Date().toISOString(),
       });
+      void queryClient.invalidateQueries({ queryKey: ["reports"] });
+      void queryClient.invalidateQueries({ queryKey: ["report", reportId] });
       router.refresh();
     } catch (error) {
       setStatus(initialStatus);

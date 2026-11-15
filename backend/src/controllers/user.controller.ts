@@ -2,8 +2,35 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import { UserService } from "../services/user.service";
 import { handleControllerError, QueryFilters } from "../utils/http";
+import type { UserReportHistoryQuery, UserScheduleHistoryQuery } from "../validators/user.validator";
 
 export class UserController {
+  static async getUserById(req: AuthRequest, res: Response) {
+    try {
+      res.set("Cache-Control", "private, no-store").json(await UserService.getUserById(req.params.id));
+    } catch (error) {
+      handleControllerError(res, error, "Failed to fetch user", "USER_FETCH_FAILED");
+    }
+  }
+
+  static async getReportHistory(req: AuthRequest, res: Response) {
+    try {
+      const query = req.query as unknown as UserReportHistoryQuery;
+      res.set("Cache-Control", "private, no-store").json(await UserService.getReportHistory(req.params.id, query));
+    } catch (error) {
+      handleControllerError(res, error, "Failed to fetch report history", "USER_REPORT_HISTORY_FAILED");
+    }
+  }
+
+  static async getScheduleHistory(req: AuthRequest, res: Response) {
+    try {
+      const query = req.query as unknown as UserScheduleHistoryQuery;
+      res.set("Cache-Control", "private, no-store").json(await UserService.getScheduleHistory(req.params.id, query));
+    } catch (error) {
+      handleControllerError(res, error, "Failed to fetch schedule history", "USER_SCHEDULE_HISTORY_FAILED");
+    }
+  }
+
   static async getFieldWorkers(req: AuthRequest, res: Response) {
     try {
       const workers = await UserService.getFieldWorkers();

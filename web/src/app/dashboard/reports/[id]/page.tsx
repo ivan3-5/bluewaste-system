@@ -184,6 +184,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
             reportId={report.id}
             initialStatus={report.status}
             isAlreadyScheduled={isAlreadyScheduled}
+            cleanupScheduleId={report.cleanupScheduleId}
             reportLatitude={report.latitude}
             reportLongitude={report.longitude}
             reportLocation={displayLocationName}

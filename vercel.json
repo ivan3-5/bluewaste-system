@@ -41,6 +41,10 @@
       "dest": "/web/dashboard/reports/[id]?nxtPid=$1"
     },
     {
+      "src": "/dashboard/users/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})",
+      "dest": "/web/dashboard/users/[id]?nxtPid=$1"
+    },
+    {
       "src": "/field-worker/tasks/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})",
       "dest": "/web/field-worker/tasks/[id]?nxtPid=$1"
     },

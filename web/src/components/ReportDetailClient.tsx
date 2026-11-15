@@ -175,6 +175,7 @@ export function ScheduleCleanupButton({
   reportId,
   status,
   isAlreadyScheduled,
+  cleanupScheduleId,
   latitude,
   longitude,
   locationName,
@@ -183,6 +184,7 @@ export function ScheduleCleanupButton({
   reportId?: string;
   status: AdminReportStatus;
   isAlreadyScheduled: boolean;
+  cleanupScheduleId?: string | null;
   latitude?: number;
   longitude?: number;
   locationName?: string;
@@ -195,9 +197,11 @@ export function ScheduleCleanupButton({
   if (isAlreadyScheduled) {
     return (
       <Link
-        href="/dashboard/schedules"
+        href={cleanupScheduleId
+          ? `/dashboard/schedules?scheduleId=${encodeURIComponent(cleanupScheduleId)}`
+          : "/dashboard/schedules"}
         className={`inline-flex items-center gap-1.5 rounded-lg border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition shadow-2xs ${className}`}
-        title="View schedule details"
+        title={cleanupScheduleId ? "View schedule details" : "View cleanup schedules"}
       >
         <CheckCircle2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
         <span>Scheduled</span>
@@ -245,6 +249,7 @@ export function ReportDetailActionHub({
   reportId,
   initialStatus,
   isAlreadyScheduled,
+  cleanupScheduleId,
   reportLatitude,
   reportLongitude,
   reportLocation,
@@ -253,6 +258,7 @@ export function ReportDetailActionHub({
   reportId: string;
   initialStatus: AdminReportStatus;
   isAlreadyScheduled: boolean;
+  cleanupScheduleId?: string | null;
   reportLatitude?: number;
   reportLongitude?: number;
   reportLocation?: string;
@@ -284,6 +290,7 @@ export function ReportDetailActionHub({
         reportId={reportId}
         status={currentStatus}
         isAlreadyScheduled={isScheduled}
+        cleanupScheduleId={cleanupScheduleId}
         latitude={reportLatitude}
         longitude={reportLongitude}
         locationName={reportLocation}

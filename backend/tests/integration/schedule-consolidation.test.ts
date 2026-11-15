@@ -6,6 +6,7 @@ import fs from "node:fs";
 import { validate } from "../../src/middleware/validate";
 import { createScheduleSchema } from "../../src/validators/schedule.validator";
 import { NotificationService } from "../../src/services/notification.service";
+import { ScheduleController } from "../../src/controllers/schedule.controller";
 
 vi.mock("../../src/services/notification.service", () => ({
   NotificationService: {
@@ -292,6 +293,88 @@ describe("Schedule Consolidation Service", () => {
           "admin-1",
         ),
       ).rejects.toThrow("already completed or rejected");
+    });
+  });
+
+  describe("Verified report eligibility", () => {
+    it("rejects a mixed-status group before creating a schedule", async () => {
+      prismaMock.user.findMany.mockResolvedValue([worker1] as never);
+      prismaMock.cleanupSchedule.findMany.mockResolvedValue([]);
+      prismaMock.report.findMany.mockResolvedValue([
+        report1, { ...report2, status: "PENDING" },
+      ] as never);
+      const json = vi.fn();
+      const status = vi.fn().mockReturnValue({ json });
+
+      await ScheduleController.create({
+        user: { id: "admin-1" },
+        body: {
+          title: "Coastal cleanup",
+          description: "Two reports at the same location",
+          barangay: "Cagangohan",
+          latitude: report1.latitude,
+          longitude: report1.longitude,
+          scheduledAt: "2027-05-10T08:00:00Z",
+          workerIds: [worker1.id],
+          reportIds: [report1.id, report2.id],
+        },
+      } as never, { status } as never);
+
+      expect(status).toHaveBeenCalledWith(409);
+      expect(json).toHaveBeenCalledWith(expect.objectContaining({
+        error: expect.stringContaining("Only verified reports can be scheduled"),
+      }));
+      expect(prismaMock.cleanupSchedule.create).not.toHaveBeenCalled();
+      expect(prismaMock.report.updateMany).not.toHaveBeenCalled();
+    });
+
+    const active = {
+      id: "active",
+      title: "Cagangohan cleanup",
+      barangay: "Cagangohan",
+      status: CleanupScheduleStatus.ONGOING,
+      reports: [{ id: report1.id, status: ReportStatus.CLEANED }],
+      workers: [{ workerId: worker1.id }],
+    };
+
+    it.each([{ addReportIds: [report2.id] }, { reportIds: [report1.id, report2.id] }])(
+      "rejects pending reports when adding or editing links (%j)",
+      async (selection) => {
+        prismaMock.cleanupSchedule.findUnique.mockResolvedValue(active as never);
+        prismaMock.report.findMany.mockResolvedValue([{ ...report2, status: "PENDING" }] as never);
+
+        await expect(ScheduleService.update(active.id, selection, "admin-1"))
+          .rejects.toThrow("Only verified reports can be scheduled");
+        expect(prismaMock.report.updateMany).not.toHaveBeenCalled();
+        expect(prismaMock.cleanupSchedule.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it("adds a newly verified report without rewriting existing work and notifies the crew", async () => {
+      prismaMock.cleanupSchedule.findUnique
+        .mockResolvedValueOnce(active as never)
+        .mockResolvedValueOnce({ ...active, reports: [...active.reports, { id: report2.id, status: "IN_PROGRESS" }] } as never);
+      prismaMock.report.findMany.mockResolvedValue([report2] as never);
+      const saved = { ...active, reports: [...active.reports, { ...report2, status: "IN_PROGRESS" }] };
+      prismaMock.cleanupSchedule.update.mockResolvedValue(saved as never);
+
+      await expect(ScheduleService.update(active.id, { addReportIds: [report2.id] }, "admin-1"))
+        .resolves.toEqual(saved);
+      expect(prismaMock.report.updateMany).toHaveBeenCalledExactlyOnceWith({
+        where: { id: { in: [report2.id] } },
+        data: { cleanupScheduleId: active.id, status: "IN_PROGRESS", assignedToId: worker1.id },
+      });
+      expect(NotificationService.create).toHaveBeenCalledWith(expect.objectContaining({
+        userId: worker1.id, title: "Cleanup Schedule Updated",
+      }));
+    });
+
+    it("keeps newly verified reports out of completed cleanups", async () => {
+      prismaMock.cleanupSchedule.findUnique.mockResolvedValue({ ...active, status: "COMPLETED" } as never);
+
+      await expect(ScheduleService.update(active.id, { addReportIds: [report2.id] }, "admin-1"))
+        .rejects.toThrow("upcoming or ongoing cleanup schedule");
+      expect(prismaMock.report.updateMany).not.toHaveBeenCalled();
     });
   });
 

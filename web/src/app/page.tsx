@@ -79,7 +79,7 @@ const features = [
     icon: BarChart3,
     title: "Analytics Dashboard",
     description:
-      "Visualize waste hotspots, and generate reports, date, or category.",
+      "Visualize waste reports, and date, or category.",
   },
   {
     icon: Shield,
@@ -263,16 +263,6 @@ export default function HomePage() {
                   >
                     Report Waste Now
                     <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </Link>
-                <Link href="/map">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 px-8 text-base font-semibold border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:-translate-y-0.5 transition-all duration-200"
-                  >
-                    <Navigation className="w-4 h-4" />
-                    View Map
                   </Button>
                 </Link>
               </div>

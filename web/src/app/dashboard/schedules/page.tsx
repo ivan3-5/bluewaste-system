@@ -68,7 +68,18 @@ export default function SchedulesPage() {
 
 function SchedulesDashboard() {
   const router = useRouter();
-  const reportId = useSearchParams().get("reportId");
+  const params = useSearchParams();
+  const reportId = params.get("reportId");
+  const scheduleReportsParam = params.get("scheduleReports");
+  const scheduleId = reportId || scheduleReportsParam ? null : params.get("scheduleId");
+  const reportLocation = reportId ? params.get("locationName")?.trim() : undefined;
+  const reportPrefill = useMemo(() => {
+    if (!reportLocation || reportLocation.toLowerCase().startsWith("waste report")) return null;
+    return {
+      locationName: reportLocation.slice(0, 300),
+      title: `Coastal Cleanup - ${reportLocation.split(",").slice(0, 2).join(",").trim()}`.slice(0, 200),
+    };
+  }, [reportLocation]);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -83,13 +94,16 @@ function SchedulesDashboard() {
   const [editingSchedule, setEditingSchedule] =
     useState<CleanupSchedule | null>(null);
 
-  // Auto-open schedule modal when pre-selected reports are passed from MapView or Report Details
+  // Open the form when a report or map selection is supplied, including client navigation.
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const scheduleReportsParam = params.get("scheduleReports");
-    if (scheduleReportsParam) {
-      const reportIds = scheduleReportsParam.split(",").filter(Boolean);
+    if (scheduleId) {
+      setIsFormOpen(false);
+      setEditingSchedule(null);
+    } else if (reportId) {
+      setEditingSchedule(null);
+      setIsFormOpen(true);
+    } else if (scheduleReportsParam) {
+      const reportIds = [...new Set(scheduleReportsParam.split(",").filter(Boolean))];
       if (reportIds.length > 0) {
         const lat = parseFloat(params.get("lat") || "") || 7.3032;
         const lng = parseFloat(params.get("lng") || "") || 125.6811;
@@ -106,14 +120,12 @@ function SchedulesDashboard() {
           longitude: lng,
           barangay,
           locationName,
-          title: `Coastal Cleanup - ${shortLoc}`,
+          title: `Coastal Cleanup - ${shortLoc}`.slice(0, 200),
         } as any);
         setIsFormOpen(true);
       }
-      // Clean up the URL query params without a full page reload
-      window.history.replaceState({}, "", window.location.pathname);
     }
-  }, []);
+  }, [params, reportId, scheduleReportsParam, scheduleId]);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -134,13 +146,34 @@ function SchedulesDashboard() {
     staleTime: 30000,
   });
 
+  const linkedSchedule = useQuery({
+    queryKey: ["schedules", "detail", scheduleId],
+    enabled: Boolean(scheduleId),
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get<CleanupSchedule>(
+        `/schedules/${encodeURIComponent(scheduleId!)}`,
+        { signal },
+      );
+      return data;
+    },
+  });
+
   const activeSchedule = useMemo(() => {
+    if (scheduleId) return linkedSchedule.data ?? null;
     if (!selectedSchedule) return null;
     return (
       schedulesData?.find((s) => s.id === selectedSchedule.id) ||
       selectedSchedule
     );
-  }, [selectedSchedule, schedulesData]);
+  }, [scheduleId, linkedSchedule.data, selectedSchedule, schedulesData]);
+
+  const closeDetail = () => {
+    setIsDetailOpen(false);
+    if (scheduleId) {
+      setSelectedSchedule(null);
+      router.replace("/dashboard/schedules", { scroll: false });
+    }
+  };
 
   const { data: workers = [] } = useQuery({
     queryKey: ["workers", "schedule-options"],
@@ -175,9 +208,7 @@ function SchedulesDashboard() {
     },
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["schedules"] });
-      queryClient.invalidateQueries({
-        queryKey: ["reports", "eligible-for-schedule"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       setSelectedSchedule(updated);
       setIsDetailOpen(true);
       setIsFormOpen(false);
@@ -222,10 +253,14 @@ function SchedulesDashboard() {
   const handleEdit = (schedule: CleanupSchedule) => {
     setEditingSchedule(schedule);
     setIsFormOpen(true);
-    setIsDetailOpen(false);
+    closeDetail();
   };
 
   const handleRefresh = (schedule: CleanupSchedule) => {
+    if (scheduleId === schedule.id) {
+      queryClient.setQueryData(["schedules", "detail", scheduleId], schedule);
+      return;
+    }
     setSelectedSchedule(schedule);
     setIsDetailOpen(true);
   };
@@ -302,6 +337,20 @@ function SchedulesDashboard() {
 
   return (
     <div className="space-y-7 pb-12 max-w-[1600px] mx-auto animate-in fade-in duration-300">
+      {scheduleId && !linkedSchedule.data && (
+        <div
+          role={linkedSchedule.isError ? "alert" : "status"}
+          className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900"
+        >
+          <p className="flex-1">
+            {linkedSchedule.isError ? "This cleanup schedule could not be loaded." : "Loading cleanup schedule…"}
+          </p>
+          {linkedSchedule.isError && (
+            <Button variant="outline" size="sm" onClick={() => void linkedSchedule.refetch()}>Retry</Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={closeDetail}>Dismiss</Button>
+        </div>
+      )}
       {/* ── Top Hero Command Banner ─────────────────────────────── */}
       <div className="relative overflow-hidden bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900/80 dark:to-slate-800 rounded-3xl border border-gray-200/80 dark:border-slate-800 p-6 md:p-8 shadow-sm">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
@@ -684,17 +733,18 @@ function SchedulesDashboard() {
       )}
 
       {/* ── Create / Edit Schedule Modal ──────────────────────────── */}
-      {isFormOpen && (
+      {isFormOpen && !scheduleId && (
         <ScheduleForm
+          key={reportId ?? scheduleReportsParam ?? editingSchedule?.id ?? "new"}
           isOpen={isFormOpen}
           onClose={() => {
             setIsFormOpen(false);
             setEditingSchedule(null);
-            if (reportId) router.replace("/dashboard/schedules", { scroll: false });
+            if (reportId || scheduleReportsParam) router.replace("/dashboard/schedules", { scroll: false });
           }}
           onSubmit={handleFormSubmit}
           initialReportId={editingSchedule ? undefined : reportId ?? undefined}
-          initialData={editingSchedule}
+          initialData={editingSchedule ?? reportPrefill}
           workers={workers}
           isEditing={!!editingSchedule && !!editingSchedule.id}
         />
@@ -703,8 +753,9 @@ function SchedulesDashboard() {
       {/* ── Schedule Detail Mission Briefing Modal ────────────────── */}
       {activeSchedule && (
         <ScheduleDetail
-          isOpen={isDetailOpen}
-          onClose={() => setIsDetailOpen(false)}
+          key={activeSchedule.id}
+          isOpen={Boolean(scheduleId) || isDetailOpen}
+          onClose={closeDetail}
           schedule={activeSchedule}
           onEdit={handleEdit}
           onRefresh={handleRefresh}

@@ -16,6 +16,7 @@ type DashboardReportRow = {
   category: string;
   status: string;
   isSpam?: boolean | null;
+  isDeleted?: boolean;
   latitude: number;
   longitude: number;
   address: string | null;
@@ -154,6 +155,7 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
     description: row.description?.trim() || null,
     status: mapDashboardStatus(row.status) as AdminReport["status"],
     isSpam: Boolean(row.isSpam) || row.severity === "SPAM",
+    isDeleted: row.isDeleted,
     severity: (row.severity as AdminReport["severity"]) ?? null,
     reporterName: row.reporterName ?? null,
     reporterEmail: row.reporterEmail ?? null,
@@ -292,6 +294,7 @@ export async function getDashboardReportById(id: string) {
     SELECT
       r.id,
       r."isSpam",
+      r."isDeleted",
       (SELECT cs."scheduledAt" FROM "CleanupSchedule" cs WHERE cs.id = r."cleanupScheduleId") AS "cleanupScheduledAt",
       r.title,
       r.description,

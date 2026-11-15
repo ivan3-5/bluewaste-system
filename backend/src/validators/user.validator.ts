@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CleanupScheduleStatus, ReportStatus } from "@prisma/client";
 
 const roleEnum = z.enum([
   "CITIZEN",
@@ -34,3 +35,21 @@ export const updateUserSchema = z
 export const userIdParamSchema = z.object({
   id: z.string().uuid("Invalid user ID"),
 });
+
+const historyQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(10_000_000).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+  search: z.string().trim().max(150).optional(),
+  sort: z.enum(["asc", "desc"]).default("desc"),
+});
+
+export const userReportHistorySchema = historyQuerySchema.extend({
+  status: z.nativeEnum(ReportStatus).optional(),
+});
+
+export const userScheduleHistorySchema = historyQuerySchema.extend({
+  status: z.nativeEnum(CleanupScheduleStatus).optional(),
+});
+
+export type UserReportHistoryQuery = z.infer<typeof userReportHistorySchema>;
+export type UserScheduleHistoryQuery = z.infer<typeof userScheduleHistorySchema>;

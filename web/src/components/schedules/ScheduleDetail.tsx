@@ -42,6 +42,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { canScheduleReport } from "@/lib/schedule-reports";
 import { GenerateCleanupReportModal } from "@/components/GenerateReportButton";
 import { hasValidCombinedReport } from "@/lib/cleanup-report-pdf";
 import { Layers } from "lucide-react";
@@ -178,42 +180,24 @@ export function ScheduleDetail({
         "/reports?status=VERIFIED&hasCleanupSchedule=false&limit=100",
       );
       const list = (res.data.data as Report[]) || [];
-      return list.filter((r) => !r.cleanupScheduleId);
+      return list.filter(canScheduleReport);
     },
     enabled: isLinkingReports,
   });
 
-  const availableReportsToLink = useMemo(() => {
-    const currentReports = (schedule.reports ?? []) as Report[];
-    const unassigned = eligibleReports.filter(
-      (er) =>
-        !er.cleanupScheduleId &&
-        !currentReports.some((cr: any) => cr.id === er.id),
-    );
-    return [...currentReports, ...unassigned];
-  }, [schedule.reports, eligibleReports]);
+  const linkedReportIds = new Set(schedule.reports?.map(({ id }) => id));
+  const availableReportsToLink = eligibleReports.filter(({ id }) => !linkedReportIds.has(id));
 
   const linkReportsMutation = useMutation({
     mutationFn: async (reportIds: string[]) => {
-      const res = await api.put(`/schedules/${schedule.id}`, {
-        reportIds,
-        workerIds: schedule.workers.map((w) => w.workerId),
-        title: schedule.title,
-        description: schedule.description,
-        barangay: schedule.barangay,
-        latitude: schedule.latitude,
-        longitude: schedule.longitude,
-        scheduledAt: schedule.scheduledAt,
-        equipment: schedule.equipment,
-        status: schedule.status,
+      const res = await api.put(`/schedules/${encodeURIComponent(schedule.id)}`, {
+        addReportIds: reportIds,
       });
       return res.data as CleanupSchedule;
     },
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["schedules"] });
-      queryClient.invalidateQueries({
-        queryKey: ["reports", "eligible-for-schedule"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       if (schedule?.id) {
         queryClient.invalidateQueries({
           queryKey: ["schedule-report", schedule.id],
@@ -226,7 +210,8 @@ export function ScheduleDetail({
   });
 
   const openLinkPanel = () => {
-    setLinkDraftIds((schedule.reports ?? []).map((r: any) => r.id));
+    setLinkDraftIds([]);
+    linkReportsMutation.reset();
     setIsLinkingReports(true);
   };
 
@@ -441,6 +426,11 @@ export function ScheduleDetail({
                   <FileText className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                   Waste Reports ({schedule.reports?.length || 0})
                 </h4>
+                {isAdmin && !isLinkingReports && (effectiveStatus === "UPCOMING" || effectiveStatus === "ONGOING") && (
+                  <Button size="sm" variant="outline" className="rounded-xl text-xs" onClick={openLinkPanel}>
+                    Add Reports
+                  </Button>
+                )}
               </div>
 
               {/* Inline Link Reports Selector */}
@@ -448,49 +438,46 @@ export function ScheduleDetail({
                 <div className="border border-indigo-200 dark:border-indigo-800/60 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-indigo-900 dark:text-indigo-200 uppercase tracking-wider">
-                      Select Verified Reports to Attach
+                      Add Verified Reports
                     </p>
                     <button
                       type="button"
+                      aria-label="Close add reports"
                       onClick={() => setIsLinkingReports(false)}
                       className="text-gray-400 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Select locations the assigned crew can cover. The crew will be notified when reports are added.
+                  </p>
+                  {linkReportsMutation.isError && (
+                    <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+                      {getApiErrorMessage(linkReportsMutation.error, "Could not add reports. Please try again.")}
+                    </p>
+                  )}
                   {fetchingReports ? (
                     <p className="text-xs text-gray-500 dark:text-slate-400 py-3 animate-pulse">
                       Loading eligible reports...
                     </p>
                   ) : availableReportsToLink.length === 0 ? (
                     <p className="text-xs text-gray-500 dark:text-slate-400 py-2">
-                      No eligible unassigned waste reports found.
+                      No verified, unassigned reports are available.
                     </p>
                   ) : (
                     <div className="max-h-56 overflow-y-auto space-y-1.5 bg-white dark:bg-slate-900 p-2 rounded-xl border border-indigo-100 dark:border-slate-800">
                       {availableReportsToLink.map((r) => {
-                        const isAssignedToOther = Boolean(
-                          r.cleanupScheduleId && r.cleanupScheduleId !== schedule.id,
-                        );
                         const isDraftChecked = linkDraftIds.includes(r.id);
                         return (
                           <label
                             key={r.id}
-                            className={`flex items-center gap-3 p-2 rounded-xl transition-colors ${
-                              isAssignedToOther
-                                ? "opacity-50 cursor-not-allowed bg-gray-50 dark:bg-slate-800/50"
-                                : "hover:bg-indigo-50/50 dark:hover:bg-slate-800/70 cursor-pointer"
-                            }`}
+                            className="flex cursor-pointer items-center gap-3 rounded-xl p-2 transition-colors hover:bg-indigo-50/50 dark:hover:bg-slate-800/70"
                           >
                             <input
                               type="checkbox"
                               checked={isDraftChecked}
-                              disabled={isAssignedToOther}
-                              onChange={() => {
-                                if (!isAssignedToOther) {
-                                  toggleLinkDraft(r.id);
-                                }
-                              }}
+                              onChange={() => toggleLinkDraft(r.id)}
                               className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-slate-600 dark:bg-slate-800 disabled:opacity-40"
                             />
                             {r.images?.[0]?.imageUrl && (
@@ -508,11 +495,7 @@ export function ScheduleDetail({
                                 <p className="text-xs font-bold text-gray-900 dark:text-slate-100 truncate">
                                   {r.title}
                                 </p>
-                                {isAssignedToOther ? (
-                                  <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
-                                    Already Scheduled
-                                  </span>
-                                ) : isDraftChecked ? (
+                                {isDraftChecked ? (
                                   <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50">
                                     Selected
                                   </span>
@@ -543,10 +526,10 @@ export function ScheduleDetail({
                     <Button
                       size="sm"
                       onClick={() => linkReportsMutation.mutate(linkDraftIds)}
-                      disabled={linkReportsMutation.isPending}
+                      disabled={linkReportsMutation.isPending || fetchingReports || linkDraftIds.length === 0}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs h-8 px-4 font-bold"
                     >
-                      {linkReportsMutation.isPending ? "Saving..." : "Save Links"}
+                      {linkReportsMutation.isPending ? "Saving..." : "Add Selected Reports"}
                     </Button>
                   </div>
                 </div>

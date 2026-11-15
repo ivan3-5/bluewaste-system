@@ -3,8 +3,109 @@ import { Role, Prisma } from "@prisma/client";
 import { getPaginationParams, buildPaginatedResponse } from "../utils/pagination";
 import { hashPassword } from "../utils/password";
 import { QueryFilters } from "../utils/http";
+import type { UserReportHistoryQuery, UserScheduleHistoryQuery } from "../validators/user.validator";
+
+const userProfileSelect = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  role: true,
+  phone: true,
+  avatarUrl: true,
+  address: true,
+  isActive: true,
+  createdAt: true,
+} satisfies Prisma.UserSelect;
 
 export class UserService {
+  static async getUserById(id: string) {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: userProfileSelect,
+    });
+    if (!user) throw new Error("User not found");
+    return user;
+  }
+
+  static async getReportHistory(id: string, query: UserReportHistoryQuery) {
+    await this.getUserById(id);
+    const { search, status, sort, page, limit } = query;
+    const where: Prisma.ReportWhereInput = {
+      reporterId: id,
+      // A named history would reveal the identity behind an anonymous submission.
+      isAnonymous: false,
+      status,
+      ...(search && {
+        OR: [
+          { id: { startsWith: search, mode: "insensitive" } },
+          { title: { contains: search, mode: "insensitive" } },
+          { address: { contains: search, mode: "insensitive" } },
+        ],
+      }),
+    };
+    const total = await prisma.report.count({ where });
+    const currentPage = Math.min(page, Math.max(1, Math.ceil(total / limit)));
+    const reports = await prisma.report.findMany({
+      where,
+      select: {
+        id: true, title: true, address: true, latitude: true, longitude: true,
+        status: true, severity: true, createdAt: true, isSpam: true, isDeleted: true,
+      },
+      orderBy: [{ createdAt: sort }, { id: sort }],
+      skip: (currentPage - 1) * limit,
+      take: limit,
+    });
+    return buildPaginatedResponse(reports, total, { page: currentPage, limit });
+  }
+
+  static async getScheduleHistory(id: string, query: UserScheduleHistoryQuery) {
+    const user = await this.getUserById(id);
+    const { search, status, sort, page, limit } = query;
+    if (user.role !== Role.FIELD_WORKER) {
+      return buildPaginatedResponse([], 0, { page: 1, limit });
+    }
+
+    const where: Prisma.CleanupScheduleWorkerWhereInput = {
+      workerId: id,
+      schedule: {
+        status,
+        ...(search && {
+          OR: [
+            { id: { startsWith: search, mode: "insensitive" } },
+            { title: { contains: search, mode: "insensitive" } },
+            { barangay: { contains: search, mode: "insensitive" } },
+          ],
+        }),
+      },
+    };
+    const linkedReports = { isDeleted: false };
+    const total = await prisma.cleanupScheduleWorker.count({ where });
+    const currentPage = Math.min(page, Math.max(1, Math.ceil(total / limit)));
+    const assignments = await prisma.cleanupScheduleWorker.findMany({
+      where,
+      select: {
+        assignedAt: true,
+        schedule: {
+          select: {
+            id: true, title: true, barangay: true, scheduledAt: true, status: true,
+            reports: {
+              where: linkedReports,
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              take: 3,
+              select: { id: true, title: true },
+            },
+            _count: { select: { reports: { where: linkedReports } } },
+          },
+        },
+      },
+      orderBy: [{ schedule: { scheduledAt: sort } }, { scheduleId: sort }],
+      skip: (currentPage - 1) * limit,
+      take: limit,
+    });
+    return buildPaginatedResponse(assignments, total, { page: currentPage, limit });
+  }
+
   static async getFieldWorkers() {
     return prisma.user.findMany({
       where: { role: Role.FIELD_WORKER, isActive: true },
@@ -45,16 +146,7 @@ export class UserService {
       prisma.user.findMany({
         where,
         select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          phone: true,
-          avatarUrl: true,
-          address: true,
-          isActive: true,
-          createdAt: true,
+          ...userProfileSelect,
           _count: { select: { reports: true, assignedReports: true } },
         },
         orderBy: { createdAt: "desc" },
