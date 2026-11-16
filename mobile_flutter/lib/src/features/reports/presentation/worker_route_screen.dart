@@ -12,6 +12,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../data/report_service.dart';
 import '../domain/report_models.dart';
+import '../domain/report_map_date_range.dart';
+import 'widgets/map_date_range_filter.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Worker Route Screen
@@ -37,6 +39,8 @@ class _WorkerRouteScreenState extends ConsumerState<WorkerRouteScreen> {
   bool _dataReady    = false;
   bool _loading      = true;
   String? _errorMessage;
+  int _requestId = 0;
+  ReportMapDateRange _dateRange = ReportMapDateRange.last30Days;
 
   Position? _workerPosition;
   List<ReportRecord> _sortedReports = const [];
@@ -96,8 +100,11 @@ class _WorkerRouteScreenState extends ConsumerState<WorkerRouteScreen> {
 
   // ── Data loading ─────────────────────────────────────────────────────────────
   Future<void> _loadData() async {
+    final requestId = ++_requestId;
+    final window = _dateRange.window();
     setState(() {
-      _loading      = true;
+      _loading = true;
+      _dataReady = false;
       _errorMessage = null;
       _routeInjected = false;
     });
@@ -106,22 +113,26 @@ class _WorkerRouteScreenState extends ConsumerState<WorkerRouteScreen> {
       // 1. Get GPS location
       Position position = await _fetchLocation();
 
-      // 2. Fetch assigned reports
-      final result = await ref
-          .read(reportServiceProvider)
-          .getAssignedReports(page: 1, limit: 100);
-
-      if (!mounted) return;
-
-      // 3. Filter reports: single specific task route vs full route
-      List<ReportRecord> active;
-      if (widget.targetReport != null) {
-        active = [widget.targetReport!];
+      // A route opened from an individual task always shows that task.
+      final ReportRecord? target = widget.targetReport;
+      final List<ReportRecord> active;
+      if (!mounted || requestId != _requestId) return;
+      if (target != null) {
+        active = [target];
       } else {
+        final result = await ref
+            .read(reportServiceProvider)
+            .getAssignedReports(page: 1, limit: 100, dateWindow: window);
         active = result.data
-            .where((r) => r.status != 'CLEANED' && r.status != 'REJECTED')
+            .where(
+              (report) =>
+                  report.status != 'CLEANED' &&
+                  report.status != 'REJECTED' &&
+                  window.contains(report.createdAt),
+            )
             .toList();
       }
+      if (!mounted || requestId != _requestId) return;
 
       // If worker position is far away (> 50km, e.g. emulator default in US),
       // place worker position ~400m from first report so route line is clearly visible
@@ -153,19 +164,25 @@ class _WorkerRouteScreenState extends ConsumerState<WorkerRouteScreen> {
 
       setState(() {
         _workerPosition = position;
-        _sortedReports  = sorted;
-        _dataReady      = true;
-        _loading        = false;
+        _sortedReports = sorted;
+        _dataReady = true;
+        _loading = false;
       });
 
       _tryInjectRoute();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _requestId) return;
       setState(() {
         _errorMessage = e.toString();
-        _loading      = false;
+        _loading = false;
       });
     }
+  }
+
+  void _changeDateRange(ReportMapDateRange range) {
+    if (range == _dateRange) return;
+    _dateRange = range;
+    _loadData();
   }
 
   // ── GPS helper ───────────────────────────────────────────────────────────────
@@ -339,32 +356,35 @@ class _WorkerRouteScreenState extends ConsumerState<WorkerRouteScreen> {
   // ── Build ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // Error state
-    if (_errorMessage != null) {
-      return _ErrorView(
-        message: _errorMessage!,
-        onRetry:  _loadData,
-      );
-    }
-
     return Stack(
       children: [
         // WebView (always mounted so it can pre-load)
         WebViewWidget(controller: _controller),
 
         // Flutter-side loading overlay (shown while GPS + API fetch)
-        if (_loading)
-          const _LoadingOverlay(),
+        if (_loading) const _LoadingOverlay(),
 
-        // Info bar at the top showing stop count
-        if (!_loading && _dataReady)
+        if (_errorMessage != null)
+          Positioned.fill(
+            child: _ErrorView(message: _errorMessage!, onRetry: _loadData),
+          ),
+
+        // Keep the date control available when a selected date range is empty or fails.
+        if (widget.targetReport == null || (!_loading && _dataReady))
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             child: _RouteInfoBar(
-              stopCount: _sortedReports.length,
-              onRefresh: _loadData,
+              stopCount: _dataReady ? _sortedReports.length : null,
+              onRefresh: _loading ? null : _loadData,
+              dateFilter: widget.targetReport == null
+                  ? MapDateRangeFilter(
+                      value: _dateRange,
+                      onSelected: _changeDateRange,
+                      enabled: !_loading,
+                    )
+                  : null,
             ),
           ),
       ],
@@ -490,16 +510,21 @@ class _RouteInfoBar extends StatelessWidget {
   const _RouteInfoBar({
     required this.stopCount,
     required this.onRefresh,
+    this.dateFilter,
   });
 
-  final int stopCount;
-  final VoidCallback onRefresh;
+  final int? stopCount;
+  final VoidCallback? onRefresh;
+  final Widget? dateFilter;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(
-        AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, 0,
+        AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.sm,
+        0,
       ),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
@@ -517,54 +542,72 @@ class _RouteInfoBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: AppColors.tint(AppColors.primary),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.route, color: AppColors.primary, size: 16),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: stopCount == 0
-                ? Text(
-                    'No active stops — all reports resolved!',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.tint(AppColors.primary),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.route,
+                  color: AppColors.primary,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: stopCount == null
+                    ? const Text('Assigned cleanup route')
+                    : stopCount == 0
+                    ? Text(
+                        'No active stops in this date range.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: AppColors.success,
+                          color: AppColors.mutedForeground,
                         ),
-                  )
-                : RichText(
-                    text: TextSpan(
-                      style: Theme.of(context).textTheme.bodySmall,
-                      children: [
-                        TextSpan(
-                          text: '$stopCount stop${stopCount == 1 ? '' : 's'} ',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.foreground,
-                          ),
+                      )
+                    : RichText(
+                        text: TextSpan(
+                          style: Theme.of(context).textTheme.bodySmall,
+                          children: [
+                            TextSpan(
+                              text:
+                                  '$stopCount stop${stopCount == 1 ? '' : 's'} ',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.foreground,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: '• Nearest-neighbour order',
+                              style: TextStyle(
+                                color: AppColors.mutedForeground,
+                              ),
+                            ),
+                          ],
                         ),
-                        const TextSpan(
-                          text: '• Nearest-neighbour order',
-                          style: TextStyle(color: AppColors.mutedForeground),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+              ),
+              IconButton(
+                tooltip: 'Refresh route',
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded),
+                iconSize: 18,
+                color: AppColors.mutedForeground,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Refresh route',
-            onPressed: onRefresh,
-            icon: const Icon(Icons.refresh_rounded),
-            iconSize: 18,
-            color: AppColors.mutedForeground,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          ),
+          if (dateFilter != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            dateFilter!,
+          ],
         ],
       ),
     );

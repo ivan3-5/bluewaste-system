@@ -9,9 +9,12 @@ import "package:latlong2/latlong.dart";
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
+import "../data/detect_service.dart";
 import "../data/report_service.dart";
 import "../../../core/network/api_exception.dart";
 import "../domain/report_models.dart";
+import "../domain/report_map_date_range.dart";
+import "widgets/map_date_range_filter.dart";
 
 class ReportsMapScreen extends ConsumerStatefulWidget {
   const ReportsMapScreen({
@@ -53,6 +56,8 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
   bool _loading = true;
   String? _errorMessage;
   Timer? _timer;
+  int _requestId = 0;
+  ReportMapDateRange _dateRange = ReportMapDateRange.last30Days;
 
   /// When true the map shows one marker per WasteIncident (deduplicated).
   /// When false it shows all individual raw reports.
@@ -108,7 +113,11 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
   // ── Data loading ──────────────────────────────────────────────────────────
 
   Future<void> _loadData({bool silent = false}) async {
-    if (!silent && mounted) {
+    if (!mounted || (silent && _loading)) return;
+
+    final requestId = ++_requestId;
+    final window = _dateRange.window();
+    if (!silent) {
       setState(() => _loading = true);
     }
 
@@ -117,10 +126,17 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
 
       if (widget.assignedOnly) {
         // Worker map: always show raw assigned reports.
-        final result = await service.getAssignedReports(page: 1, limit: 500);
-        if (!mounted) return;
+        final result = await service.getAssignedReports(
+          page: 1,
+          limit: 500,
+          dateWindow: window,
+        );
+        if (!mounted || requestId != _requestId) return;
+        _markerCache.clear();
         setState(() {
-          _reports = result.data;
+          _reports = result.data
+              .where((report) => window.contains(report.createdAt))
+              .toList();
           _loading = false;
           _errorMessage = null;
         });
@@ -131,29 +147,25 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
       // Limit 500 covers all practical deployment sizes; 2000 was wasteful
       // in memory and caused jank parsing huge JSON on the main thread.
       final results = await Future.wait([
-        service.getMapReports(limit: 500),
-        service.getIncidentMapData(limit: 500),
+        service.getMapReports(limit: 500, dateWindow: window),
+        service.getIncidentMapData(limit: 500, dateWindow: window),
       ]);
 
-      if (!mounted) return;
+      if (!mounted || requestId != _requestId) return;
 
-      final newReports = results[0] as List<ReportRecord>;
-      final newIncidents = results[1] as List<IncidentMapData>;
-
-      // Evict stale cache entries when the data set changes.
-      if (newReports.length != _reports.length ||
-          newIncidents.length != _incidents.length) {
-        _markerCache.clear();
-      }
-
+      _markerCache.clear();
       setState(() {
-        _reports = newReports;
-        _incidents = newIncidents;
+        _reports = (results[0] as List<ReportRecord>)
+            .where((report) => window.contains(report.createdAt))
+            .toList();
+        _incidents = (results[1] as List<IncidentMapData>)
+            .where((incident) => window.contains(incident.createdAt))
+            .toList();
         _loading = false;
         _errorMessage = null;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || requestId != _requestId) return;
 
       String message;
       if (error is ApiException) {
@@ -169,6 +181,18 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
         _errorMessage = message;
       });
     }
+  }
+
+  void _changeDateRange(ReportMapDateRange range) {
+    if (range == _dateRange) return;
+    setState(() {
+      _dateRange = range;
+      _reports = const [];
+      _incidents = const [];
+      _errorMessage = null;
+      _markerCache.clear();
+    });
+    _loadData();
   }
 
   // ── Marker helpers ────────────────────────────────────────────────────────
@@ -659,12 +683,10 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
                                 ),
                                 if (incident.severity != null)
                                   AppStatusPill(
-                                    label: incident.severity!,
-                                    color: incident.severity == "CRITICAL"
-                                        ? AppColors.destructive
-                                        : incident.severity == "HIGH"
-                                            ? AppColors.orange
-                                            : AppColors.warning,
+                                    label: WasteSeverity.fromString(incident.severity).label,
+                                    color: WasteSeverity.fromString(incident.severity) == WasteSeverity.high
+                                        ? AppColors.orange
+                                        : AppColors.warning,
                                   ),
                               ],
                             ),
@@ -868,6 +890,11 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
                 ),
               ],
             ),
+            const SizedBox(height: AppSpacing.xs),
+            MapDateRangeFilter(
+              value: _dateRange,
+              onSelected: _changeDateRange,
+            ),
             // Group toggle — hidden in worker assignedOnly mode
             if (!widget.assignedOnly) ...[
               const SizedBox(height: AppSpacing.xs),
@@ -1051,8 +1078,8 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
                     : "Unable to load map data",
                 subtitle: _errorMessage ??
                     (useGrouped
-                        ? "There are no active waste incidents right now."
-                        : "There are no reports with map coordinates right now."),
+                        ? "No waste incidents match the selected date range."
+                        : "No reports with map coordinates match the selected date range."),
               ),
             ),
           ),

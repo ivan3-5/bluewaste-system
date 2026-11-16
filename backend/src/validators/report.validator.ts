@@ -57,7 +57,7 @@ export const updateStatusSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
-export const mapFilterSchema = z.object({
+const mapQuerySchema = z.object({
   status: z
     .enum([
       "PENDING",
@@ -73,6 +73,24 @@ export const mapFilterSchema = z.object({
     .string()
     .regex(/^\d+$/, "limit must be a positive integer")
     .optional(),
+  createdFrom: z.string().datetime({ offset: true }).optional(),
+  createdBefore: z.string().datetime({ offset: true }).optional(),
+});
+
+function validDateRange({ createdFrom, createdBefore }: z.infer<typeof mapQuerySchema>) {
+  return !createdFrom || !createdBefore || Date.parse(createdFrom) < Date.parse(createdBefore);
+}
+
+export const mapFilterSchema = mapQuerySchema.refine(validDateRange, {
+  path: ["createdBefore"],
+  message: "End of date range must be after its start",
+});
+
+export const assignedReportFilterSchema = mapQuerySchema.extend({
+  page: z.string().regex(/^\d+$/, "page must be a positive integer").optional(),
+}).refine(validDateRange, {
+  path: ["createdBefore"],
+  message: "End of date range must be after its start",
 });
 
 export const heatmapFilterSchema = z.object({

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { canScheduleReport } from "@/lib/schedule-reports";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -14,6 +15,7 @@ import {
   type IncidentMapData,
 } from "@/lib/admin-report";
 import { getStatusColor, CleanupRadiusGroup } from "@/types";
+import { DASHBOARD_PERIODS, DEFAULT_DASHBOARD_RANGE, type DashboardRange } from "@/lib/dashboard-period";
 import { useAuth } from "@/providers/AuthProvider";
 import api from "@/lib/api";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -50,6 +52,7 @@ import {
 
 type MapViewProps = {
   reports: AdminReport[];
+  dateRange: DashboardRange;
   center?: [number, number];
   zoom?: number;
   hideControls?: boolean;
@@ -385,6 +388,7 @@ function getRadiusCircleStyle(group: CleanupRadiusGroup<AdminReport>) {
 
 export default function MapView({
   reports,
+  dateRange,
   center = DEFAULT_CENTER,
   zoom = 12,
   hideControls = false,
@@ -392,6 +396,10 @@ export default function MapView({
   className = "",
   mapHeightClassName,
 }: MapViewProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [nextDateRange, setNextDateRange] = useState(dateRange);
+  const [isDatePending, startDateTransition] = useTransition();
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isEditingZone, setIsEditingZone] = useState(false);
   const [isDrawingZone, setIsDrawingZone] = useState(false);
@@ -996,6 +1004,15 @@ export default function MapView({
 
   const visibleCount = groupedMode ? radiusGroups.length : filteredReports.length;
 
+  function changeDateRange(value: DashboardRange) {
+    setNextDateRange(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === DEFAULT_DASHBOARD_RANGE) params.delete("range");
+    else params.set("range", value);
+    const query = params.toString();
+    startDateTransition(() => router.push(query ? `/dashboard/map?${query}` : "/dashboard/map", { scroll: false }));
+  }
+
   return (
     <div
       className={cn(
@@ -1042,6 +1059,26 @@ export default function MapView({
                   onChange={(e) => setStatusFilter(e.target.value as WasteMapStatusFilter)}
                 >
                   {Object.entries(WASTE_MAP_STATUS_OPTIONS).map(([value, label]) => (
+                    <option key={value} value={value} className="dark:bg-slate-900 dark:text-slate-200">
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-full sm:w-44">
+                <label
+                  htmlFor="waste-map-date-select"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400"
+                >
+                  Date Range
+                </label>
+                <select
+                  id="waste-map-date-select"
+                  className={MAP_SELECT_CLASS}
+                  value={isDatePending ? nextDateRange : dateRange}
+                  onChange={(event) => changeDateRange(event.target.value as DashboardRange)}
+                >
+                  {Object.entries(DASHBOARD_PERIODS).map(([value, label]) => (
                     <option key={value} value={value} className="dark:bg-slate-900 dark:text-slate-200">
                       {label}
                     </option>
@@ -1131,6 +1168,10 @@ export default function MapView({
                   setIsEditingZone(false);
                   setIsDrawingZone(false);
                   setStatusFilter(DEFAULT_WASTE_MAP_STATUS);
+                  if (dateRange !== DEFAULT_DASHBOARD_RANGE || isDatePending) {
+                    changeDateRange(DEFAULT_DASHBOARD_RANGE);
+                    return;
+                  }
                   const positions = filterWasteMapReports(reports, DEFAULT_WASTE_MAP_STATUS)
                     .filter((r) => isValidCoordinate(r.latitude, r.longitude))
                     .map((r) => [r.latitude, r.longitude] as [number, number]);
@@ -1152,16 +1193,19 @@ export default function MapView({
               ? "Drawing mode enabled: click to plot polygon vertices on the map."
               : isEditingZone
                 ? "Editing mode enabled: drag vertices to adjust the selected zone boundary."
-                : visibleCount === 0
-                  ? "No report locations match this status."
-                  : groupedMode
-                    ? `Showing ${filteredReports.length} report${filteredReports.length === 1 ? "" : "s"} across ${visibleCount} cleanup area${visibleCount === 1 ? "" : "s"} (${groupedAreasCount} grouped, ${isolatedReportsCount} isolated).`
-                    : `Showing ${visibleCount} individual report location${visibleCount === 1 ? "" : "s"}.`}
+                : isDatePending
+                  ? "Updating report locations…"
+                  : visibleCount === 0
+                    ? "No report locations match these filters."
+                    : groupedMode
+                      ? `Showing ${filteredReports.length} report${filteredReports.length === 1 ? "" : "s"} across ${visibleCount} cleanup area${visibleCount === 1 ? "" : "s"} (${groupedAreasCount} grouped, ${isolatedReportsCount} isolated).`
+                      : `Showing ${visibleCount} individual report location${visibleCount === 1 ? "" : "s"}.`}
           </p>
         </div>
       )}
 
       <div
+        aria-busy={isDatePending}
         className={cn(
           "relative w-full",
           mapHeightClassName ? mapHeightClassName : "flex-1 min-h-[420px] h-full",

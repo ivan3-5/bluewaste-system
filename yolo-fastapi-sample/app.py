@@ -41,26 +41,20 @@ CUSTOM_CONF_THRESHOLD      = float(os.getenv("CUSTOM_CONF",           "0.30"))
 DETECT_CONF_THRESHOLD      = float(os.getenv("DETECT_CONF",           "0.30"))
 
 # Severity is based on the total number of waste items detected in the photo.
-SEVERITY_CRITICAL_COUNT    = 25
-SEVERITY_HIGH_COUNT        = 16
-
-
-def severity_from_count(waste_count: int) -> str:
-    if waste_count >= SEVERITY_CRITICAL_COUNT:
-        return "CRITICAL"
-    if waste_count >= SEVERITY_HIGH_COUNT:
+def severity_from_count(waste_count: int) -> Optional[str]:
+    if waste_count >= 26:
         return "HIGH"
-    if waste_count >= 9:
+    if waste_count >= 14:
         return "MODERATE"
-    if waste_count >= 1:
+    if waste_count >= 4:
         return "LOW"
-    return "SPAM"
+    return "SPAM" if waste_count <= 0 else None
 
 
-def analysis_summary(severity: str) -> str:
+def analysis_summary(severity: Optional[str]) -> str:
     if severity == "SPAM":
         return "No waste detected. Severity: None."
-    label = "Medium" if severity == "MODERATE" else severity.title()
+    label = "Medium" if severity == "MODERATE" else severity.title() if severity else "None"
     return f"Waste detected. Severity: {label}."
 
 
@@ -318,11 +312,12 @@ def _detect_gpu(image: Image.Image) -> dict:
     results = custom.predict(source=frame, conf=DETECT_CONF_THRESHOLD, iou=0.45, verbose=False)
     waste_count = len(results[0].boxes) if results else 0
     has_waste = waste_count > 0
+    severity = severity_from_count(waste_count)
     return {
         "has_waste":   has_waste,
         "waste_count": waste_count,
-        "severity":    severity_from_count(waste_count),
-        "message":     analysis_summary(severity_from_count(waste_count)),
+        "severity":    severity,
+        "message":     analysis_summary(severity),
     }
 
 
@@ -363,7 +358,7 @@ with gr.Blocks(title="BlueWaste YOLO Analyzer", theme=gr.themes.Soft()) as demo:
     | 2 | `weights/best.pt` (custom) | Waste classification |
 
     **Severity scoring** — based on the total number of waste items detected by `best.pt`:
-    `25+` → Critical · `16–24` → High · `9–15` → Medium · `1–8` → Low · `0` → None
+    `26+` → High · `14–25` → Medium · `4–13` → Low · `1–3` → No severity
     """)
 
     with gr.Tabs():

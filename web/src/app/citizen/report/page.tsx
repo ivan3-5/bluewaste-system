@@ -35,7 +35,7 @@ const LocationPickerMap = dynamic(
 
 type AnalyzeWasteResult = {
   model: string;
-  severity: DbSeverity;
+  severity: DbSeverity | null;
   has_waste: boolean;
   status: "DIRTY" | "CLEAN";
   wasteCount: number;
@@ -578,7 +578,7 @@ export default function SubmitReportPage() {
         analysisWasteCount: analysisResult?.wasteCount ?? null,
         aiModel: analysisResult?.model ?? null,
         aiCategories: analysisResult?.labels?.filter((l: unknown): l is string => typeof l === "string" && l !== "with_waste" && l !== "no_waste") ?? [],
-        aiReason: analysisResult && severityToSave
+        aiReason: analysisResult
           ? formatWasteAnalysis(analysisResult.has_waste === true, dbSeverityToAiLabel(severityToSave))
           : null,
       });

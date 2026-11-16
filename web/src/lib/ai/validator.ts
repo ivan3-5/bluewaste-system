@@ -15,7 +15,7 @@ export type WasteCategory =
   | "diaper"
   | "cigarette_butt";
 
-export type AiSeverity = "Low" | "Medium" | "High" | "Critical" | "None";
+export type AiSeverity = "Low" | "Medium" | "High" | "None";
 
 export interface GeminiWasteResult {
   hasWaste: boolean;

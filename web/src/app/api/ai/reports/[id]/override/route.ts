@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-const ALLOWED_SEVERITIES = new Set(["CRITICAL", "HIGH", "MODERATE", "LOW", "SPAM"]);
+const ALLOWED_SEVERITIES = new Set(["HIGH", "MODERATE", "LOW"]);
 const ALLOWED_STATUSES = new Set([
   "PENDING",
   "VERIFIED",

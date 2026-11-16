@@ -3,7 +3,8 @@ import { ReportStatus, WasteCategory, Prisma, Role, NotificationType, Severity, 
 import { getPaginationParams, buildPaginatedResponse } from "../utils/pagination";
 import { NotificationService } from "./notification.service";
 import { GeoCache } from "../utils/geo-cache";
-import { severityFromWasteCount } from "../utils/severity";
+import { formatWasteAnalysis, severityFromWasteCount } from "../utils/severity";
+import { getReportDateFilter, type ReportDateFilter } from "../utils/report-date-filter";
 import { ReportSpamService } from "./report-spam.service";
 import { ReportDedupService } from "./report-dedup.service";
 import { ReportingZoneService, OUTSIDE_ZONE_MESSAGE } from "./reportingZone.service";
@@ -98,11 +99,16 @@ export class ReportCrudService {
         ? "No visible waste or pollution detected in the submitted image."
         : null;
     const isSpam = clientSpamFlagged || data.category === "no_waste";
-    // Severity is derived from the number of detected waste items when the client reports it.
-    const resolvedSeverity =
-      typeof data.analysisWasteCount === "number" && data.analysisWasteCount >= 0 && !isSpam
-        ? severityFromWasteCount(data.analysisWasteCount)
-        : data.severity;
+    const wasteCount = data.analysisWasteCount;
+    const hasWasteCount = typeof wasteCount === "number" && wasteCount >= 0;
+    const resolvedSeverity = isSpam
+      ? "SPAM"
+      : hasWasteCount
+        ? severityFromWasteCount(wasteCount)
+        : data.severity === "CRITICAL" ? "HIGH" : data.severity;
+    const aiReason = isSpam || hasWasteCount
+      ? formatWasteAnalysis(resolvedSeverity ?? null)
+      : data.aiReason;
 
     const report = await prisma.$transaction(async (tx) => {
       let resolvedAddress = data.address?.trim() || null;
@@ -138,15 +144,15 @@ export class ReportCrudService {
           isSpam,
           spamMarkedAt: isSpam ? new Date() : null,
           spamReason: resolvedSpamReason,
-          ...((resolvedSeverity != null || data.aiModel != null || data.aiCategories != null) && {
-            ...(resolvedSeverity != null && { severity: resolvedSeverity as Severity }),
+          ...((hasWasteCount || resolvedSeverity != null || data.aiModel != null || data.aiCategories != null) && {
+            severity: resolvedSeverity ?? null,
             analysisStatus: (data.analysisStatus as AnalysisStatus) ?? null,
             analysisWasteCount: data.analysisWasteCount ?? null,
             analyzedAt: new Date(),
           }),
           ...(data.aiModel != null && { aiModel: data.aiModel }),
           ...(data.aiCategories != null && { aiCategories: data.aiCategories }),
-          ...(data.aiReason != null && { aiReason: data.aiReason }),
+          ...(aiReason != null && { aiReason }),
           ...(data.aiProcessingMs != null && { aiProcessingMs: data.aiProcessingMs }),
           ...(data.aiGeminiMs != null && { aiGeminiMs: data.aiGeminiMs }),
           reporterId: data.reporterId ?? null,
@@ -793,7 +799,7 @@ export class ReportCrudService {
 
   static async getAssignedReports(
     userId: string,
-    filters: { page?: string; limit?: string; status?: ReportStatus },
+    filters: ReportDateFilter & { page?: string; limit?: string; status?: ReportStatus },
   ) {
     await ReportSpamService.purgeExpiredSpamIfDue();
     const pagination = getPaginationParams({
@@ -808,6 +814,7 @@ export class ReportCrudService {
       ],
       isDeleted: false,
       isSpam: false,
+      createdAt: getReportDateFilter(filters),
     };
     if (filters.status) where.status = filters.status;
 

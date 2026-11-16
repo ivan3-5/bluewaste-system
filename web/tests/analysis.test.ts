@@ -92,8 +92,8 @@ describe("web image analysis", () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      hasWaste: true, categories: ["plastic_bottle"], severity: "Low",
-      wasteCount: 3, reason: "Waste detected. Severity: Low.", model: "gemini-test",
+      hasWaste: true, categories: ["plastic_bottle"], severity: "None",
+      wasteCount: 3, reason: "Waste detected. Severity: None.", model: "gemini-test",
     });
     expect(mocks.gemini).toHaveBeenCalledOnce();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -127,7 +127,7 @@ describe("web image analysis", () => {
     vi.stubGlobal("fetch", fetchMock);
     const response = await POST(request());
     expect(await response.json()).toMatchObject({
-      severity: "Low", reason: "Waste detected. Severity: Low.", model: "yolo", cached: true,
+      severity: "None", reason: "Waste detected. Severity: None.", model: "yolo", cached: true,
     });
     expect(mocks.query.mock.calls.at(-1)?.at(-1)).toBe("yolo");
     expect(fetchMock).not.toHaveBeenCalled();
@@ -149,8 +149,8 @@ describe("web image analysis", () => {
   });
 
   it.each([
-    [0, "None"], [1, "Low"], [8, "Low"], [9, "Medium"], [15, "Medium"],
-    [16, "High"], [24, "High"], [25, "Critical"],
+    [0, "None"], [1, "None"], [3, "None"], [4, "Low"], [13, "Low"],
+    [14, "Medium"], [25, "Medium"], [26, "High"],
   ])("uses the same severity and summary for %i detected items in both providers", (count, label) => {
     const hasWaste = count > 0;
     const categories = hasWaste ? ["plastic_bottle"] : [];
@@ -202,7 +202,7 @@ describe("web image analysis", () => {
       modelName: "gemini-test", latencyMs: 1,
     });
     const response = await POST(request());
-    expect(await response.json()).toMatchObject({ severity: "Critical", wasteCount: 25, reason: "Waste detected. Severity: Critical." });
+    expect(await response.json()).toMatchObject({ severity: "Medium", wasteCount: 25, reason: "Waste detected. Severity: Medium." });
   });
 
   it("uses the Gradio protocol in the legacy endpoint", async () => {
@@ -227,7 +227,7 @@ describe("web image analysis", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       provider: "gemini", aiModel: "gemini-test", has_waste: true,
-      labels: ["plastic_bottle"], waste_count: 3, severity: "LOW", reason: "Waste detected. Severity: Low.",
+      labels: ["plastic_bottle"], waste_count: 3, severity: null, reason: "Waste detected. Severity: None.",
       detectedObject: "plastic_bottle", wasteCategory: "PLASTIC_WASTE",
     });
     expect(mocks.gemini).toHaveBeenCalledOnce();
@@ -247,7 +247,7 @@ describe("web image analysis", () => {
     const response = await legacyPOST(legacyRequest(true));
     expect(response.status).toBe(200);
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
-      detectedObject: "plastic_bottle", labels: ["plastic_bottle"], severity: "LOW",
+      detectedObject: "plastic_bottle", labels: ["plastic_bottle"], severity: null,
     });
   });
 });

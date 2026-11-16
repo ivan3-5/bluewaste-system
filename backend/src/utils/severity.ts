@@ -1,26 +1,21 @@
-export type WasteSeverityLevel = "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM";
+export type WasteSeverityLevel = "HIGH" | "MODERATE" | "LOW" | "SPAM";
 
-export const SEVERITY_CRITICAL_COUNT = 25;
-export const SEVERITY_HIGH_COUNT = 16;
-
-/** Zero indicates no waste. MODERATE is the stored value for Medium. */
-export function severityFromWasteCount(wasteCount: number): WasteSeverityLevel {
-  if (wasteCount >= SEVERITY_CRITICAL_COUNT) return "CRITICAL";
-  if (wasteCount >= SEVERITY_HIGH_COUNT) return "HIGH";
-  if (wasteCount >= 9) return "MODERATE";
-  if (wasteCount >= 1) return "LOW";
-  return "SPAM";
+export function severityFromWasteCount(wasteCount: number): WasteSeverityLevel | null {
+  if (wasteCount >= 26) return "HIGH";
+  if (wasteCount >= 14) return "MODERATE";
+  if (wasteCount >= 4) return "LOW";
+  return wasteCount <= 0 ? "SPAM" : null;
 }
 
 const severityLabels: Record<WasteSeverityLevel, string> = {
-  CRITICAL: "Critical",
   HIGH: "High",
   MODERATE: "Medium",
   LOW: "Low",
   SPAM: "None",
 };
 
-export function formatWasteAnalysis(severity: WasteSeverityLevel): string {
+export function formatWasteAnalysis(severity: WasteSeverityLevel | null): string {
   const detection = severity === "SPAM" ? "No waste detected" : "Waste detected";
-  return `${detection}. Severity: ${severityLabels[severity]}.`;
+  const label = severity ? severityLabels[severity] : "None";
+  return `${detection}. Severity: ${label}.`;
 }

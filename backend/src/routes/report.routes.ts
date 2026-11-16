@@ -10,6 +10,7 @@ import {
   heatmapFilterSchema,
   reportFilterSchema,
   assignWorkerSchema,
+  assignedReportFilterSchema,
 } from "../validators/report.validator";
 import { upload, validateUploadedImages } from "../middleware/upload";
 
@@ -63,6 +64,7 @@ router.get(
   "/assigned",
   authenticate,
   authorize("FIELD_WORKER"),
+  validate(assignedReportFilterSchema, "query"),
   ReportController.getAssignedReports,
 );
 

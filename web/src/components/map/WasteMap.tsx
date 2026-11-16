@@ -489,9 +489,8 @@ export default function WasteMap({
         (REPORT_STATUS_LABELS as Record<string, string>)[report.status] ||
         report.status;
 
-      const severity = report.severity;
+      const severity = report.severity === "CRITICAL" ? "HIGH" : report.severity;
       const severityColors: Record<string, { bg: string; color: string }> = {
-        CRITICAL: { bg: "#fef2f2", color: "#dc2626" },
         HIGH: { bg: "#fff7ed", color: "#ea580c" },
         LOW: { bg: "#f0fdf4", color: "#15803d" },
         MODERATE: { bg: "#fefce8", color: "#ca8a04" },

@@ -10,8 +10,8 @@ export function AnalysisSummary({ hasWaste, severity }: {
       <p className="font-semibold">{hasWaste ? "Waste detected" : "No waste detected"}</p>
       <div className="flex items-center justify-between gap-2">
         <span>Severity</span>
-        {hasWaste
-          ? <SeverityBadge severity={severity} showEmoji={false} showFallback />
+        {hasWaste && severity
+          ? <SeverityBadge severity={severity} showEmoji={false} />
           : <span>None</span>}
       </div>
     </div>

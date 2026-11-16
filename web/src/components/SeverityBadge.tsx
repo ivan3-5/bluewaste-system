@@ -3,14 +3,9 @@ import type { ReactElement } from "react";
 export type SeverityLevel = "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM" | null | undefined;
 
 const SEVERITY_CONFIG: Record<
-  NonNullable<SeverityLevel>,
+  Exclude<NonNullable<SeverityLevel>, "CRITICAL">,
   { label: string; emoji: string; className: string }
 > = {
-  CRITICAL: {
-    label: "Critical",
-    emoji: "🔴",
-    className: "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-300",
-  },
   HIGH: {
     label: "High",
     emoji: "🟠",
@@ -39,24 +34,26 @@ interface SeverityBadgeProps {
   showEmoji?: boolean;
   /** If true, show a "Not Analyzed" placeholder when severity is null/undefined */
   showFallback?: boolean;
+  analyzed?: boolean;
 }
 
 export function SeverityBadge({
   severity,
   showEmoji = true,
   showFallback = false,
+  analyzed = false,
 }: SeverityBadgeProps): ReactElement | null {
   if (!severity) {
     if (!showFallback) return null;
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1 text-xs font-medium text-slate-400 dark:text-slate-400">
         {showEmoji && <span>⏳</span>}
-        Not Analyzed
+        {analyzed ? "None" : "Not Analyzed"}
       </span>
     );
   }
 
-  const config = SEVERITY_CONFIG[severity];
+  const config = SEVERITY_CONFIG[severity === "CRITICAL" ? "HIGH" : severity];
   if (!config) return null;
 
   return (

@@ -858,17 +858,13 @@ class _WorkerTaskCard extends StatelessWidget {
                         ),
                         margin: const EdgeInsets.only(right: 6),
                         decoration: BoxDecoration(
-                          color: task.severity == "CRITICAL"
-                              ? AppColors.destructive.withValues(alpha: 0.12)
-                              : AppColors.warning.withValues(alpha: 0.12),
+                          color: AppColors.warning.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           WasteSeverity.fromString(task.severity).label,
                           style: TextStyle(
-                            color: task.severity == "CRITICAL"
-                                ? AppColors.destructive
-                                : AppColors.warning,
+                            color: AppColors.warning,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                           ),
