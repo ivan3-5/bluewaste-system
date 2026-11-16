@@ -24,8 +24,8 @@ void main() {
 
   test("severity is based on the number of waste items detected", () {
     expect(WasteSeverity.fromWasteCount(0), WasteSeverity.spam);
-    expect(WasteSeverity.fromWasteCount(1), WasteSeverity.ungraded);
-    expect(WasteSeverity.fromWasteCount(3), WasteSeverity.ungraded);
+    expect(WasteSeverity.fromWasteCount(1), WasteSeverity.spam);
+    expect(WasteSeverity.fromWasteCount(3), WasteSeverity.spam);
     expect(WasteSeverity.fromWasteCount(4), WasteSeverity.low);
     expect(WasteSeverity.fromWasteCount(13), WasteSeverity.low);
     expect(WasteSeverity.fromWasteCount(14), WasteSeverity.moderate);
@@ -126,7 +126,11 @@ void main() {
         ),
       );
       expect(find.text("Analysis Summary"), findsOneWidget);
-      expect(find.text("Waste detected"), findsOneWidget);
+      expect(result.hasWaste, isFalse);
+      expect(result.isSpam, isTrue);
+      expect(result.severity.dbValue, "SPAM");
+      expect(result.wasteCount, 3);
+      expect(find.text("No waste detected"), findsOneWidget);
       expect(find.text("Confidence"), findsNothing);
       expect(find.text("Waste items detected"), findsNothing);
       expect(find.text("3"), findsNothing);

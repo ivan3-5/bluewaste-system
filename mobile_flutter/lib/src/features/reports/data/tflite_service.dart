@@ -401,10 +401,11 @@ class TFLiteService {
         .toList()
       ..sort((a, b) => b.count.compareTo(a.count));
 
-    final message = severity.summary(wasteCount > 0);
+    final hasWaste = severity != WasteSeverity.spam;
+    final message = severity.summary(hasWaste);
 
     return DetectResult(
-      hasWaste: wasteCount > 0,
+      hasWaste: hasWaste,
       message: message,
       wasteCount: wasteCount,
       severity: severity,
@@ -412,6 +413,7 @@ class TFLiteService {
       categories: categories,
       labels: labels,
       allLabels: labels,
+      spamReason: hasWaste ? null : "Photo did not meet the minimum waste severity.",
       reason: message,
     );
   }
