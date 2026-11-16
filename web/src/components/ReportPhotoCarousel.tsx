@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Maximize2, X, Camera, User } from "lucide-react";
 
@@ -32,13 +32,13 @@ export function ReportPhotoCarousel({
   const currentImage = images[currentIndex];
   const hasMultiple = total > 1;
 
-  const goToPrevious = () => {
+  const goToPrevious = useCallback(() => {
     setCurrentIndex((index) => Math.max(0, index - 1));
-  };
+  }, []);
 
-  const goToNext = () => {
+  const goToNext = useCallback(() => {
     setCurrentIndex((index) => Math.min(total - 1, index + 1));
-  };
+  }, [total]);
 
   // Keyboard navigation for Lightbox
   useEffect(() => {
@@ -61,7 +61,7 @@ export function ReportPhotoCarousel({
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = prevOverflow;
     };
-  }, [isLightboxOpen, total]);
+  }, [isLightboxOpen, goToNext, goToPrevious]);
 
   if (total === 0) return null;
 

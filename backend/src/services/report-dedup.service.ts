@@ -127,7 +127,7 @@ export class ReportDedupService {
       },
     });
 
-    if (candidates.length === 0) {
+    if (!candidates || candidates.length === 0) {
       return null;
     }
 
@@ -275,6 +275,10 @@ export class ReportDedupService {
         isResolved: false,
       },
     });
+
+    if (!incident) {
+      return "";
+    }
 
     // Link the report to the newly created incident
     await (tx as typeof prisma).report.update({
