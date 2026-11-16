@@ -4,6 +4,7 @@ import { getPaginationParams, buildPaginatedResponse } from "../utils/pagination
 import { NotificationService } from "./notification.service";
 import { GeoCache } from "../utils/geo-cache";
 import { formatWasteAnalysis, severityFromWasteCount } from "../utils/severity";
+import { getReportDateFilter, type ReportDateFilter } from "../utils/report-date-filter";
 import { ReportSpamService } from "./report-spam.service";
 import { ReportDedupService } from "./report-dedup.service";
 import { ReportingZoneService, OUTSIDE_ZONE_MESSAGE } from "./reportingZone.service";
@@ -798,7 +799,7 @@ export class ReportCrudService {
 
   static async getAssignedReports(
     userId: string,
-    filters: { page?: string; limit?: string; status?: ReportStatus },
+    filters: ReportDateFilter & { page?: string; limit?: string; status?: ReportStatus },
   ) {
     await ReportSpamService.purgeExpiredSpamIfDue();
     const pagination = getPaginationParams({
@@ -813,6 +814,7 @@ export class ReportCrudService {
       ],
       isDeleted: false,
       isSpam: false,
+      createdAt: getReportDateFilter(filters),
     };
     if (filters.status) where.status = filters.status;
 

@@ -377,7 +377,10 @@
     }
   }
 
+  let routeVersion = 0;
+
   async function initRoute(waypoints) {
+    const version = ++routeVersion;
     ensureMap();
 
     // Clear existing non-tile layers
@@ -444,6 +447,7 @@
         const res = await fetch(osrmUrl);
         if (res.ok) {
           const data = await res.json();
+          if (version !== routeVersion) return;
           const route = data?.routes?.[0];
           if (route?.geometry?.coordinates && route.geometry.coordinates.length > 0) {
             const lineCoords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
@@ -460,7 +464,7 @@
       }
 
       // Fallback: draw direct polyline connecting worker to report mark
-      if (!polylineDrawn) {
+      if (version === routeVersion && !polylineDrawn) {
         const linePts = waypoints.map(w => [w.lat, w.lng]);
         L.polyline(linePts, {
           color: '#0066cc',

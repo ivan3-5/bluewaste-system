@@ -65,7 +65,6 @@ flutter_native_splash:
 flutter:
   uses-material-design: true
   assets:
-    - assets/charls.png
     - assets/images/logo-final.png
     - assets/html/
     - assets/models/

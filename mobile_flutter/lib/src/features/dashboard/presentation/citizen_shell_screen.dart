@@ -10,6 +10,7 @@ import "../../auth/presentation/auth_controller.dart";
 import "../../notifications/presentation/notification_providers.dart";
 import "../../notifications/presentation/notifications_screen.dart";
 import "../../profile/presentation/profile_screen.dart";
+import "../../profile/presentation/widgets/profile_avatar.dart";
 import "../../reports/presentation/citizen_home_screen.dart";
 import "../../reports/presentation/report_create_screen.dart";
 import "../../reports/presentation/reports_map_screen.dart";
@@ -40,20 +41,6 @@ class _CitizenShellScreenState extends ConsumerState<CitizenShellScreen> {
   Widget build(BuildContext context) {
     final unreadCount = ref.watch(unreadCountProvider).valueOrNull ?? 0;
     final user = ref.watch(authControllerProvider).user;
-    final avatarUrl = (user?.avatarUrl ?? "").trim();
-    final hasAvatar = avatarUrl.isNotEmpty;
-    final useCitizenPlaceholder =
-        !hasAvatar && ((user?.role ?? "").toUpperCase() == "CITIZEN");
-    ImageProvider<Object>? profileImage;
-    if (hasAvatar) {
-      profileImage = NetworkImage(avatarUrl);
-    } else if (useCitizenPlaceholder) {
-      profileImage = const AssetImage("assets/charls.png");
-    }
-    final firstName = (user?.firstName ?? "").trim();
-    final initials =
-        firstName.isEmpty ? "U" : firstName.substring(0, 1).toUpperCase();
-
     final pages = <Widget>[
       CitizenHomeScreen(
         onSelectTab: (tab) => setState(() => _index = tab),
@@ -112,22 +99,7 @@ class _CitizenShellScreenState extends ConsumerState<CitizenShellScreen> {
                       width: 2,
                     ),
                   ),
-                  child: CircleAvatar(
-                    radius: 18,
-                    backgroundColor:
-                        AppColors.tint(AppColors.primary, opacity: 0.1),
-                    foregroundImage: profileImage,
-                    child: profileImage == null
-                        ? Text(
-                            initials,
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                            ),
-                          )
-                        : null,
-                  ),
+                  child: ProfileAvatar(user: user, radius: 18, fontSize: 14),
                 ),
               ),
             ),

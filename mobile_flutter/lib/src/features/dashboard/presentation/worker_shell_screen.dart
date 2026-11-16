@@ -9,6 +9,7 @@ import "../../auth/presentation/auth_controller.dart";
 import "../../notifications/presentation/notification_providers.dart";
 import "../../notifications/presentation/notifications_screen.dart";
 import "../../profile/presentation/profile_screen.dart";
+import "../../profile/presentation/widgets/profile_avatar.dart";
 import "../../reports/presentation/worker_home_screen.dart";
 import "../../reports/presentation/worker_route_screen.dart";
 import "../../reports/presentation/worker_tasks_screen.dart";
@@ -50,17 +51,6 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
   Widget build(BuildContext context) {
     final unreadCount = ref.watch(unreadCountProvider).value ?? 0;
     final user = ref.watch(authControllerProvider).user;
-    final avatarUrl = (user?.avatarUrl ?? "").trim();
-    final hasAvatar = avatarUrl.isNotEmpty;
-    ImageProvider<Object>? profileImage;
-    if (hasAvatar) {
-      profileImage = NetworkImage(avatarUrl);
-    }
-    final firstName = (user?.firstName ?? "").trim();
-    final initials = firstName.isEmpty
-        ? "U"
-        : firstName.substring(0, 1).toUpperCase();
-
     final pages = <Widget>[
       WorkerHomeScreen(onSelectTab: _setTab),
       const WorkerTasksScreen(),
@@ -106,24 +96,7 @@ class _WorkerShellScreenState extends ConsumerState<WorkerShellScreen> {
                       width: 2,
                     ),
                   ),
-                  child: CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppColors.tint(
-                      AppColors.primary,
-                      opacity: 0.1,
-                    ),
-                    foregroundImage: profileImage,
-                    child: profileImage == null
-                        ? Text(
-                            initials,
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                            ),
-                          )
-                        : null,
-                  ),
+                  child: ProfileAvatar(user: user, radius: 18, fontSize: 14),
                 ),
               ),
             ),

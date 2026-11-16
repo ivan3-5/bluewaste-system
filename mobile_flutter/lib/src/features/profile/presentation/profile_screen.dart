@@ -8,6 +8,7 @@ import "../../../core/ui/app_components.dart";
 import "../../auth/domain/app_user.dart";
 import "../../auth/presentation/auth_controller.dart";
 import "../../reports/presentation/my_reports_screen.dart";
+import "widgets/profile_avatar.dart";
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -368,19 +369,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     });
 
     final user = ref.watch(authControllerProvider).user;
-    final avatarUrl = (user?.avatarUrl ?? "").trim();
-    final hasAvatar = avatarUrl.isNotEmpty;
-    final useCitizenPlaceholder =
-        !hasAvatar && ((user?.role ?? "").toUpperCase() == "CITIZEN");
-    ImageProvider<Object>? profileImage;
-    if (hasAvatar) {
-      profileImage = NetworkImage(avatarUrl);
-    } else if (useCitizenPlaceholder) {
-      profileImage = const AssetImage("assets/charls.png");
-    }
-    final initials = (user?.firstName.isNotEmpty ?? false)
-        ? user!.firstName.substring(0, 1).toUpperCase()
-        : "U";
     final isBusy = _saving || _uploadingAvatar;
 
     final roleText = (user?.role ?? "CITIZEN").toUpperCase();
@@ -432,8 +420,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 // Hero Profile Card
                 _HeroProfileCard(
                   user: user,
-                  profileImage: profileImage,
-                  initials: initials,
                   userRoleLabel: userRoleLabel,
                   isWorker: isWorker,
                   uploadingAvatar: _uploadingAvatar,
@@ -572,8 +558,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 class _HeroProfileCard extends StatelessWidget {
   const _HeroProfileCard({
     required this.user,
-    required this.profileImage,
-    required this.initials,
     required this.userRoleLabel,
     required this.isWorker,
     required this.uploadingAvatar,
@@ -582,8 +566,6 @@ class _HeroProfileCard extends StatelessWidget {
   });
 
   final AppUser? user;
-  final ImageProvider<Object>? profileImage;
-  final String initials;
   final String userRoleLabel;
   final bool isWorker;
   final bool uploadingAvatar;
@@ -653,21 +635,11 @@ class _HeroProfileCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          child: CircleAvatar(
+                          child: ProfileAvatar(
+                            user: user,
                             radius: 46,
-                            backgroundColor:
-                                AppColors.tint(AppColors.primary, opacity: 0.12),
-                            foregroundImage: profileImage,
-                            child: profileImage == null
-                                ? Text(
-                                    initials,
-                                    style: const TextStyle(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 30,
-                                    ),
-                                  )
-                                : null,
+                            fontSize: 30,
+                            backgroundOpacity: 0.12,
                           ),
                         ),
 

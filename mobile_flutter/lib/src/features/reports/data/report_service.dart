@@ -5,6 +5,7 @@ import "package:image_picker/image_picker.dart";
 import "../../../core/network/api_exception.dart";
 import "../../../core/providers.dart";
 import "../domain/report_models.dart";
+import "../domain/report_map_date_range.dart";
 import "offline_service.dart";
 import "photo_upload.dart";
 
@@ -278,6 +279,7 @@ class ReportService {
     int page = 1,
     int limit = 20,
     String? status,
+    ReportMapDateWindow? dateWindow,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -285,6 +287,7 @@ class ReportService {
         queryParameters: {
           "page": page,
           "limit": limit,
+          ...?dateWindow?.queryParameters,
           if (status != null && status.isNotEmpty) "status": status,
         },
       );
@@ -304,10 +307,12 @@ class ReportService {
   Future<List<IncidentMapData>> getIncidentMapData({
     int limit = 2000,
     String? status,
+    ReportMapDateWindow? dateWindow,
     String? category,
   }) async {
     final queryParameters = {
       "limit": limit,
+      ...?dateWindow?.queryParameters,
       if (status != null && status.isNotEmpty) "status": status,
       if (category != null && category.isNotEmpty) "category": category,
     };
@@ -334,10 +339,12 @@ class ReportService {
   Future<List<ReportRecord>> getMapReports({
     int limit = 2000,
     String? status,
+    ReportMapDateWindow? dateWindow,
     String? category,
   }) async {
     final queryParameters = {
       "limit": limit,
+      ...?dateWindow?.queryParameters,
       if (status != null && status.isNotEmpty) "status": status,
       if (category != null && category.isNotEmpty) "category": category,
     };

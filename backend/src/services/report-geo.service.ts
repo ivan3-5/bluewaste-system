@@ -2,6 +2,7 @@ import prisma from "../config/database";
 import { ReportStatus, WasteCategory, Severity, Prisma } from "@prisma/client";
 import { GeoCache } from "../utils/geo-cache";
 import { ReportSpamService } from "./report-spam.service";
+import { getReportDateFilter, type ReportDateFilter } from "../utils/report-date-filter";
 import {
   groupReportsByRadius,
   DEFAULT_RADIUS_METERS,
@@ -42,7 +43,7 @@ export type IncidentMapData = {
 };
 
 export class ReportGeoService {
-  static async getMapData(filters?: {
+  static async getMapData(filters?: ReportDateFilter & {
     status?: ReportStatus;
     category?: WasteCategory;
     limit?: string;
@@ -52,10 +53,12 @@ export class ReportGeoService {
     const limit = Number.isFinite(parsedLimit)
       ? Math.min(Math.max(parsedLimit, 1), 5000)
       : 2000;
+    const createdAt = getReportDateFilter(filters ?? {});
 
     const cacheKey = `bluewaste:geo:v2:map:${JSON.stringify({
       status: filters?.status || null,
       category: filters?.category || null,
+      createdAt,
       limit,
     })}`;
 
@@ -67,6 +70,7 @@ export class ReportGeoService {
     const where: Prisma.ReportWhereInput = {
       isDeleted: false,
       isSpam: false,
+      createdAt,
     };
     if (filters?.status) where.status = filters.status;
     if (filters?.category) where.category = filters.category;
@@ -96,7 +100,7 @@ export class ReportGeoService {
       })) as unknown as ReportMapData[];
     } catch (error) {
       // Backward-compatible fallback for deployments with older DB schema.
-      const legacyWhere: Prisma.ReportWhereInput = {};
+      const legacyWhere: Prisma.ReportWhereInput = { createdAt };
       if (filters?.status) legacyWhere.status = filters.status;
       if (filters?.category) legacyWhere.category = filters.category;
 
@@ -173,7 +177,7 @@ export class ReportGeoService {
    * Returns one entry per `WasteIncident` (deduplicated), instead of one per `Report`.
    * Used by the Leaflet map to show grouped markers with contributor-count badges.
    */
-  static async getIncidentMapData(filters?: {
+  static async getIncidentMapData(filters?: ReportDateFilter & {
     status?: ReportStatus;
     category?: WasteCategory;
     limit?: string;
@@ -184,10 +188,13 @@ export class ReportGeoService {
     const limit = Number.isFinite(parsedLimit)
       ? Math.min(Math.max(parsedLimit, 1), 5000)
       : 2000;
+    const createdAt = getReportDateFilter(filters ?? {});
+    const visibleReports = { isDeleted: false, isSpam: false, createdAt };
 
     const cacheKey = `bluewaste:geo:v2:incidents:${JSON.stringify({
       status: filters?.status || null,
       category: filters?.category || null,
+      createdAt,
       limit,
     })}`;
 
@@ -199,6 +206,7 @@ export class ReportGeoService {
     const where: Prisma.WasteIncidentWhereInput = {};
     if (filters?.status) where.status = filters.status;
     if (filters?.category) where.category = filters.category;
+    if (createdAt) where.reports = { some: visibleReports };
 
     let incidents: IncidentMapData[] = [];
 
@@ -215,10 +223,12 @@ export class ReportGeoService {
           address: true,
           contributorCount: true,
           createdAt: true,
+          ...(createdAt && { _count: { select: { reports: { where: visibleReports } } } }),
           reports: {
-            where: { isDeleted: false, isSpam: false },
+            where: visibleReports,
             select: {
               id: true,
+              createdAt: true,
               images: { take: 1, select: { imageUrl: true } },
             },
             orderBy: { createdAt: "asc" },
@@ -243,10 +253,10 @@ export class ReportGeoService {
           latitude: inc.latitude,
           longitude: inc.longitude,
           address: inc.address,
-          contributorCount: inc.contributorCount,
+          contributorCount: createdAt ? inc._count.reports : inc.contributorCount,
           reportIds: inc.reports.map((r) => r.id),
           imageUrl: firstImageUrl,
-          createdAt: inc.createdAt,
+          createdAt: createdAt ? inc.reports[0]?.createdAt ?? inc.createdAt : inc.createdAt,
         };
       });
     } catch (error) {
