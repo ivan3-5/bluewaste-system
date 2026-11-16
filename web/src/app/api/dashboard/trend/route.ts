@@ -4,6 +4,7 @@ import {
   getDashboardMonthlyTrend,
   getDashboardTrend,
 } from "@/lib/dashboard-reports";
+import { isDashboardRange } from "@/lib/dashboard-period";
 
 export async function OPTIONS() {
   return corsEmptyResponse();
@@ -14,12 +15,7 @@ export async function GET(request: NextRequest) {
   const typeParam = request.nextUrl.searchParams.get("type");
 
   if (rangeParam || typeParam === "monthly") {
-    const range =
-      rangeParam === "thisMonth" ||
-      rangeParam === "6months" ||
-      rangeParam === "12months"
-        ? rangeParam
-        : "thisYear";
+    const range = isDashboardRange(rangeParam) || rangeParam === "12months" ? rangeParam : "thisYear";
 
     const rows = await getDashboardMonthlyTrend(range);
     return corsResponse(rows);

@@ -12,7 +12,7 @@ const cards = [
   {
     key: "totalReports",
     label: "Total Reports",
-    caption: "All submitted reports",
+    caption: "Submitted in this period",
     icon: FileText,
     gradient: "from-sky-500 to-blue-600",
   },

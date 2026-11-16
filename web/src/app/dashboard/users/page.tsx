@@ -31,17 +31,12 @@ import { useLiveNotifications } from "@/contexts/LiveNotificationContext";
 import { PaginationControls } from "@/components/ui/pagination";
 
 import { ROLE_LABELS, UserRoleBadge, UserStatusBadge } from "@/components/users/UserBadges";
+import { UserAvatar } from "@/components/users/UserAvatar";
 
 const ROLE_DOT_COLORS: Record<string, string> = {
   LGU_ADMIN: "bg-blue-500",
   FIELD_WORKER: "bg-green-500",
   CITIZEN: "bg-slate-400",
-};
-
-const ROLE_AVATAR_CLASSES: Record<string, string> = {
-  LGU_ADMIN: "bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300",
-  FIELD_WORKER: "bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300",
-  CITIZEN: "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300",
 };
 
 const FIELD_CLASS =
@@ -72,10 +67,6 @@ const emptyForm: UserFormData = {
   role: "FIELD_WORKER",
   phone: "",
 };
-
-function getInitials(firstName: string, lastName: string) {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "?";
-}
 
 export default function UsersPage() {
   const { pushToast } = useLiveNotifications();
@@ -477,15 +468,7 @@ export default function UsersPage() {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                            ROLE_AVATAR_CLASSES[user.role] ?? ROLE_AVATAR_CLASSES.CITIZEN,
-                          )}
-                        >
-                          {getInitials(user.firstName, user.lastName)}
-                        </span>
+                        <UserAvatar user={user} />
                         <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                           {user.firstName} {user.lastName}
                         </span>

@@ -8,6 +8,7 @@ export interface UserRecord {
   firstName: string;
   lastName: string;
   role: "CITIZEN" | "LGU_ADMIN" | "FIELD_WORKER";
+  avatarUrl?: string | null;
   phone?: string;
   isActive: boolean;
   createdAt: string;

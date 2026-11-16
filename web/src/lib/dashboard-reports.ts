@@ -5,6 +5,8 @@ import {
   type AdminReport,
 } from "@/lib/admin-report";
 import type { ReportStatus } from "@/types";
+import { Prisma } from "@/generated/prisma";
+import { getDashboardPeriod, type DashboardPeriod, type DashboardRange } from "@/lib/dashboard-period";
 
 const PLACEHOLDER_IMAGE_URL =
   "https://placehold.co/800x600?text=No+Image+Available";
@@ -69,8 +71,6 @@ type DashboardCategoryRow = {
   bucket: string;
   count: bigint | number;
 };
-
-export type MonthlyTrendRange = "thisYear" | "thisMonth" | "6months" | "12months";
 
 type DashboardMonthlyTrendRow = {
   month_date: Date;
@@ -410,7 +410,15 @@ export async function getDashboardReportById(id: string) {
     : null;
 }
 
-export async function getDashboardStats() {
+function reportPeriodCondition(period?: DashboardPeriod) {
+  if (!period) return Prisma.empty;
+  return Prisma.sql`
+    AND r."createdAt" >= ((${period.startDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+    AND r."createdAt" < ((${period.endDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+  `;
+}
+
+export async function getDashboardStats(period?: DashboardPeriod) {
   const rows = await prisma.$queryRaw<DashboardStatsRow[]>`
     SELECT
       COUNT(*)::bigint AS "totalReports",
@@ -420,6 +428,7 @@ export async function getDashboardStats() {
     FROM "Report" r
     WHERE r."isDeleted" = false
       AND r."isSpam" = false
+      ${reportPeriodCondition(period)}
   `;
 
   const stats = rows[0];
@@ -466,44 +475,28 @@ export async function getDashboardTrend(days = 30) {
 }
 
 export async function getDashboardMonthlyTrend(
-  range: MonthlyTrendRange = "thisYear",
+  range: DashboardRange | "12months" | DashboardPeriod = "thisYear",
 ): Promise<MonthlyTrendPoint[]> {
+  const period = typeof range === "string" ? getDashboardPeriod(range) : range;
+  const step = period.bucket === "day" ? "1 day" : "1 month";
   const rows = await prisma.$queryRaw<DashboardMonthlyTrendRow[]>`
-    WITH settings AS (
-      SELECT ${range}::text AS range,
-        (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date AS today
-    ), bounds AS (
-      SELECT
-        CASE range
-          WHEN 'thisYear' THEN DATE_TRUNC('year', today::timestamp)
-          WHEN 'thisMonth' THEN DATE_TRUNC('month', today::timestamp)
-          WHEN '6months' THEN DATE_TRUNC('month', today::timestamp) - interval '5 months'
-          ELSE DATE_TRUNC('month', today::timestamp) - interval '11 months'
-        END AS start_date,
-        CASE range
-          WHEN 'thisYear' THEN DATE_TRUNC('year', today::timestamp) + interval '1 year'
-          WHEN 'thisMonth' THEN today + interval '1 day'
-          ELSE DATE_TRUNC('month', today::timestamp) + interval '1 month'
-        END AS end_date,
-        CASE WHEN range = 'thisMonth' THEN 'day' ELSE 'month' END AS bucket_unit,
-        CASE WHEN range = 'thisMonth' THEN interval '1 day' ELSE interval '1 month' END AS step
-      FROM settings
-    ), buckets AS (
-      SELECT generate_series(start_date, end_date - step, step)::date AS bucket_date
-      FROM bounds
+    WITH buckets AS (
+      SELECT generate_series(
+        DATE_TRUNC(${period.bucket}::text, ${period.startDate}::timestamp),
+        DATE_TRUNC(${period.bucket}::text, ${period.endDate}::timestamp - interval '1 day'),
+        ${step}::interval
+      )::date AS bucket_date
     ), aggregated AS (
       SELECT
-        DATE_TRUNC(bounds.bucket_unit, (r."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Manila')::date AS bucket_date,
+        DATE_TRUNC(${period.bucket}::text, (r."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Manila')::date AS bucket_date,
         COUNT(*) FILTER (WHERE r."status" = 'PENDING')::bigint AS "pendingCount",
         COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
         COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount",
         COUNT(*)::bigint AS "totalCount"
       FROM "Report" r
-      CROSS JOIN bounds
       WHERE r."isDeleted" = false
         AND r."isSpam" = false
-        AND r."createdAt" >= (bounds.start_date AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC'
-        AND r."createdAt" < (bounds.end_date AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC'
+        ${reportPeriodCondition(period)}
       GROUP BY 1
     )
     SELECT
@@ -531,7 +524,7 @@ export async function getDashboardMonthlyTrend(
     monthKey: row.month_key,
     year: Number(row.year),
     monthNum: Number(row.month_num),
-    ...(range === "thisMonth" && { dayOfMonth: Number(row.day_of_month) }),
+    ...(period.bucket === "day" && { dayOfMonth: Number(row.day_of_month) }),
     pendingCount: toNumber(row.pendingCount),
     inProgressCount: toNumber(row.inProgressCount),
     cleanedCount: toNumber(row.cleanedCount),
@@ -539,7 +532,7 @@ export async function getDashboardMonthlyTrend(
   }));
 }
 
-export async function getDashboardCategoryDistribution() {
+export async function getDashboardCategoryDistribution(period?: DashboardPeriod) {
   const rows = await prisma.$queryRaw<DashboardCategoryRow[]>`
     WITH bucketed AS (
       SELECT
@@ -554,6 +547,7 @@ export async function getDashboardCategoryDistribution() {
         COUNT(*)::bigint AS count
       FROM "Report" r
       WHERE r."isDeleted" = false
+        ${reportPeriodCondition(period)}
       GROUP BY 1
     )
     SELECT
