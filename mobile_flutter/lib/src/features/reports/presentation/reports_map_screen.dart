@@ -9,6 +9,7 @@ import "package:latlong2/latlong.dart";
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
+import "../data/detect_service.dart";
 import "../data/report_service.dart";
 import "../../../core/network/api_exception.dart";
 import "../domain/report_models.dart";
@@ -659,12 +660,10 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
                                 ),
                                 if (incident.severity != null)
                                   AppStatusPill(
-                                    label: incident.severity!,
-                                    color: incident.severity == "CRITICAL"
-                                        ? AppColors.destructive
-                                        : incident.severity == "HIGH"
-                                            ? AppColors.orange
-                                            : AppColors.warning,
+                                    label: WasteSeverity.fromString(incident.severity).label,
+                                    color: WasteSeverity.fromString(incident.severity) == WasteSeverity.high
+                                        ? AppColors.orange
+                                        : AppColors.warning,
                                   ),
                               ],
                             ),

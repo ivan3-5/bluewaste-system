@@ -10,28 +10,25 @@ import "photo_upload.dart";
 
 // ── Severity levels from the AI pipeline ────────────────────────────────────
 enum WasteSeverity {
-  critical,
   high,
   moderate,
   low,
   spam,
+  ungraded,
   unknown;
 
-  /// Severity from the total number of waste items detected:
-  /// Zero means no waste. MODERATE is the stored value for Medium.
+  /// Counts of 1–3 indicate waste with no severity assigned.
   static WasteSeverity fromWasteCount(int wasteCount) {
-    if (wasteCount >= 25) return WasteSeverity.critical;
-    if (wasteCount >= 16) return WasteSeverity.high;
-    if (wasteCount >= 9) return WasteSeverity.moderate;
-    if (wasteCount >= 1) return WasteSeverity.low;
-    return WasteSeverity.spam;
+    if (wasteCount >= 26) return WasteSeverity.high;
+    if (wasteCount >= 14) return WasteSeverity.moderate;
+    if (wasteCount >= 4) return WasteSeverity.low;
+    return wasteCount <= 0 ? WasteSeverity.spam : WasteSeverity.ungraded;
   }
 
   /// Parse the server string value (case-insensitive).
   static WasteSeverity fromString(String? value) {
     switch (value?.toUpperCase()) {
       case "CRITICAL":
-        return WasteSeverity.critical;
       case "HIGH":
         return WasteSeverity.high;
       case "MODERATE":
@@ -40,8 +37,9 @@ enum WasteSeverity {
       case "LOW":
         return WasteSeverity.low;
       case "SPAM":
-      case "NONE":
         return WasteSeverity.spam;
+      case "NONE":
+        return WasteSeverity.ungraded;
       default:
         return WasteSeverity.unknown;
     }
@@ -49,8 +47,6 @@ enum WasteSeverity {
 
   String get label {
     switch (this) {
-      case WasteSeverity.critical:
-        return "Critical";
       case WasteSeverity.high:
         return "High";
       case WasteSeverity.moderate:
@@ -58,6 +54,7 @@ enum WasteSeverity {
       case WasteSeverity.low:
         return "Low";
       case WasteSeverity.spam:
+      case WasteSeverity.ungraded:
         return "None";
       case WasteSeverity.unknown:
         return "Unknown";
@@ -69,8 +66,6 @@ enum WasteSeverity {
 
   String? get dbValue {
     switch (this) {
-      case WasteSeverity.critical:
-        return "CRITICAL";
       case WasteSeverity.high:
         return "HIGH";
       case WasteSeverity.moderate:
@@ -79,6 +74,7 @@ enum WasteSeverity {
         return "LOW";
       case WasteSeverity.spam:
         return "SPAM";
+      case WasteSeverity.ungraded:
       case WasteSeverity.unknown:
         return null;
     }

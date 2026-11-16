@@ -318,7 +318,7 @@ export function ReportsTable({
                       <CategoryBadge category={report.category} />
                     </td>
                     <td className="px-4 py-3">
-                      <SeverityBadge severity={report.severity} showFallback />
+                      <SeverityBadge severity={report.severity} analyzed={Boolean(report.analyzedAt || report.wasteCount != null)} showFallback />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">

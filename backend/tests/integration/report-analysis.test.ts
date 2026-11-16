@@ -44,7 +44,7 @@ describe("background report analysis", () => {
   });
 
   it.each([
-    [1, "LOW"], [8, "LOW"], [9, "MODERATE"], [15, "MODERATE"], [16, "HIGH"], [24, "HIGH"], [25, "CRITICAL"],
+    [1, null], [3, null], [4, "LOW"], [13, "LOW"], [14, "MODERATE"], [25, "MODERATE"], [26, "HIGH"],
   ])("derives YOLO severity from %i detected items", async (count, severity) => {
     prismaMock.report.findUnique.mockResolvedValue({
       id: "report-1", images: [{ imageUrl: "https://example.com/image.png" }],
@@ -89,7 +89,7 @@ describe("background report analysis", () => {
 
   it("does not replace an existing web analysis", async () => {
     prismaMock.report.findUnique.mockResolvedValue({
-      id: "report-1", images: [], analyzedAt: new Date(), severity: "SPAM",
+      id: "report-1", images: [], analyzedAt: new Date(), severity: null, analysisWasteCount: 3,
     } as never);
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -118,8 +118,8 @@ describe("background report analysis", () => {
     expect(prismaMock.report.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         aiModel: "gemini-test", aiCategories: ["plastic_bottle"],
-        aiReason: "Waste detected. Severity: Low.", analysisConfidence: null,
-        analysisWasteCount: 3, severity: "LOW",
+        aiReason: "Waste detected. Severity: None.", analysisConfidence: null,
+        analysisWasteCount: 3, severity: null,
       }),
     }));
   });

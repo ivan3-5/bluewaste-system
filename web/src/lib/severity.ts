@@ -1,21 +1,16 @@
 export type DbSeverity = "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM";
-export type AiSeverityLabel = "Low" | "Medium" | "High" | "Critical" | "None";
+export type AiSeverityLabel = "Low" | "Medium" | "High" | "None";
 
-export const SEVERITY_CRITICAL_COUNT = 25;
-export const SEVERITY_HIGH_COUNT = 16;
-
-/** Zero indicates no waste. MODERATE is the stored value for Medium. */
-export function severityFromWasteCount(wasteCount: number): DbSeverity {
-  if (wasteCount >= SEVERITY_CRITICAL_COUNT) return "CRITICAL";
-  if (wasteCount >= SEVERITY_HIGH_COUNT) return "HIGH";
-  if (wasteCount >= 9) return "MODERATE";
-  if (wasteCount >= 1) return "LOW";
-  return "SPAM";
+export function severityFromWasteCount(wasteCount: number): Exclude<DbSeverity, "CRITICAL"> | null {
+  if (wasteCount >= 26) return "HIGH";
+  if (wasteCount >= 14) return "MODERATE";
+  if (wasteCount >= 4) return "LOW";
+  return wasteCount <= 0 ? "SPAM" : null;
 }
 
-export function dbSeverityToAiLabel(severity: DbSeverity): AiSeverityLabel {
+export function dbSeverityToAiLabel(severity: DbSeverity | null | undefined): AiSeverityLabel {
   switch (severity) {
-    case "CRITICAL": return "Critical";
+    case "CRITICAL":
     case "HIGH": return "High";
     case "MODERATE": return "Medium";
     case "LOW": return "Low";

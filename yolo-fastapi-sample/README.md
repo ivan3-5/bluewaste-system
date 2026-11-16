@@ -44,10 +44,10 @@ A FastAPI service that analyzes waste images using a two-layer YOLOv8 pipeline.
 
 | Waste items detected | Severity |
 |---|---|
-| 25+ | Critical |
-| 16–24 | High |
-| 9–15 | Medium (`MODERATE`) |
-| 1–8 | Low |
+| 26+ | High |
+| 14–25 | Medium (`MODERATE`) |
+| 4–13 | Low |
+| 1–3 | None (`null`, `has_waste: true`) |
 | 0 | None (`SPAM`, `has_waste: false`) |
 
 ## Usage

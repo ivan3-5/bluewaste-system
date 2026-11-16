@@ -21,7 +21,7 @@ export interface ClassificationResult {
   dominantWaste: WasteType | null;
   totalItems: number;
   /** Severity in the DB enum format: CRITICAL | HIGH | MODERATE | LOW | SPAM */
-  severity: WasteSeverity;
+  severity: WasteSeverity | null;
   wasteCategory: WasteCategory;
   confidence: number;
   labels: string[];
@@ -289,7 +289,7 @@ function mapLabelToWasteType(label: string): WasteType | null {
   return WASTE_LABEL_MAP[label] ?? null;
 }
 
-function toSeverity(totalItems: number): WasteSeverity {
+function toSeverity(totalItems: number): WasteSeverity | null {
   return severityFromWasteCount(totalItems);
 }
 

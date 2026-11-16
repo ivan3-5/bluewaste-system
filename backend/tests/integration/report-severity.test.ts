@@ -44,7 +44,7 @@ describe("report creation", () => {
   });
 
   it.each([
-    [1, "LOW"], [8, "LOW"], [9, "MODERATE"], [15, "MODERATE"], [16, "HIGH"], [24, "HIGH"], [25, "CRITICAL"],
+    [1, null], [3, null], [4, "LOW"], [13, "LOW"], [14, "MODERATE"], [25, "MODERATE"], [26, "HIGH"],
   ])("derives severity from %i detected items and drops confidence", async (count, severity) => {
     prismaMock.$transaction.mockImplementation(async (transaction) => {
       if (typeof transaction !== "function") throw new Error("Expected an interactive transaction");
@@ -59,7 +59,8 @@ describe("report creation", () => {
       analysisWasteCount: count, analysisConfidence: 0.95, severity: "CRITICAL",
     });
     const data = prismaMock.report.create.mock.calls[0][0].data as Record<string, unknown>;
-    expect(data).toMatchObject({ severity, analysisWasteCount: count, description: "" });
+    expect(data).toMatchObject({ severity, analysisWasteCount: count, isSpam: false, description: "" });
+    if (severity == null) expect(data.aiReason).toBe("Waste detected. Severity: None.");
     expect(data).not.toHaveProperty("analysisConfidence");
   });
 });

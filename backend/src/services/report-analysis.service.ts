@@ -1,5 +1,5 @@
 import prisma from "../config/database";
-import { WasteCategory, AnalysisStatus, Severity } from "@prisma/client";
+import { WasteCategory, AnalysisStatus } from "@prisma/client";
 import { NotificationService } from "./notification.service";
 import { env } from "../config/env";
 import { formatWasteAnalysis, severityFromWasteCount } from "../utils/severity";
@@ -193,7 +193,7 @@ export class ReportAnalysisService {
     if (!report) throw new Error("Report not found");
 
     // If report has already been analyzed (e.g., analyzed on client during submission), skip redundant re-analysis
-    if (report.analyzedAt != null && report.severity != null) {
+    if (report.analyzedAt != null && (report.severity != null || report.analysisWasteCount != null)) {
       return report;
     }
 
@@ -222,7 +222,7 @@ export class ReportAnalysisService {
     const newCategory: WasteCategory = hasWaste ? "with_waste" : "no_waste";
 
     // Severity is based on the total number of waste items detected.
-    const resolvedSeverity: Severity = hasWaste
+    const resolvedSeverity = hasWaste
       ? severityFromWasteCount(Math.max(analysis.wasteCount ?? 0, 1))
       : "SPAM";
 

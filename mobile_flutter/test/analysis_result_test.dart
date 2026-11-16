@@ -24,13 +24,16 @@ void main() {
 
   test("severity is based on the number of waste items detected", () {
     expect(WasteSeverity.fromWasteCount(0), WasteSeverity.spam);
-    expect(WasteSeverity.fromWasteCount(1), WasteSeverity.low);
-    expect(WasteSeverity.fromWasteCount(8), WasteSeverity.low);
-    expect(WasteSeverity.fromWasteCount(9), WasteSeverity.moderate);
-    expect(WasteSeverity.fromWasteCount(15), WasteSeverity.moderate);
-    expect(WasteSeverity.fromWasteCount(16), WasteSeverity.high);
-    expect(WasteSeverity.fromWasteCount(24), WasteSeverity.high);
-    expect(WasteSeverity.fromWasteCount(25), WasteSeverity.critical);
+    expect(WasteSeverity.fromWasteCount(1), WasteSeverity.ungraded);
+    expect(WasteSeverity.fromWasteCount(3), WasteSeverity.ungraded);
+    expect(WasteSeverity.fromWasteCount(4), WasteSeverity.low);
+    expect(WasteSeverity.fromWasteCount(13), WasteSeverity.low);
+    expect(WasteSeverity.fromWasteCount(14), WasteSeverity.moderate);
+    expect(WasteSeverity.fromWasteCount(25), WasteSeverity.moderate);
+    expect(WasteSeverity.fromWasteCount(26), WasteSeverity.high);
+    expect(WasteSeverity.fromString("CRITICAL"), WasteSeverity.high);
+    expect(WasteSeverity.ungraded.dbValue, isNull);
+    expect(WasteSeverity.ungraded.summary(true), "Waste detected. Severity: None.");
   });
 
   test("on-device results identify the TFLite model", () {
@@ -128,7 +131,7 @@ void main() {
       expect(find.text("Waste items detected"), findsNothing);
       expect(find.text("3"), findsNothing);
       expect(find.text("Severity"), findsOneWidget);
-      expect(find.text("Low"), findsOneWidget);
+      expect(find.text("None"), findsOneWidget);
       expect(find.text("Citizen Comment: None"), findsOneWidget);
       expect(find.text("A bottle is visible."), findsNothing);
     },

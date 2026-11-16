@@ -101,7 +101,7 @@ class ReportRecord {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<ReportImage> images;
-  /// Severity level from the hybrid pipeline (CRITICAL / HIGH / MODERATE / LOW / SPAM).
+  /// Severity level (HIGH / MODERATE / LOW), with SPAM for no waste.
   final String? severity;
   /// Total number of waste items detected by the analysis.
   final int? analysisWasteCount;

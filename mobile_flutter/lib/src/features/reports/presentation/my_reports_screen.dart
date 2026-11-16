@@ -517,14 +517,11 @@ class _ReportCardItem extends StatelessWidget {
                                       color: categoryColor,
                                     ),
                                   ],
-                                  if (report.severity == "CRITICAL" ||
-                                      report.severity == "HIGH") ...[
+                                  if (WasteSeverity.fromString(report.severity) == WasteSeverity.high) ...[
                                     const SizedBox(width: 6),
                                     AppStatusPill(
                                       label: WasteSeverity.fromString(report.severity).label,
-                                      color: report.severity == "CRITICAL"
-                                          ? AppColors.destructive
-                                          : AppColors.warning,
+                                      color: AppColors.warning,
                                     ),
                                   ],
                                 ],
@@ -801,9 +798,7 @@ class _ReportDetailSheet extends StatelessWidget {
                         if (report.severity != null)
                           AppStatusPill(
                             label: WasteSeverity.fromString(report.severity).label,
-                            color: report.severity == "CRITICAL"
-                                ? AppColors.destructive
-                                : report.severity == "HIGH"
+                            color: WasteSeverity.fromString(report.severity) == WasteSeverity.high
                                 ? AppColors.warning
                                 : AppColors.mutedForeground,
                           ),
@@ -827,10 +822,10 @@ class _ReportDetailSheet extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.md),
 
-                    if (report.severity != null) ...[
+                    if (report.severity != null || report.analysisWasteCount != null) ...[
                       WasteAnalysisSummary(
                         hasWaste: report.hasDetectedWaste,
-                        severity: WasteSeverity.fromString(report.severity),
+                        severity: WasteSeverity.fromString(report.severity ?? "NONE"),
                       ),
                       const SizedBox(height: AppSpacing.md),
                     ],
