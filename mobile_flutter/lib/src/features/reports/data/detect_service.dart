@@ -17,12 +17,12 @@ enum WasteSeverity {
   ungraded,
   unknown;
 
-  /// Counts of 1–3 indicate waste with no severity assigned.
+  /// Mobile reports below the Low severity threshold are classified as No Waste.
   static WasteSeverity fromWasteCount(int wasteCount) {
     if (wasteCount >= 26) return WasteSeverity.high;
     if (wasteCount >= 14) return WasteSeverity.moderate;
     if (wasteCount >= 4) return WasteSeverity.low;
-    return wasteCount <= 0 ? WasteSeverity.spam : WasteSeverity.ungraded;
+    return WasteSeverity.spam;
   }
 
   /// Parse the server string value (case-insensitive).
@@ -182,20 +182,21 @@ class DetectResult {
           .toList(growable: false);
     }
 
-    final hasWasteVal = json["hasWaste"] == true || json["has_waste"] == true;
+    final detectedWaste = json["hasWaste"] == true || json["has_waste"] == true;
     final reportedCount =
         (json["wasteCount"] ?? json["waste_count"] ?? json["count"]) as num?;
-    final wasteCountVal = hasWasteVal
+    final wasteCountVal = detectedWaste
         ? (reportedCount?.toInt() ?? categoriesList.length)
               .clamp(1, 1 << 30)
               .toInt()
         : 0;
 
     final severity = WasteSeverity.fromWasteCount(wasteCountVal);
-    final reasonStr = severity.summary(hasWasteVal);
+    final hasWaste = severity != WasteSeverity.spam;
+    final reasonStr = severity.summary(hasWaste);
 
     return DetectResult(
-      hasWaste: hasWasteVal,
+      hasWaste: hasWaste,
       message: reasonStr,
       wasteCount: wasteCountVal,
       severity: severity,
@@ -206,7 +207,7 @@ class DetectResult {
       allLabels: parseLabels(json["all_labels"] ?? json["categories"]),
       spamReason:
           (json["spamReason"] ?? json["spam_reason"])?.toString() ??
-          (!hasWasteVal ? "No visible waste detected in photo" : null),
+          (!hasWaste ? "Photo did not meet the minimum waste severity." : null),
       reason: reasonStr,
       reportId: json["reportId"]?.toString(),
       imageUrl: json["imageUrl"]?.toString(),

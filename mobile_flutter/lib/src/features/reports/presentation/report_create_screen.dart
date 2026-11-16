@@ -157,8 +157,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text("No Waste Detected"),
         content: const Text(
-          "Our system did not detect any waste in your photo. "
-          "Submitting false reports may be flagged as spam.",
+          "This photo did not meet the minimum waste severity. "
+          "If you continue, the report will be classified as No Waste and flagged as spam.",
         ),
         actions: [
           TextButton(
