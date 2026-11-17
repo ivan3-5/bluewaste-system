@@ -1,6 +1,7 @@
 import "dart:ui";
 
 import "package:flutter/material.dart";
+import "package:flutter/services.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../../core/theme/app_colors.dart";
@@ -16,6 +17,8 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+  static const _phoneDigitLimit = 11;
+
   final _formKey = GlobalKey<FormState>();
 
   final _firstNameController = TextEditingController();
@@ -108,8 +111,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? _validatePhone(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return null; // Phone is optional
-    final digitsOnly = trimmed.replaceAll(RegExp(r"\D"), "");
-    if (digitsOnly.length < 7) {
+    if (trimmed.length > _phoneDigitLimit || RegExp(r"[^0-9]").hasMatch(trimmed)) {
+      return "Phone number must contain up to $_phoneDigitLimit digits.";
+    }
+    if (trimmed.length < 7) {
       return "Please enter a valid phone number (at least 7 digits).";
     }
     return null;
@@ -694,9 +699,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     controller: _phoneController,
                                     focusNode: _phoneFocusNode,
                                     labelText: "Phone Number (optional)",
-                                    hintText: "e.g. +63 912 345 6789",
+                                    hintText: "e.g. 09123456789",
                                     prefixIcon: Icons.phone_rounded,
                                     keyboardType: TextInputType.phone,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(
+                                        _phoneDigitLimit,
+                                      ),
+                                    ],
                                     textInputAction: TextInputAction.next,
                                     errorText: _phoneError,
                                     onChanged: _onPhoneChanged,

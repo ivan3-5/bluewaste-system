@@ -23,6 +23,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
+import { limitPhoneDigits, phoneError, phonePattern } from "@/lib/phone";
+
 const registerSchema = z
   .object({
     firstName: z.string().min(1, "First name is required"),
@@ -30,7 +32,7 @@ const registerSchema = z
     email: z.string().email("Invalid email address"),
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
-    phone: z.string().optional(),
+    phone: z.string().regex(phonePattern, phoneError).optional(),
     address: z.string().min(1, "Address is required"),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -61,6 +63,8 @@ export default function RegisterPage() {
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
+
+  const phoneField = register("phone");
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -280,11 +284,23 @@ export default function RegisterPage() {
                       id="phone"
                       type="tel"
                       autoComplete="tel"
-                      placeholder="+639xxxxxxxxx"
+                      inputMode="numeric"
+                      placeholder="09123456789"
+                      aria-invalid={Boolean(errors.phone)}
+                      aria-describedby={errors.phone ? "phone-error" : undefined}
                       className="h-11 rounded-xl border-slate-200 pl-10 focus-visible:border-primary focus-visible:ring-primary/30"
-                      {...register("phone")}
+                      {...phoneField}
+                      onChange={(event) => {
+                        event.target.value = limitPhoneDigits(event.target.value);
+                        void phoneField.onChange(event);
+                      }}
                     />
                   </div>
+                  {errors.phone && (
+                    <p id="phone-error" className="text-sm text-red-600">
+                      {errors.phone.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">

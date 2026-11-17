@@ -80,7 +80,7 @@ class AuthService {
           "password": password,
           "firstName": firstName,
           "lastName": lastName,
-          "phone": phone,
+          if (phone != null) "phone": phone,
           "address": address,
         },
       );
