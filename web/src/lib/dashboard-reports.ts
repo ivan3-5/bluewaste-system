@@ -1,11 +1,10 @@
-import prisma from "@/lib/prisma";
+import prisma, { Prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 import {
   ADMIN_REPORT_STATUS_LABELS,
   type AdminReport,
 } from "@/lib/admin-report";
 import type { ReportStatus } from "@/types";
-import { Prisma } from "@/generated/prisma";
 import { getDashboardPeriod, type DashboardPeriod, type DashboardRange } from "@/lib/dashboard-period";
 
 const PLACEHOLDER_IMAGE_URL =
@@ -179,111 +178,217 @@ function mapDashboardReport(row: DashboardReportRow): AdminReport {
 }
 
 export async function getDashboardReports(limit: number, period?: DashboardPeriod) {
-  const reports = await prisma.$queryRaw<DashboardReportRow[]>`
-    SELECT
-      r.id,
-      r."isSpam",
-      (SELECT cs."scheduledAt" FROM "CleanupSchedule" cs WHERE cs.id = r."cleanupScheduleId") AS "cleanupScheduledAt",
-      r.title,
-      r.description,
-      r.category,
-      r.status,
-      r.latitude,
-      r.longitude,
-      r.address,
-      r."analysisWasteCount",
-      r."analysisStatus",
-      r.severity,
-      r."createdAt" AS "reportedAt",
-      r."updatedAt",
-      r."analyzedAt",
-      r."aiCategories",
-      r."aiReason",
-      r."aiModel",
-      r."aiProcessingMs",
-      r."aiGeminiMs",
-      r."cleanupScheduleId",
-      COALESCE(image."imageUrl", null) AS "imageUrl",
-      COALESCE(images.images, '[]'::json) AS images,
-      r."reporterId",
-      CASE WHEN r."isAnonymous" THEN 'Anonymous Citizen' ELSE COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous Citizen') END AS "reporterName",
-      CASE WHEN r."isAnonymous" THEN NULL ELSE rep.email END AS "reporterEmail",
-      r."assignedToId",
-      COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
-      COALESCE(rep_workers."assignedWorkers", '[]'::json) AS "assignedWorkers",
-      COALESCE(rep_workers."reportWorkerNames", schedule_workers."assignedWorkerNames", u."firstName" || ' ' || u."lastName", null) AS "assignedWorkerNames",
-      cleaned_by."cleanedByName" AS "cleanedByName",
-      cleaned_by."cleanedAt" AS "cleanedAt"
-    FROM "Report" r
-    LEFT JOIN "User" rep ON rep.id = r."reporterId"
-    LEFT JOIN "User" u ON u.id = r."assignedToId"
-    LEFT JOIN LATERAL (
-      SELECT ri."imageUrl"
-      FROM "ReportImage" ri
-      WHERE ri."reportId" = r.id
-        AND ri.type = 'REPORT'
-      ORDER BY ri."createdAt" ASC
-      LIMIT 1
-    ) image ON TRUE
-    LEFT JOIN LATERAL (
-      SELECT json_agg(
-        json_build_object(
-          'id', ri.id,
-          'imageUrl', ri."imageUrl",
-          'publicId', ri."publicId",
-          'type', ri.type,
-          'createdAt', ri."createdAt"
-        ) ORDER BY ri."createdAt" ASC
-      ) AS images
-      FROM "ReportImage" ri
-      WHERE ri."reportId" = r.id
-    ) images ON TRUE
-    LEFT JOIN LATERAL (
-      SELECT
-        json_agg(
-          json_build_object(
-            'id', rw_u.id,
-            'firstName', rw_u."firstName",
-            'lastName', rw_u."lastName",
-            'email', rw_u.email
-          ) ORDER BY rw."assignedAt" ASC
-        ) AS "assignedWorkers",
-        string_agg(
-          rw_u."firstName" || ' ' || rw_u."lastName",
-          ', '
-          ORDER BY rw."assignedAt" ASC
-        ) AS "reportWorkerNames"
-      FROM "ReportWorker" rw
-      JOIN "User" rw_u ON rw_u.id = rw."workerId"
-      WHERE rw."reportId" = r.id
-    ) rep_workers ON TRUE
-    LEFT JOIN LATERAL (
-      SELECT string_agg(
-        sw."firstName" || ' ' || sw."lastName",
-        ', '
-        ORDER BY csw."assignedAt" ASC
-      ) AS "assignedWorkerNames"
-      FROM "CleanupSchedule" cs
-      JOIN "CleanupScheduleWorker" csw ON csw."scheduleId" = cs.id
-      JOIN "User" sw ON sw.id = csw."workerId"
-      WHERE cs.id = r."cleanupScheduleId"
-    ) schedule_workers ON TRUE
-    LEFT JOIN LATERAL (
-      SELECT
-        cb."firstName" || ' ' || cb."lastName" AS "cleanedByName",
-        sh."createdAt" AS "cleanedAt"
-      FROM "StatusHistory" sh
-      JOIN "User" cb ON cb.id = sh."changedById"
-      WHERE sh."reportId" = r.id AND sh."newStatus" = 'CLEANED'
-      ORDER BY sh."createdAt" DESC
-      LIMIT 1
-    ) cleaned_by ON TRUE
-    WHERE r."isDeleted" = false
-      AND r."isSpam" = false
-      ${reportPeriodCondition(period)}
-    ORDER BY r."createdAt" DESC
-    LIMIT ${limit}
-  `;
+  const reports = period
+    ? await prisma.$queryRaw<DashboardReportRow[]>`
+        SELECT
+          r.id,
+          r."isSpam",
+          (SELECT cs."scheduledAt" FROM "CleanupSchedule" cs WHERE cs.id = r."cleanupScheduleId") AS "cleanupScheduledAt",
+          r.title,
+          r.description,
+          r.category,
+          r.status,
+          r.latitude,
+          r.longitude,
+          r.address,
+          r."analysisWasteCount",
+          r."analysisStatus",
+          r.severity,
+          r."createdAt" AS "reportedAt",
+          r."updatedAt",
+          r."analyzedAt",
+          r."aiCategories",
+          r."aiReason",
+          r."aiModel",
+          r."aiProcessingMs",
+          r."aiGeminiMs",
+          r."cleanupScheduleId",
+          COALESCE(image."imageUrl", null) AS "imageUrl",
+          COALESCE(images.images, '[]'::json) AS images,
+          r."reporterId",
+          CASE WHEN r."isAnonymous" THEN 'Anonymous Citizen' ELSE COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous Citizen') END AS "reporterName",
+          CASE WHEN r."isAnonymous" THEN NULL ELSE rep.email END AS "reporterEmail",
+          r."assignedToId",
+          COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
+          COALESCE(rep_workers."assignedWorkers", '[]'::json) AS "assignedWorkers",
+          COALESCE(rep_workers."reportWorkerNames", schedule_workers."assignedWorkerNames", u."firstName" || ' ' || u."lastName", null) AS "assignedWorkerNames",
+          cleaned_by."cleanedByName" AS "cleanedByName",
+          cleaned_by."cleanedAt" AS "cleanedAt"
+        FROM "Report" r
+        LEFT JOIN "User" rep ON rep.id = r."reporterId"
+        LEFT JOIN "User" u ON u.id = r."assignedToId"
+        LEFT JOIN LATERAL (
+          SELECT ri."imageUrl"
+          FROM "ReportImage" ri
+          WHERE ri."reportId" = r.id
+            AND ri.type = 'REPORT'
+          ORDER BY ri."createdAt" ASC
+          LIMIT 1
+        ) image ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT json_agg(
+            json_build_object(
+              'id', ri.id,
+              'imageUrl', ri."imageUrl",
+              'publicId', ri."publicId",
+              'type', ri.type,
+              'createdAt', ri."createdAt"
+            ) ORDER BY ri."createdAt" ASC
+          ) AS images
+          FROM "ReportImage" ri
+          WHERE ri."reportId" = r.id
+        ) images ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT
+            json_agg(
+              json_build_object(
+                'id', rw_u.id,
+                'firstName', rw_u."firstName",
+                'lastName', rw_u."lastName",
+                'email', rw_u.email
+              ) ORDER BY rw."assignedAt" ASC
+            ) AS "assignedWorkers",
+            string_agg(
+              rw_u."firstName" || ' ' || rw_u."lastName",
+              ', '
+              ORDER BY rw."assignedAt" ASC
+            ) AS "reportWorkerNames"
+          FROM "ReportWorker" rw
+          JOIN "User" rw_u ON rw_u.id = rw."workerId"
+          WHERE rw."reportId" = r.id
+        ) rep_workers ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT string_agg(
+            sw."firstName" || ' ' || sw."lastName",
+            ', '
+            ORDER BY csw."assignedAt" ASC
+          ) AS "assignedWorkerNames"
+          FROM "CleanupSchedule" cs
+          JOIN "CleanupScheduleWorker" csw ON csw."scheduleId" = cs.id
+          JOIN "User" sw ON sw.id = csw."workerId"
+          WHERE cs.id = r."cleanupScheduleId"
+        ) schedule_workers ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT
+            cb."firstName" || ' ' || cb."lastName" AS "cleanedByName",
+            sh."createdAt" AS "cleanedAt"
+          FROM "StatusHistory" sh
+          JOIN "User" cb ON cb.id = sh."changedById"
+          WHERE sh."reportId" = r.id AND sh."newStatus" = 'CLEANED'
+          ORDER BY sh."createdAt" DESC
+          LIMIT 1
+        ) cleaned_by ON TRUE
+        WHERE r."isDeleted" = false
+          AND r."isSpam" = false
+          AND r."createdAt" >= ((${period.startDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+          AND r."createdAt" < ((${period.endDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+        ORDER BY r."createdAt" DESC
+        LIMIT ${limit}
+      `
+    : await prisma.$queryRaw<DashboardReportRow[]>`
+        SELECT
+          r.id,
+          r."isSpam",
+          (SELECT cs."scheduledAt" FROM "CleanupSchedule" cs WHERE cs.id = r."cleanupScheduleId") AS "cleanupScheduledAt",
+          r.title,
+          r.description,
+          r.category,
+          r.status,
+          r.latitude,
+          r.longitude,
+          r.address,
+          r."analysisWasteCount",
+          r."analysisStatus",
+          r.severity,
+          r."createdAt" AS "reportedAt",
+          r."updatedAt",
+          r."analyzedAt",
+          r."aiCategories",
+          r."aiReason",
+          r."aiModel",
+          r."aiProcessingMs",
+          r."aiGeminiMs",
+          r."cleanupScheduleId",
+          COALESCE(image."imageUrl", null) AS "imageUrl",
+          COALESCE(images.images, '[]'::json) AS images,
+          r."reporterId",
+          CASE WHEN r."isAnonymous" THEN 'Anonymous Citizen' ELSE COALESCE(rep."firstName" || ' ' || rep."lastName", 'Anonymous Citizen') END AS "reporterName",
+          CASE WHEN r."isAnonymous" THEN NULL ELSE rep.email END AS "reporterEmail",
+          r."assignedToId",
+          COALESCE(u."firstName" || ' ' || u."lastName", null) AS "assignedToName",
+          COALESCE(rep_workers."assignedWorkers", '[]'::json) AS "assignedWorkers",
+          COALESCE(rep_workers."reportWorkerNames", schedule_workers."assignedWorkerNames", u."firstName" || ' ' || u."lastName", null) AS "assignedWorkerNames",
+          cleaned_by."cleanedByName" AS "cleanedByName",
+          cleaned_by."cleanedAt" AS "cleanedAt"
+        FROM "Report" r
+        LEFT JOIN "User" rep ON rep.id = r."reporterId"
+        LEFT JOIN "User" u ON u.id = r."assignedToId"
+        LEFT JOIN LATERAL (
+          SELECT ri."imageUrl"
+          FROM "ReportImage" ri
+          WHERE ri."reportId" = r.id
+            AND ri.type = 'REPORT'
+          ORDER BY ri."createdAt" ASC
+          LIMIT 1
+        ) image ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT json_agg(
+            json_build_object(
+              'id', ri.id,
+              'imageUrl', ri."imageUrl",
+              'publicId', ri."publicId",
+              'type', ri.type,
+              'createdAt', ri."createdAt"
+            ) ORDER BY ri."createdAt" ASC
+          ) AS images
+          FROM "ReportImage" ri
+          WHERE ri."reportId" = r.id
+        ) images ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT
+            json_agg(
+              json_build_object(
+                'id', rw_u.id,
+                'firstName', rw_u."firstName",
+                'lastName', rw_u."lastName",
+                'email', rw_u.email
+              ) ORDER BY rw."assignedAt" ASC
+            ) AS "assignedWorkers",
+            string_agg(
+              rw_u."firstName" || ' ' || rw_u."lastName",
+              ', '
+              ORDER BY rw."assignedAt" ASC
+            ) AS "reportWorkerNames"
+          FROM "ReportWorker" rw
+          JOIN "User" rw_u ON rw_u.id = rw."workerId"
+          WHERE rw."reportId" = r.id
+        ) rep_workers ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT string_agg(
+            sw."firstName" || ' ' || sw."lastName",
+            ', '
+            ORDER BY csw."assignedAt" ASC
+          ) AS "assignedWorkerNames"
+          FROM "CleanupSchedule" cs
+          JOIN "CleanupScheduleWorker" csw ON csw."scheduleId" = cs.id
+          JOIN "User" sw ON sw.id = csw."workerId"
+          WHERE cs.id = r."cleanupScheduleId"
+        ) schedule_workers ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT
+            cb."firstName" || ' ' || cb."lastName" AS "cleanedByName",
+            sh."createdAt" AS "cleanedAt"
+          FROM "StatusHistory" sh
+          JOIN "User" cb ON cb.id = sh."changedById"
+          WHERE sh."reportId" = r.id AND sh."newStatus" = 'CLEANED'
+          ORDER BY sh."createdAt" DESC
+          LIMIT 1
+        ) cleaned_by ON TRUE
+        WHERE r."isDeleted" = false
+          AND r."isSpam" = false
+        ORDER BY r."createdAt" DESC
+        LIMIT ${limit}
+      `;
 
   return reports.map(mapDashboardReport);
 }
@@ -411,26 +516,30 @@ export async function getDashboardReportById(id: string) {
     : null;
 }
 
-function reportPeriodCondition(period?: DashboardPeriod) {
-  if (!period) return Prisma.empty;
-  return Prisma.sql`
-    AND r."createdAt" >= ((${period.startDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
-    AND r."createdAt" < ((${period.endDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
-  `;
-}
-
 export async function getDashboardStats(period?: DashboardPeriod) {
-  const rows = await prisma.$queryRaw<DashboardStatsRow[]>`
-    SELECT
-      COUNT(*)::bigint AS "totalReports",
-      COUNT(*) FILTER (WHERE r."status" = 'PENDING')::bigint AS "pendingCount",
-      COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
-      COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount"
-    FROM "Report" r
-    WHERE r."isDeleted" = false
-      AND r."isSpam" = false
-      ${reportPeriodCondition(period)}
-  `;
+  const rows = period
+    ? await prisma.$queryRaw<DashboardStatsRow[]>`
+        SELECT
+          COUNT(*)::bigint AS "totalReports",
+          COUNT(*) FILTER (WHERE r."status" = 'PENDING')::bigint AS "pendingCount",
+          COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
+          COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount"
+        FROM "Report" r
+        WHERE r."isDeleted" = false
+          AND r."isSpam" = false
+          AND r."createdAt" >= ((${period.startDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+          AND r."createdAt" < ((${period.endDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+      `
+    : await prisma.$queryRaw<DashboardStatsRow[]>`
+        SELECT
+          COUNT(*)::bigint AS "totalReports",
+          COUNT(*) FILTER (WHERE r."status" = 'PENDING')::bigint AS "pendingCount",
+          COUNT(*) FILTER (WHERE r."status" = 'IN_PROGRESS')::bigint AS "inProgressCount",
+          COUNT(*) FILTER (WHERE r."status" = 'CLEANED')::bigint AS "cleanedCount"
+        FROM "Report" r
+        WHERE r."isDeleted" = false
+          AND r."isSpam" = false
+      `;
 
   const stats = rows[0];
 
@@ -497,7 +606,8 @@ export async function getDashboardMonthlyTrend(
       FROM "Report" r
       WHERE r."isDeleted" = false
         AND r."isSpam" = false
-        ${reportPeriodCondition(period)}
+        AND r."createdAt" >= ((${period.startDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+        AND r."createdAt" < ((${period.endDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
       GROUP BY 1
     )
     SELECT
@@ -534,30 +644,55 @@ export async function getDashboardMonthlyTrend(
 }
 
 export async function getDashboardCategoryDistribution(period?: DashboardPeriod) {
-  const rows = await prisma.$queryRaw<DashboardCategoryRow[]>`
-    WITH bucketed AS (
-      SELECT
-        CASE
-          WHEN r."isSpam" = true
-            OR r.category = 'no_waste'
-            OR COALESCE(r."analysisStatus", 'DIRTY') = 'CLEAN'
-            OR r.severity = 'SPAM'
-            THEN 'no_waste'
-          ELSE 'with_waste'
-        END AS bucket,
-        COUNT(*)::bigint AS count
-      FROM "Report" r
-      WHERE r."isDeleted" = false
-        ${reportPeriodCondition(period)}
-      GROUP BY 1
-    )
-    SELECT
-      base.bucket,
-      COALESCE(bucketed.count, 0)::bigint AS count
-    FROM (VALUES ('with_waste'), ('no_waste')) AS base(bucket)
-    LEFT JOIN bucketed ON bucketed.bucket = base.bucket
-    ORDER BY CASE WHEN base.bucket = 'with_waste' THEN 1 ELSE 2 END
-  `;
+  const rows = period
+    ? await prisma.$queryRaw<DashboardCategoryRow[]>`
+        WITH bucketed AS (
+          SELECT
+            CASE
+              WHEN r."isSpam" = true
+                OR r.category = 'no_waste'
+                OR COALESCE(r."analysisStatus", 'DIRTY') = 'CLEAN'
+                OR r.severity = 'SPAM'
+                THEN 'no_waste'
+              ELSE 'with_waste'
+            END AS bucket,
+            COUNT(*)::bigint AS count
+          FROM "Report" r
+          WHERE r."isDeleted" = false
+            AND r."createdAt" >= ((${period.startDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+            AND r."createdAt" < ((${period.endDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+          GROUP BY 1
+        )
+        SELECT
+          base.bucket,
+          COALESCE(bucketed.count, 0)::bigint AS count
+        FROM (VALUES ('with_waste'), ('no_waste')) AS base(bucket)
+        LEFT JOIN bucketed ON bucketed.bucket = base.bucket
+        ORDER BY CASE WHEN base.bucket = 'with_waste' THEN 1 ELSE 2 END
+      `
+    : await prisma.$queryRaw<DashboardCategoryRow[]>`
+        WITH bucketed AS (
+          SELECT
+            CASE
+              WHEN r."isSpam" = true
+                OR r.category = 'no_waste'
+                OR COALESCE(r."analysisStatus", 'DIRTY') = 'CLEAN'
+                OR r.severity = 'SPAM'
+                THEN 'no_waste'
+              ELSE 'with_waste'
+            END AS bucket,
+            COUNT(*)::bigint AS count
+          FROM "Report" r
+          WHERE r."isDeleted" = false
+          GROUP BY 1
+        )
+        SELECT
+          base.bucket,
+          COALESCE(bucketed.count, 0)::bigint AS count
+        FROM (VALUES ('with_waste'), ('no_waste')) AS base(bucket)
+        LEFT JOIN bucketed ON bucketed.bucket = base.bucket
+        ORDER BY CASE WHEN base.bucket = 'with_waste' THEN 1 ELSE 2 END
+      `;
 
   return rows.map((row: DashboardCategoryRow) => ({
     key: row.bucket,
