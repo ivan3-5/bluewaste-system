@@ -91,6 +91,21 @@ describe('Auth Integration Tests', () => {
   })
 
   describe('POST /api/v1/auth/register', () => {
+    it.each(['091234567890', '0912345678A'])('rejects invalid phone %s', async (phone) => {
+      const res = await request(app)
+        .post('/api/v1/auth/register')
+        .send({
+          email: 'newuser@example.com',
+          password: 'password123',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          phone,
+        })
+
+      expect(res.status).toBe(400)
+      expect(prismaMock.user.create).not.toHaveBeenCalled()
+    })
+
     it('should register successfully and preserve address', async () => {
       prismaMock.user.findUnique.mockResolvedValue(null)
       prismaMock.user.create.mockResolvedValue({

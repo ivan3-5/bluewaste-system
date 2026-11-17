@@ -5,7 +5,7 @@ export const registerSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().min(1, "First name is required").max(50),
   lastName: z.string().min(1, "Last name is required").max(50),
-  phone: z.string().optional(),
+  phone: z.string().trim().regex(/^[0-9]{0,11}$/, "Phone number must contain up to 11 digits.").optional(),
   address: z.string().optional(),
 });
 

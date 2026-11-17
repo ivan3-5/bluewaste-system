@@ -1,5 +1,5 @@
 import "package:flutter/material.dart";
-
+import "package:flutter/services.dart";
 
 import "../../../../core/theme/app_colors.dart";
 
@@ -71,6 +71,7 @@ class PremiumTextField extends StatefulWidget {
   final IconData prefixIcon;
   final bool obscureText;
   final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
   final TextInputAction? textInputAction;
   final Widget? suffixIcon;
   final ValueChanged<String>? onSubmitted;
@@ -88,6 +89,7 @@ class PremiumTextField extends StatefulWidget {
     required this.prefixIcon,
     this.obscureText = false,
     this.keyboardType,
+    this.inputFormatters,
     this.textInputAction,
     this.suffixIcon,
     this.onSubmitted,
@@ -182,6 +184,7 @@ class _PremiumTextFieldState extends State<PremiumTextField> {
             focusNode: _effectiveFocusNode,
             obscureText: widget.obscureText,
             keyboardType: widget.keyboardType,
+            inputFormatters: widget.inputFormatters,
             textInputAction: widget.textInputAction,
             textCapitalization: widget.textCapitalization,
             enabled: widget.enabled,
