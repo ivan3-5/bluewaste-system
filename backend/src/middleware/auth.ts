@@ -104,20 +104,26 @@ export const authenticate = async (
   res: Response,
   next: NextFunction,
 ) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return sendError(
+      res,
+      401,
+      "Access denied. No token provided.",
+      "UNAUTHORIZED",
+    );
+  }
+
+  const token = authHeader.split(" ")[1];
+  let decoded: { userId: string };
+
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return sendError(
-        res,
-        401,
-        "Access denied. No token provided.",
-        "UNAUTHORIZED",
-      );
-    }
+    decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string };
+  } catch {
+    return sendError(res, 401, "Invalid or expired token.", "UNAUTHORIZED");
+  }
 
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string };
-
+  try {
     let user = await AuthCache.get(decoded.userId);
     
     if (!user) {
@@ -151,7 +157,8 @@ export const authenticate = async (
 
     next();
   } catch (error) {
-    return sendError(res, 401, "Invalid or expired token.", "UNAUTHORIZED");
+    logger.error({ error, userId: decoded.userId }, "User verification failed due to internal error");
+    return sendError(res, 500, "Internal server error during authentication verification.", "INTERNAL_SERVER_ERROR");
   }
 };
 

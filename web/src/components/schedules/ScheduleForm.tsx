@@ -42,8 +42,28 @@ import {
   ShieldCheck,
   Layers,
   Circle,
-  Sliders,
+  ArrowLeft,
+  ArrowRight,
+  ChevronRight,
 } from "lucide-react";
+
+import {
+  WizardStep,
+  WIZARD_STEPS,
+  ValidationResult,
+  detectBarangayFromLocation,
+  validateScheduleDetails,
+  validateScheduleEquipment,
+  validateScheduleWorkers,
+} from "@/lib/schedule-validation";
+
+export {
+  type WizardStep,
+  detectBarangayFromLocation,
+  validateScheduleDetails,
+  validateScheduleEquipment,
+  validateScheduleWorkers,
+};
 
 export type ScheduleWorkerOption = Pick<User, "id" | "firstName" | "lastName" | "email">;
 
@@ -85,48 +105,6 @@ const STANDARD_PRESET = [
   "Trash Pickers",
 ];
 
-// Helper to automatically extract and format the Target Barangay based on Location Name
-export function detectBarangayFromLocation(locationStr: string): string {
-  if (!locationStr || !locationStr.trim()) return "";
-  const lower = locationStr.toLowerCase().trim();
-
-  // 1. Direct or partial match with official Panabo coastal barangays
-  if (lower.includes("san francisco")) return "Barangay San Francisco";
-  if (lower.includes("san pedro")) return "Barangay San Pedro";
-  if (lower.includes("cagangohan")) return "Barangay Cagangohan";
-  if (lower.includes("san vicente")) return "Barangay San Vicente";
-  if (lower.includes("j.p. laurel") || lower.includes("jp laurel"))
-    return "Barangay J.P. Laurel";
-  if (lower.includes("new visayas")) return "Barangay New Visayas";
-  if (lower.includes("tagpore")) return "Barangay Tagpore";
-  if (lower.includes("datu abdul")) return "Barangay Datu Abdul Dadia";
-  if (lower.includes("maduao")) return "Barangay Maduao";
-  if (lower.includes("kasilak")) return "Barangay Kasilak";
-  if (lower.includes("malativas")) return "Barangay Malativas";
-  if (lower.includes("san nicolas")) return "Barangay San Nicolas";
-  if (lower.includes("san roque")) return "Barangay San Roque";
-  if (lower.includes("salvacion")) return "Barangay Salvacion";
-
-  // 2. Regex match for "Barangay [Name]" or "Brgy. [Name]"
-  const match = locationStr.match(/(?:Barangay|Brgy\.?)\s+([A-Za-z\s]+)/i);
-  if (match && match[1]) {
-    const raw = match[1].split(",")[0].trim();
-    if (raw) return `Barangay ${raw}`;
-  }
-
-  // 3. If it already starts with Barangay, return it
-  if (lower.startsWith("barangay ") || lower.startsWith("brgy.")) {
-    return locationStr.trim();
-  }
-
-  // 4. Default for Panabo coastal general area
-  if (lower.includes("panabo")) {
-    return "Barangay Cagangohan"; // Main Panabo coastal sector
-  }
-
-  return locationStr.trim();
-}
-
 export function ScheduleForm({
   isOpen,
   onClose,
@@ -138,9 +116,22 @@ export function ScheduleForm({
 }: ScheduleFormProps) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [highlightedField, setHighlightedField] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     "details" | "equipment" | "workers"
   >("details");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const clearFieldError = useCallback((field: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+    setHighlightedField((prev) => (prev === field ? null : prev));
+  }, []);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -253,7 +244,7 @@ export function ScheduleForm({
 
   // ── GPS 50-Meter Radius Grouping States ────────────────────────────────────
   const [reportGroupingMode, setReportGroupingMode] = useState<"radius" | "flat">("radius");
-  const [groupingRadius, setGroupingRadius] = useState<number>(50);
+  const groupingRadius = DEFAULT_RADIUS_METERS;
 
   const radiusGroups = useMemo(() => {
     return groupReportsByRadius(displayedReports, groupingRadius);
@@ -351,6 +342,11 @@ export function ScheduleForm({
 
   useEffect(() => {
     setErrorMessage(null);
+    setFieldErrors({});
+    setHighlightedField(null);
+    if (isOpen) {
+      setActiveTab("details");
+    }
     if (initialData && isOpen) {
       const rawInitialLoc =
         initialData.locationName ||
@@ -502,6 +498,7 @@ export function ScheduleForm({
 
   // Handle Location Name changes: Automatically fills in Target Barangay / Coastal Area
   const handleLocationNameChange = (newLocationName: string) => {
+    clearFieldError("locationName");
     const autoBarangay = detectBarangayFromLocation(newLocationName);
 
     // Also check if any eligible unassigned report matches this location name
@@ -544,6 +541,7 @@ export function ScheduleForm({
   // When a waste report is toggled in Tab 1 (Operation Details):
   // Automatically fill in Location Name, Target Barangay, and GPS Coordinates!
   const handleReportToggle = (reportId: string) => {
+    clearFieldError("reportIds");
     const targetReport = displayedReports.find((r: any) => r.id === reportId);
     if (
       targetReport?.cleanupScheduleId &&
@@ -614,6 +612,7 @@ export function ScheduleForm({
 
   // Select or Deselect an entire 50-meter radius group of reports with 1 click
   const handleGroupToggle = (group: CleanupRadiusGroup) => {
+    clearFieldError("reportIds");
     const groupReportIds = group.reports
       .filter(
         (r: any) =>
@@ -680,6 +679,7 @@ export function ScheduleForm({
   };
 
   const handleWorkerToggle = (workerId: string) => {
+    clearFieldError("workerIds");
     setFormData((prev) => ({
       ...prev,
       workerIds: prev.workerIds.includes(workerId)
@@ -689,6 +689,7 @@ export function ScheduleForm({
   };
 
   const handleEquipmentToggle = (item: string) => {
+    clearFieldError("equipment");
     setFormData((prev) => ({
       ...prev,
       equipment: prev.equipment.includes(item)
@@ -698,6 +699,7 @@ export function ScheduleForm({
   };
 
   const applyPreset = (preset: "standard" | "all" | "clear") => {
+    clearFieldError("equipment");
     if (preset === "standard") {
       setFormData((prev) => ({ ...prev, equipment: STANDARD_PRESET }));
     } else if (preset === "all") {
@@ -707,60 +709,225 @@ export function ScheduleForm({
     }
   };
 
+  // Step 1 Validation
+  const validateDetailsStep = useCallback((): ValidationResult => {
+    return validateScheduleDetails(formData, displayedReports, isEditing);
+  }, [formData, displayedReports, isEditing]);
+
+  // Step 2 Validation
+  const validateEquipmentStep = useCallback((): ValidationResult => {
+    return validateScheduleEquipment(formData.equipment);
+  }, [formData.equipment]);
+
+  // Step 3 Validation
+  const validateWorkersStep = useCallback((): ValidationResult => {
+    return validateScheduleWorkers(formData.workerIds);
+  }, [formData.workerIds]);
+
+  // Step Completion States for Stepper Badges & Navigation Guards
+  const isDetailsComplete = useMemo(() => validateDetailsStep().valid, [validateDetailsStep]);
+  const isEquipmentComplete = useMemo(() => validateEquipmentStep().valid, [validateEquipmentStep]);
+  const isWorkersComplete = useMemo(() => validateWorkersStep().valid, [validateWorkersStep]);
+
+  // Intelligent Navigation and Scrolling to Missing / Invalid Fields
+  const navigateAndScrollToField = useCallback(
+    (field: string, message?: string) => {
+      let targetStep: WizardStep = "details";
+      if (field === "equipment") {
+        targetStep = "equipment";
+      } else if (field === "workerIds") {
+        targetStep = "workers";
+      }
+
+      setFieldErrors((prev) => ({
+        ...prev,
+        [field]: message || "This field requires your attention.",
+      }));
+      setHighlightedField(field);
+
+      if (activeTab !== targetStep) {
+        setActiveTab(targetStep);
+      }
+
+      const focusAndScroll = () => {
+        const container = scrollContainerRef.current;
+        const targetElement =
+          document.getElementById(`field-${field}`) ||
+          document.getElementById(field);
+
+        if (!targetElement) return;
+
+        // Perform smooth scroll inside modal's scrollable container
+        if (container && container.contains(targetElement)) {
+          const containerRect = container.getBoundingClientRect();
+          const targetRect = targetElement.getBoundingClientRect();
+          const relativeTargetTop = targetRect.top - containerRect.top + container.scrollTop;
+          const targetOffsetTop =
+            relativeTargetTop - container.clientHeight / 2 + targetRect.height / 2;
+
+          container.scrollTo({
+            top: Math.max(0, targetOffsetTop),
+            behavior: "smooth",
+          });
+        } else {
+          targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
+        // Focus input or first focusable control inside field
+        if (
+          targetElement instanceof HTMLInputElement ||
+          targetElement instanceof HTMLTextAreaElement ||
+          targetElement instanceof HTMLSelectElement
+        ) {
+          targetElement.focus({ preventScroll: true });
+        } else {
+          const focusable = targetElement.querySelector<
+            HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement
+          >("input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])");
+          if (focusable) {
+            focusable.focus({ preventScroll: true });
+          }
+        }
+      };
+
+      setTimeout(focusAndScroll, 80);
+    },
+    [activeTab],
+  );
+
+  // Step Navigation Handlers
+  const handleNextToEquipment = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMessage(null);
+    const result = validateDetailsStep();
+    if (!result.valid) {
+      if (result.field) {
+        navigateAndScrollToField(result.field, result.error);
+      } else {
+        setErrorMessage(result.error || "Please complete all required fields in Operation Details.");
+      }
+      return;
+    }
+    setFieldErrors({});
+    setHighlightedField(null);
+    setActiveTab("equipment");
+  };
+
+  const handleNextToWorkers = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMessage(null);
+    const result = validateEquipmentStep();
+    if (!result.valid) {
+      if (result.field) {
+        navigateAndScrollToField(result.field, result.error);
+      } else {
+        setErrorMessage(result.error || "Please select at least one equipment item.");
+      }
+      return;
+    }
+    setFieldErrors({});
+    setHighlightedField(null);
+    setActiveTab("workers");
+  };
+
+  const handleStepClick = (targetTab: WizardStep) => {
+    setErrorMessage(null);
+    if (targetTab === "details") {
+      setActiveTab("details");
+      return;
+    }
+    if (targetTab === "equipment") {
+      const detailsResult = validateDetailsStep();
+      if (!detailsResult.valid) {
+        if (detailsResult.field) {
+          navigateAndScrollToField(detailsResult.field, detailsResult.error);
+        } else {
+          setErrorMessage(detailsResult.error || "Please complete Operation Details first.");
+        }
+        return;
+      }
+      setActiveTab("equipment");
+      return;
+    }
+    if (targetTab === "workers") {
+      const detailsResult = validateDetailsStep();
+      if (!detailsResult.valid) {
+        if (detailsResult.field) {
+          navigateAndScrollToField(detailsResult.field, detailsResult.error);
+        } else {
+          setErrorMessage(detailsResult.error || "Please complete Operation Details first.");
+        }
+        return;
+      }
+      const equipResult = validateEquipmentStep();
+      if (!equipResult.valid) {
+        if (equipResult.field) {
+          navigateAndScrollToField(equipResult.field, equipResult.error);
+        } else {
+          setErrorMessage(equipResult.error || "Please select equipment before proceeding to Assign.");
+        }
+        return;
+      }
+      setActiveTab("workers");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
+    // If submitted via keyboard Enter while on Step 1 or Step 2, advance smoothly
+    if (activeTab === "details") {
+      handleNextToEquipment(e);
+      return;
+    }
+    if (activeTab === "equipment") {
+      handleNextToWorkers(e);
+      return;
+    }
+
     if (loading) return;
+
+    // Check Step 1 (earliest step with unresolved error)
+    const detailsVal = validateDetailsStep();
+    if (!detailsVal.valid) {
+      if (detailsVal.field) {
+        navigateAndScrollToField(detailsVal.field, detailsVal.error);
+      } else {
+        setErrorMessage(detailsVal.error || "Please check Operation Details.");
+        setActiveTab("details");
+      }
+      return;
+    }
+
+    // Check Step 2
+    const equipVal = validateEquipmentStep();
+    if (!equipVal.valid) {
+      if (equipVal.field) {
+        navigateAndScrollToField(equipVal.field, equipVal.error);
+      } else {
+        setErrorMessage(equipVal.error || "Please select at least one equipment item.");
+        setActiveTab("equipment");
+      }
+      return;
+    }
+
+    // Check Step 3
+    const workersVal = validateWorkersStep();
+    if (!workersVal.valid) {
+      if (workersVal.field) {
+        navigateAndScrollToField(workersVal.field, workersVal.error);
+      } else {
+        setErrorMessage(workersVal.error || "Please assign at least one field worker.");
+        setActiveTab("workers");
+      }
+      return;
+    }
+
     const title = formData.title.trim();
     const description = formData.description.trim();
     const barangay = formData.barangay.trim() || formData.locationName.trim();
     const scheduledAt = parseScheduleDateTime(formData.scheduledAt);
-
-    if (title.length < 3 || title.length > 200) {
-      setErrorMessage("Enter an operation title between 3 and 200 characters.");
-      setActiveTab("details");
-      return;
-    }
-    if (!barangay || barangay.length > 300) {
-      setErrorMessage("Enter a coastal location of up to 300 characters.");
-      setActiveTab("details");
-      return;
-    }
-    if (!Number.isFinite(scheduledAt.getTime()) ||
-        (!isEditing && formData.scheduledAt < formatScheduleDateTime(new Date()))) {
-      setErrorMessage("Choose a valid deployment date and time in Panabo.");
-      setActiveTab("details");
-      return;
-    }
-    if (description.length < 10 || description.length > 2000) {
-      setErrorMessage("Enter an operational briefing between 10 and 2,000 characters.");
-      setActiveTab("details");
-      return;
-    }
-    if (formData.equipment.length === 0) {
-      setErrorMessage("Please select at least one equipment item.");
-      setActiveTab("equipment");
-      return;
-    }
-    if (formData.workerIds.length === 0) {
-      setErrorMessage("Please assign at least one field worker.");
-      setActiveTab("workers");
-      return;
-    }
-    if (formData.reportIds.length === 0) {
-      setErrorMessage(
-        "Select at least one verified report for this cleanup operation.",
-      );
-      setActiveTab("details");
-      return;
-    }
-
-    if (formData.reportIds.some((id) => !displayedReports.some((report) => report.id === id))) {
-      setErrorMessage("A selected report is no longer available. Review your report selection.");
-      setActiveTab("details");
-      return;
-    }
 
     try {
       setLoading(true);
@@ -816,10 +983,10 @@ export function ScheduleForm({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         overlayClassName="bg-black/40 backdrop-blur-sm"
-        className="max-w-3xl max-h-[92vh] flex flex-col p-0 bg-white dark:bg-slate-900 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-2xl overflow-hidden"
+        className="max-w-3xl w-[95vw] sm:w-full max-h-[90vh] flex flex-col p-0 bg-white dark:bg-slate-900 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-2xl overflow-hidden"
       >
         {/* Header */}
-        <div className="px-8 pt-7 pb-5 border-b border-gray-100 dark:border-slate-800 bg-gradient-to-r from-blue-50/50 via-white to-indigo-50/30 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/20">
+        <div className="px-6 sm:px-8 pt-6 pb-4 border-b border-gray-100 dark:border-slate-800 bg-gradient-to-r from-blue-50/50 via-white to-indigo-50/30 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/20 shrink-0">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-0.5 rounded-full border border-indigo-100/60 dark:border-indigo-900/50">
@@ -835,58 +1002,115 @@ export function ScheduleForm({
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 mt-5 bg-gray-100/80 dark:bg-slate-800/80 p-1 rounded-2xl w-fit">
-            <button
-              type="button"
-              onClick={() => setActiveTab("details")}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === "details"
-                  ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
-                  : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
-                }`}
-            >
-              1. Operation Details
-              {formData.reportIds.length > 0 && (
-                <span className="px-1.5 py-0.2 bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-full text-[10px]">
-                  {formData.reportIds.length}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("equipment")}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === "equipment"
-                  ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
-                  : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
-                }`}
-            >
-              2. Equipment
-              {formData.equipment.length > 0 && (
-                <span className="px-1.5 py-0.2 bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-full text-[10px]">
-                  {formData.equipment.length}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("workers")}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === "workers"
-                  ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm"
-                  : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
-                }`}
-            >
-              3. Assign
-              {formData.workerIds.length > 0 && (
-                <span className="px-1.5 py-0.2 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-full text-[10px]">
-                  {formData.workerIds.length}
-                </span>
-              )}
-            </button>
+          {/* Enhanced Multi-Step Stepper Progress Bar */}
+          <div className="mt-5" role="tablist" aria-label="Cleanup Schedule Wizard">
+            <div className="flex items-center gap-1 sm:gap-2 p-1.5 rounded-2xl bg-gray-100/80 dark:bg-slate-800/80 border border-gray-200/60 dark:border-slate-700/60">
+              {WIZARD_STEPS.map((step, idx) => {
+                const isCurrent = activeTab === step.id;
+                const isComplete =
+                  step.id === "details"
+                    ? isDetailsComplete
+                    : step.id === "equipment"
+                      ? isDetailsComplete && isEquipmentComplete
+                      : isDetailsComplete && isEquipmentComplete && isWorkersComplete;
+                const isAccessible =
+                  step.id === "details"
+                    ? true
+                    : step.id === "equipment"
+                      ? isDetailsComplete
+                      : isDetailsComplete && isEquipmentComplete;
+
+                return (
+                  <React.Fragment key={step.id}>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={isCurrent}
+                      onClick={() => handleStepClick(step.id)}
+                      className={`flex-1 flex items-center justify-center sm:justify-start gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all relative ${isCurrent
+                        ? isComplete
+                          ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shadow-sm ring-1 ring-emerald-500/30"
+                          : "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-sm ring-1 ring-indigo-500/20"
+                        : isComplete
+                          ? "text-emerald-700 dark:text-emerald-300 hover:bg-white/60 dark:hover:bg-slate-800/60"
+                          : isAccessible
+                            ? "text-gray-600 dark:text-slate-300 hover:bg-white/40 dark:hover:bg-slate-800/40"
+                            : "text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-400 opacity-70"
+                        }`}
+                    >
+                      {/* Step Circle / Checkmark */}
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 transition-all ${isComplete
+                          ? isCurrent
+                            ? "bg-emerald-600 text-white shadow-sm"
+                            : "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
+                          : isCurrent
+                            ? "bg-indigo-600 text-white shadow-sm"
+                            : "bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400"
+                          }`}
+                      >
+                        {isComplete ? (
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        ) : (
+                          step.stepNumber
+                        )}
+                      </div>
+
+                      {/* Step Name */}
+                      <span className="hidden sm:inline truncate">{step.label}</span>
+                      <span className="inline sm:hidden truncate">{step.shortLabel}</span>
+
+                      {/* Count Badge */}
+                      {step.id === "details" && formData.reportIds.length > 0 && (
+                        <span
+                          className={`hidden md:inline-flex px-1.5 py-0.2 rounded-full text-[10px] font-bold ${isComplete
+                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
+                            : isCurrent
+                              ? "bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300"
+                              : "bg-gray-200/80 dark:bg-slate-700 text-gray-600 dark:text-slate-400"
+                            }`}
+                        >
+                          {formData.reportIds.length}
+                        </span>
+                      )}
+                      {step.id === "equipment" && formData.equipment.length > 0 && (
+                        <span
+                          className={`hidden md:inline-flex px-1.5 py-0.2 rounded-full text-[10px] font-bold ${isComplete
+                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
+                            : isCurrent
+                              ? "bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300"
+                              : "bg-gray-200/80 dark:bg-slate-700 text-gray-600 dark:text-slate-400"
+                            }`}
+                        >
+                          {formData.equipment.length}
+                        </span>
+                      )}
+                      {step.id === "workers" && formData.workerIds.length > 0 && (
+                        <span
+                          className={`hidden md:inline-flex px-1.5 py-0.2 rounded-full text-[10px] font-bold ${isComplete
+                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
+                            : isCurrent
+                              ? "bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300"
+                              : "bg-gray-200/80 dark:bg-slate-700 text-gray-600 dark:text-slate-400"
+                            }`}
+                        >
+                          {formData.workerIds.length}
+                        </span>
+                      )}
+                    </button>
+
+                    {idx < WIZARD_STEPS.length - 1 && (
+                      <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 shrink-0 hidden sm:block" />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
           </div>
         </div>
 
         {/* Scrollable Form Body */}
-        <div className="flex-1 overflow-y-auto px-8 py-6">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-6 sm:px-8 py-6 min-h-0 scroll-smooth">
           {/* Error Banner */}
           {errorMessage && (
             <div className="mb-6 p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center gap-3">
@@ -908,13 +1132,21 @@ export function ScheduleForm({
               <div className="space-y-5 animate-in fade-in duration-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Operation Title */}
-                  <div className="space-y-1.5 md:col-span-2">
-                    <Label
-                      htmlFor="title"
-                      className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
-                    >
-                      Operation Title *
-                    </Label>
+                  <div id="field-title" className="space-y-1.5 md:col-span-2 scroll-mt-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label
+                        htmlFor="title"
+                        className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
+                      >
+                        Operation Title *
+                      </Label>
+                      {fieldErrors.title && (
+                        <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-in fade-in duration-200">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          {fieldErrors.title}
+                        </span>
+                      )}
+                    </div>
                     <Input
                       id="title"
                       required
@@ -922,13 +1154,17 @@ export function ScheduleForm({
                       maxLength={200}
                       placeholder="e.g., Coastal Sweep - Barangay Cagangohan Zone 1"
                       value={formData.title}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearFieldError("title");
                         setFormData((prev) => ({
                           ...prev,
                           title: e.target.value,
-                        }))
-                      }
-                      className="rounded-xl border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500 h-11 text-sm font-medium"
+                        }));
+                      }}
+                      className={`rounded-xl h-11 text-sm font-medium transition-all ${fieldErrors.title
+                        ? "border-rose-400 dark:border-rose-600 focus-visible:ring-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20 dark:bg-rose-950/20 text-rose-900 dark:text-rose-100"
+                        : "border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500"
+                        }`}
                     />
                     {existingScheduleOnDate && (
                       <div className="flex items-start gap-2 p-3 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 mt-1.5">
@@ -944,14 +1180,22 @@ export function ScheduleForm({
                   </div>
 
                   {/* Location Name / Coastal Site */}
-                  <div className="space-y-1.5 md:col-span-2">
-                    <Label
-                      htmlFor="locationName"
-                      className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5"
-                    >
-                      <Compass className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                      Location Name / Reported Coastal Site *
-                    </Label>
+                  <div id="field-locationName" className="space-y-1.5 md:col-span-2 scroll-mt-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label
+                        htmlFor="locationName"
+                        className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5"
+                      >
+                        <Compass className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        Location Name / Reported Coastal Site *
+                      </Label>
+                      {fieldErrors.locationName && (
+                        <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-in fade-in duration-200">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          {fieldErrors.locationName}
+                        </span>
+                      )}
+                    </div>
 
                     <div className="relative">
                       <Input
@@ -959,62 +1203,61 @@ export function ScheduleForm({
                         placeholder="Type a location name (e.g., Lilia Homes, San Francisco) or select a waste report below..."
                         value={formData.locationName}
                         onChange={(e) => handleLocationNameChange(e.target.value)}
-                        className="rounded-xl border-gray-200 dark:border-slate-700 bg-blue-50/20 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500 h-11 text-sm font-medium pl-9"
+                        className={`rounded-xl h-11 text-sm font-medium pl-9 transition-all ${fieldErrors.locationName
+                          ? "border-rose-400 dark:border-rose-600 focus-visible:ring-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20 dark:bg-rose-950/20 text-rose-900 dark:text-rose-100"
+                          : "border-gray-200 dark:border-slate-700 bg-blue-50/20 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500"
+                          }`}
                       />
-                      <MapPin className="w-4 h-4 text-blue-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <MapPin className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${fieldErrors.locationName ? "text-rose-500" : "text-blue-500"
+                        }`} />
                     </div>
                   </div>
 
                   {/* Waste Reports Linking */}
-                  <div className="space-y-3 md:col-span-2 pt-1">
+                  <div
+                    id="field-reportIds"
+                    className={`space-y-3 md:col-span-2 pt-1 scroll-mt-6 rounded-2xl transition-all ${fieldErrors.reportIds
+                      ? "p-3 border-2 border-rose-400 dark:border-rose-600 ring-2 ring-rose-500/20 bg-rose-50/10"
+                      : ""
+                      }`}
+                  >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <Label className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <FileText className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-                        Waste Reports *
-                      </Label>
-
-                      {/* Grouping Mode Pill Switcher & Radius Selector */}
                       <div className="flex items-center gap-2">
-                        <div className="flex items-center bg-gray-100 dark:bg-slate-800 p-0.5 rounded-lg border border-gray-200 dark:border-slate-700 text-xs">
-                          <button
-                            type="button"
-                            onClick={() => setReportGroupingMode("radius")}
-                            className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 ${reportGroupingMode === "radius"
-                                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                                : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
-                              }`}
-                          >
-                            <Circle className="w-3 h-3 text-indigo-500 fill-indigo-500/20" />
-                            <span>50m Radius Groups ({groupedAreas.length})</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setReportGroupingMode("flat")}
-                            className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 ${reportGroupingMode === "flat"
-                                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                                : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
-                              }`}
-                          >
-                            <span>All Reports ({displayedReports.length})</span>
-                          </button>
-                        </div>
-
-                        {reportGroupingMode === "radius" && (
-                          <div className="flex items-center gap-1 text-[11px] bg-indigo-50/70 dark:bg-indigo-950/40 px-2 py-1 rounded-lg border border-indigo-100 dark:border-indigo-900/50">
-                            <span className="font-semibold text-indigo-700 dark:text-indigo-300">Radius:</span>
-                            <select
-                              value={groupingRadius}
-                              onChange={(e) => setGroupingRadius(Number(e.target.value))}
-                              className="bg-transparent font-bold text-indigo-900 dark:text-indigo-200 focus:outline-none cursor-pointer"
-                            >
-                              <option value={20} className="dark:bg-slate-900">20m</option>
-                              <option value={30} className="dark:bg-slate-900">30m</option>
-                              <option value={50} className="dark:bg-slate-900">50m (Default)</option>
-                              <option value={75} className="dark:bg-slate-900">75m</option>
-                              <option value={100} className="dark:bg-slate-900">100m</option>
-                            </select>
-                          </div>
+                        <Label className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <FileText className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                          Waste Reports *
+                        </Label>
+                        {fieldErrors.reportIds && (
+                          <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-in fade-in duration-200">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            {fieldErrors.reportIds}
+                          </span>
                         )}
+                      </div>
+
+                      {/* Grouping Mode Pill Switcher */}
+                      <div className="flex items-center bg-gray-100 dark:bg-slate-800 p-0.5 rounded-lg border border-gray-200 dark:border-slate-700 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setReportGroupingMode("radius")}
+                          className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 ${reportGroupingMode === "radius"
+                            ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                            : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
+                            }`}
+                        >
+                          <Circle className="w-3 h-3 text-indigo-500 fill-indigo-500/20" />
+                          <span>50m Radius Groups ({groupedAreas.length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReportGroupingMode("flat")}
+                          className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 ${reportGroupingMode === "flat"
+                            ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                            : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
+                            }`}
+                        >
+                          <span>All Reports ({displayedReports.length})</span>
+                        </button>
                       </div>
                     </div>
 
@@ -1073,8 +1316,8 @@ export function ScheduleForm({
                     {selectedReportsDistanceInfo.count > 1 && (
                       <div
                         className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs ${selectedReportsDistanceInfo.isWithinRadius
-                            ? "bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/50 text-emerald-900 dark:text-emerald-200"
-                            : "bg-blue-50/90 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50 text-blue-900 dark:text-blue-200"
+                          ? "bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/50 text-emerald-900 dark:text-emerald-200"
+                          : "bg-blue-50/90 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50 text-blue-900 dark:text-blue-200"
                           }`}
                       >
                         {selectedReportsDistanceInfo.isWithinRadius ? (
@@ -1141,8 +1384,8 @@ export function ScheduleForm({
                                 <div
                                   key={group.id}
                                   className={`rounded-2xl border transition-all overflow-hidden ${allGroupSelected
-                                      ? "border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm"
-                                      : "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-gray-300 dark:hover:border-slate-700"
+                                    ? "border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm"
+                                    : "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-gray-300 dark:hover:border-slate-700"
                                     }`}
                                 >
                                   {/* Area Card Header */}
@@ -1173,12 +1416,12 @@ export function ScheduleForm({
                                       onClick={() => handleGroupToggle(group)}
                                       disabled={groupUnassignedReports.length === 0}
                                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${groupUnassignedReports.length === 0
-                                          ? "opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800 text-gray-400"
-                                          : allGroupSelected
-                                            ? "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
-                                            : someGroupSelected
-                                              ? "bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-200"
-                                              : "bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700"
+                                        ? "opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800 text-gray-400"
+                                        : allGroupSelected
+                                          ? "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+                                          : someGroupSelected
+                                            ? "bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-200"
+                                            : "bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700"
                                         }`}
                                     >
                                       {allGroupSelected ? (
@@ -1231,10 +1474,10 @@ export function ScheduleForm({
                                         <label
                                           key={report.id}
                                           className={`flex items-center gap-3 p-2.5 transition-colors ${isAssignedToOther
-                                              ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
-                                              : isLinked
-                                                ? "bg-indigo-50/50 dark:bg-slate-800/80 cursor-pointer hover:bg-white dark:hover:bg-slate-800/60"
-                                                : "hover:bg-gray-50/60 dark:hover:bg-slate-800/40 cursor-pointer"
+                                            ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
+                                            : isLinked
+                                              ? "bg-indigo-50/50 dark:bg-slate-800/80 cursor-pointer hover:bg-white dark:hover:bg-slate-800/60"
+                                              : "hover:bg-gray-50/60 dark:hover:bg-slate-800/40 cursor-pointer"
                                             }`}
                                         >
                                           <input
@@ -1328,10 +1571,10 @@ export function ScheduleForm({
                                   <label
                                     key={report.id}
                                     className={`flex items-center gap-3 p-3 transition-colors ${isAssignedToOther
-                                        ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
-                                        : isLinked
-                                          ? "bg-blue-50/40 dark:bg-slate-800/70 cursor-pointer hover:bg-white dark:hover:bg-slate-800/50"
-                                          : "hover:bg-gray-50/50 dark:hover:bg-slate-800/50 cursor-pointer"
+                                      ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
+                                      : isLinked
+                                        ? "bg-blue-50/40 dark:bg-slate-800/70 cursor-pointer hover:bg-white dark:hover:bg-slate-800/50"
+                                        : "hover:bg-gray-50/50 dark:hover:bg-slate-800/50 cursor-pointer"
                                       }`}
                                   >
                                     <input
@@ -1416,10 +1659,10 @@ export function ScheduleForm({
                               <label
                                 key={report.id}
                                 className={`flex items-center gap-3 p-3 transition-colors ${isAssignedToOther
-                                    ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
-                                    : isLinked
-                                      ? "bg-blue-50/40 dark:bg-slate-800/70 cursor-pointer hover:bg-white dark:hover:bg-slate-800/50"
-                                      : "hover:bg-white dark:hover:bg-slate-800/50 cursor-pointer"
+                                  ? "opacity-50 cursor-not-allowed bg-gray-100/60 dark:bg-slate-800/50"
+                                  : isLinked
+                                    ? "bg-blue-50/40 dark:bg-slate-800/70 cursor-pointer hover:bg-white dark:hover:bg-slate-800/50"
+                                    : "hover:bg-white dark:hover:bg-slate-800/50 cursor-pointer"
                                   }`}
                               >
                                 <input
@@ -1484,26 +1727,39 @@ export function ScheduleForm({
                   </div>
 
                   {/* Deployment Date & Time (Panabo) */}
-                  <div className="space-y-1.5 md:col-span-2">
-                    <Label
-                      htmlFor="scheduledAt"
-                      className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
-                    >
-                      Deployment Date & Time (Panabo) *
-                    </Label>
+                  <div id="field-scheduledAt" className="space-y-1.5 md:col-span-2 scroll-mt-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label
+                        htmlFor="scheduledAt"
+                        className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                        Deployment Date & Time (Panabo) *
+                      </Label>
+                      {fieldErrors.scheduledAt && (
+                        <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-in fade-in duration-200">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          {fieldErrors.scheduledAt}
+                        </span>
+                      )}
+                    </div>
                     <Input
                       id="scheduledAt"
                       type="datetime-local"
                       required
                       min={isEditing ? undefined : formatScheduleDateTime(new Date())}
                       value={formData.scheduledAt}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearFieldError("scheduledAt");
                         setFormData((prev) => ({
                           ...prev,
                           scheduledAt: e.target.value,
-                        }))
-                      }
-                      className="rounded-xl border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500 h-11 text-sm font-medium"
+                        }));
+                      }}
+                      className={`rounded-xl h-11 text-sm font-medium transition-all ${fieldErrors.scheduledAt
+                        ? "border-rose-400 dark:border-rose-600 focus-visible:ring-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20 dark:bg-rose-950/20 text-rose-900 dark:text-rose-100"
+                        : "border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500"
+                        }`}
                     />
                     {existingScheduleOnDate && (
                       <div className="flex items-start gap-2 p-3 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 mt-1.5">
@@ -1520,13 +1776,21 @@ export function ScheduleForm({
                 </div>
 
                 {/* Description */}
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="description"
-                    className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
-                  >
-                    Operational Directives & Briefing *
-                  </Label>
+                <div id="field-description" className="space-y-1.5 scroll-mt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label
+                      htmlFor="description"
+                      className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider"
+                    >
+                      Operational Directives & Briefing *
+                    </Label>
+                    {fieldErrors.description && (
+                      <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-in fade-in duration-200">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        {fieldErrors.description}
+                      </span>
+                    )}
+                  </div>
                   <Textarea
                     id="description"
                     required
@@ -1535,13 +1799,17 @@ export function ScheduleForm({
                     rows={4}
                     placeholder="Provide detailed instructions for the field team (e.g. rendezvous point, target debris type, high tide warnings, disposal truck coordination)..."
                     value={formData.description}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      clearFieldError("description");
                       setFormData((prev) => ({
                         ...prev,
                         description: e.target.value,
-                      }))
-                    }
-                    className="rounded-xl border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500 resize-none text-sm leading-relaxed"
+                      }));
+                    }}
+                    className={`rounded-xl resize-none text-sm leading-relaxed transition-all ${fieldErrors.description
+                      ? "border-rose-400 dark:border-rose-600 focus-visible:ring-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20 dark:bg-rose-950/20 text-rose-900 dark:text-rose-100"
+                      : "border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500"
+                      }`}
                   />
                 </div>
 
@@ -1578,11 +1846,21 @@ export function ScheduleForm({
 
             {/* TAB 2: EQUIPMENT */}
             {activeTab === "equipment" && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50/60 to-blue-50/30 dark:from-slate-800/60 dark:to-indigo-950/20 border border-indigo-100 dark:border-slate-700">
+              <div id="field-equipment" className="space-y-6 animate-in fade-in duration-200 scroll-mt-6">
+                <div
+                  className={`p-5 rounded-2xl transition-all ${fieldErrors.equipment
+                    ? "bg-gradient-to-br from-rose-50/60 to-red-50/30 dark:from-slate-800/80 dark:to-rose-950/30 border-2 border-rose-400 dark:border-rose-600 shadow-sm ring-2 ring-rose-500/20"
+                    : "bg-gradient-to-br from-indigo-50/60 to-blue-50/30 dark:from-slate-800/60 dark:to-indigo-950/20 border border-indigo-100 dark:border-slate-700"
+                    }`}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-600 dark:bg-indigo-500 text-white flex items-center justify-center">
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${fieldErrors.equipment
+                          ? "bg-rose-600 text-white"
+                          : "bg-indigo-600 dark:bg-indigo-500 text-white"
+                          }`}
+                      >
                         <Wrench className="w-4 h-4" />
                       </div>
                       <div>
@@ -1621,6 +1899,13 @@ export function ScheduleForm({
                     </div>
                   </div>
 
+                  {fieldErrors.equipment && (
+                    <div className="mb-4 p-3 rounded-xl bg-rose-100/80 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-xs font-semibold text-rose-800 dark:text-rose-200 flex items-center gap-2 animate-in fade-in duration-200">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                      <span>{fieldErrors.equipment}</span>
+                    </div>
+                  )}
+
                   {/* Flexible Responsive Gear Grid - NO TRUNCATION */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                     {EQUIPMENT_OPTIONS.map((item) => {
@@ -1631,14 +1916,14 @@ export function ScheduleForm({
                           type="button"
                           onClick={() => handleEquipmentToggle(item)}
                           className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${isSelected
-                              ? "border-indigo-500 dark:border-indigo-500 bg-white dark:bg-slate-800 shadow-sm ring-1 ring-indigo-500/20"
-                              : "border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"
+                            ? "border-indigo-500 dark:border-indigo-500 bg-white dark:bg-slate-800 shadow-sm ring-1 ring-indigo-500/20"
+                            : "border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 hover:border-gray-300 dark:hover:border-slate-600"
                             }`}
                         >
                           <div
                             className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${isSelected
-                                ? "bg-indigo-600 border-indigo-600 text-white"
-                                : "border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800"
+                              ? "bg-indigo-600 border-indigo-600 text-white"
+                              : "border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800"
                               }`}
                           >
                             {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -1669,18 +1954,38 @@ export function ScheduleForm({
             {/* TAB 3: ASSIGN FIELD WORKERS */}
             {activeTab === "workers" && (
               <div className="space-y-5 animate-in fade-in duration-200">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Users className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-                      Assign Field Workers *
-                    </Label>
-                    <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900/50">
+                <div id="field-workerIds" tabIndex={-1} className="space-y-3 scroll-mt-6 focus:outline-none">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                        Assign Field Workers *
+                      </Label>
+                      {fieldErrors.workerIds && (
+                        <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-in fade-in duration-200">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          {fieldErrors.workerIds}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-colors ${fieldErrors.workerIds
+                        ? "text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 border-rose-200 dark:border-rose-900/50"
+                        : formData.workerIds.length > 0
+                          ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border-indigo-100 dark:border-indigo-900/50"
+                          : "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border-amber-100 dark:border-amber-900/50"
+                        }`}
+                    >
                       {formData.workerIds.length} assigned
                     </span>
                   </div>
 
-                  <div className="border border-gray-200 dark:border-slate-800 rounded-2xl max-h-96 overflow-y-auto bg-gray-50/30 dark:bg-slate-900/50 p-2">
+                  <div
+                    className={`border rounded-2xl max-h-96 overflow-y-auto bg-gray-50/30 dark:bg-slate-900/50 p-2 transition-all ${fieldErrors.workerIds
+                      ? "border-2 border-rose-400 dark:border-rose-600 ring-2 ring-rose-500/20 shadow-sm"
+                      : "border-gray-200 dark:border-slate-800"
+                      }`}
+                  >
                     {workers.length === 0 ? (
                       <div className="p-8 text-xs text-gray-500 dark:text-slate-400 text-center">
                         No field workers registered.
@@ -1695,8 +2000,8 @@ export function ScheduleForm({
                             <label
                               key={worker.id}
                               className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${isAssigned
-                                  ? "bg-indigo-50/60 dark:bg-slate-800 border-indigo-300 dark:border-indigo-600 shadow-sm ring-1 ring-indigo-500/20"
-                                  : "bg-white dark:bg-slate-800/40 border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 hover:bg-gray-50/60 dark:hover:bg-slate-800"
+                                ? "bg-indigo-50/60 dark:bg-slate-800 border-indigo-300 dark:border-indigo-600 shadow-sm ring-1 ring-indigo-500/20"
+                                : "bg-white dark:bg-slate-800/40 border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600 hover:bg-gray-50/60 dark:hover:bg-slate-800"
                                 }`}
                             >
                               <input
@@ -1735,79 +2040,96 @@ export function ScheduleForm({
           </form>
         </div>
 
-        {/* Footer */}
-        <div className="px-8 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-3">
-          {/* Readiness Indicators */}
-          <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-slate-400">
-            <span
-              className={`inline-flex items-center gap-1 ${formData.workerIds.length > 0
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-amber-600 dark:text-amber-400"
-                }`}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              {formData.workerIds.length} assigned
-            </span>
-            <span>•</span>
-            <span
-              className={`inline-flex items-center gap-1 ${formData.reportIds.length > 0
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-gray-400 dark:text-slate-500"
-                }`}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              {formData.reportIds.length} reports
-            </span>
-            <span>•</span>
-            <span
-              className={`inline-flex items-center gap-1 ${formData.equipment.length > 0
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-amber-600 dark:text-amber-400"
-                }`}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              {formData.equipment.length} gear items
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {(formData.equipment.length === 0 || formData.workerIds.length === 0) && !loading && (
-              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 hidden sm:inline-flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
-                {formData.equipment.length === 0 && formData.workerIds.length === 0
-                  ? "Equipment & worker required"
-                  : formData.equipment.length === 0
-                    ? "Equipment required"
-                    : "Worker required"}
-              </span>
+        {/* Dynamic Wizard Footer */}
+        <div className="px-6 sm:px-8 py-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/95 dark:bg-slate-900/95 backdrop-blur-sm flex items-center justify-end gap-2.5 shrink-0">
+          {/* STEP 1: Details */}
+          {activeTab === "details" && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  disabled={loading}
+                  className="rounded-xl h-10 px-5 border-gray-200 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 text-xs font-bold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleNextToEquipment()}
+                  disabled={loading}
+                  className="rounded-xl h-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-indigo-500/20 text-white font-bold text-xs transition-all flex items-center gap-2"
+                >
+                  <span>Next: Equipment</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </>
             )}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-              className="rounded-xl h-10 px-5 border-gray-200 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 text-xs font-bold"
-            >
-              Cancel
-            </Button>
-            <Button
-              form="schedule-form"
-              type="submit"
-              disabled={loading}
-              className="rounded-xl h-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-indigo-500/20 text-white font-bold text-xs transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none disabled:hover:from-blue-600 disabled:hover:to-indigo-600"
-            >
-              {loading ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : isEditing ? (
-                "Update Operation"
-              ) : (
-                "Create Cleanup Schedule"
-              )}
-            </Button>
-          </div>
+
+            {/* STEP 2: Equipment */}
+            {activeTab === "equipment" && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    setActiveTab("details");
+                  }}
+                  disabled={loading}
+                  className="rounded-xl h-10 px-5 border-gray-200 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 text-xs font-bold flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleNextToWorkers()}
+                  disabled={loading}
+                  className="rounded-xl h-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-indigo-500/20 text-white font-bold text-xs transition-all flex items-center gap-2"
+                >
+                  <span>Next: Assign Workers</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+
+            {/* STEP 3: Assign */}
+            {activeTab === "workers" && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    setActiveTab("equipment");
+                  }}
+                  disabled={loading}
+                  className="rounded-xl h-10 px-5 border-gray-200 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 text-xs font-bold flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </Button>
+                <Button
+                  form="schedule-form"
+                  type="submit"
+                  disabled={loading || formData.workerIds.length === 0}
+                  className="rounded-xl h-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-indigo-500/20 text-white font-bold text-xs transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{isEditing ? "Update Operation" : "Create Cleanup Schedule"}</span>
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
         </div>
       </DialogContent>
     </Dialog>

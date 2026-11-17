@@ -10,6 +10,7 @@ import {
   ReactNode,
 } from "react";
 import { Notification } from "@/types";
+import { AUTH_KEYS } from "@/lib/api";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -142,7 +143,7 @@ function InternalPoller({
       }
       try {
         // Only poll if a user session is active
-        const token = localStorage.getItem("bluewaste_token");
+        const token = localStorage.getItem(AUTH_KEYS.TOKEN);
         if (!token) return;
 
         const { default: api } = await import("@/lib/api");

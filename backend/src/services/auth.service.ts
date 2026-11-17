@@ -104,7 +104,10 @@ export class AuthService {
       throw new Error("Invalid or expired refresh token");
     }
 
-    return { token: generateToken(user.id) };
+    return {
+      token: generateToken(user.id),
+      refreshToken: generateRefreshToken(user.id),
+    };
   }
 
   static async getProfile(userId: string) {

@@ -7,7 +7,7 @@ import {
   useState,
   useCallback,
 } from "react";
-import api from "@/lib/api";
+import api, { AUTH_KEYS, setUnauthorizedHandler } from "@/lib/api";
 import { useDemoMode } from "@/hooks/useDemoMode";
 import { User } from "@/types";
 
@@ -43,15 +43,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("bluewaste_token");
-    const savedUser = localStorage.getItem("bluewaste_user");
+    setUnauthorizedHandler(() => {
+      setUser(null);
+      setToken(null);
+    });
+
+    const savedToken = localStorage.getItem(AUTH_KEYS.TOKEN);
+    const savedUser = localStorage.getItem(AUTH_KEYS.USER);
 
     if (savedToken && savedUser) {
       setToken(savedToken);
       try {
         setUser(JSON.parse(savedUser));
       } catch {
-        localStorage.removeItem("bluewaste_user");
+        localStorage.removeItem(AUTH_KEYS.USER);
       }
     }
     setIsLoading(false);
@@ -62,8 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data } = await api.post("/auth/login", { email, password });
       setUser(data.user);
       setToken(data.token);
-      localStorage.setItem("bluewaste_token", data.token);
-      localStorage.setItem("bluewaste_user", JSON.stringify(data.user));
+      localStorage.setItem(AUTH_KEYS.TOKEN, data.token);
+      if (data.refreshToken) {
+        localStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
+      }
+      localStorage.setItem(AUTH_KEYS.USER, JSON.stringify(data.user));
     } catch (error) {
       throw error;
     }
@@ -74,8 +82,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data } = await api.post("/auth/register", registerData);
       setUser(data.user);
       setToken(data.token);
-      localStorage.setItem("bluewaste_token", data.token);
-      localStorage.setItem("bluewaste_user", JSON.stringify(data.user));
+      localStorage.setItem(AUTH_KEYS.TOKEN, data.token);
+      if (data.refreshToken) {
+        localStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
+      }
+      localStorage.setItem(AUTH_KEYS.USER, JSON.stringify(data.user));
     } catch (error) {
       throw error;
     }
@@ -84,15 +95,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem("bluewaste_token");
-    localStorage.removeItem("bluewaste_user");
+    localStorage.removeItem(AUTH_KEYS.TOKEN);
+    localStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
+    localStorage.removeItem(AUTH_KEYS.USER);
+    api.post("/auth/logout").catch(() => {});
   }, []);
 
   const updateUser = useCallback((updatedUser: Partial<User>) => {
     setUser((prev) => {
       if (!prev) return null;
       const newUser = { ...prev, ...updatedUser };
-      localStorage.setItem("bluewaste_user", JSON.stringify(newUser));
+      localStorage.setItem(AUTH_KEYS.USER, JSON.stringify(newUser));
       return newUser;
     });
   }, []);

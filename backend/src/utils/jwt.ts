@@ -2,8 +2,8 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 
 export const generateToken = (userId: string): string => {
-  // Short-lived access token — 15 minutes
-  return jwt.sign({ userId }, env.JWT_SECRET, { expiresIn: "15m" });
+  // Comfortable access token lifetime for active operational sessions — 1 day
+  return jwt.sign({ userId }, env.JWT_SECRET, { expiresIn: "1d" });
 };
 
 export const generateRefreshToken = (userId: string): string => {

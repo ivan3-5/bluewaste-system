@@ -10,9 +10,9 @@ const REFRESH_COOKIE = "refresh_token";
 const refreshCookieOptions = {
   httpOnly: true,                              // Never accessible via document.cookie
   secure: env.NODE_ENV === "production",       // HTTPS only in prod
-  sameSite: "strict" as const,
+  sameSite: (env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000,           // 7 days in ms
-  path: "/api/auth",                           // Scoped to auth endpoints only
+  path: "/",                                  // Root path so refresh works regardless of routing prefix
 };
 
 export class AuthController {
@@ -20,7 +20,7 @@ export class AuthController {
     try {
       const { refreshToken, ...result } = await AuthService.register(req.body);
       res.cookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions);
-      res.status(201).json(result);
+      res.status(201).json({ ...result, refreshToken });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Registration failed";
       if (message === "Email already registered") {
@@ -35,7 +35,7 @@ export class AuthController {
       const { email, password } = req.body;
       const { refreshToken, ...result } = await AuthService.login(email, password);
       res.cookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions);
-      res.json(result);
+      res.json({ ...result, refreshToken });
     } catch (error: unknown) {
       console.error("Login Error Details:", error);
       const message = error instanceof Error ? error.message : "An unexpected error occurred during login";
@@ -55,16 +55,19 @@ export class AuthController {
 
   /**
    * POST /api/auth/refresh
-   * Reads the HttpOnly refresh_token cookie and returns a new short-lived
-   * access token. No request body required.
+   * Reads either the HttpOnly refresh_token cookie OR a JSON payload refreshToken,
+   * returning a new access token.
    */
   static async refresh(req: Request, res: Response) {
     try {
-      const token: string | undefined = req.cookies?.[REFRESH_COOKIE];
+      const token: string | undefined = req.cookies?.[REFRESH_COOKIE] || req.body?.refreshToken;
       if (!token) {
         return res.status(401).json({ error: "No refresh token provided" });
       }
       const result = await AuthService.refreshAccessToken(token);
+      if (result.refreshToken) {
+        res.cookie(REFRESH_COOKIE, result.refreshToken, refreshCookieOptions);
+      }
       res.json(result);
     } catch {
       return res.status(401).json({ error: "Invalid or expired refresh token" });
@@ -73,15 +76,14 @@ export class AuthController {
 
   /**
    * POST /api/auth/logout
-   * Clears the refresh_token cookie. The short-lived access token will
-   * expire naturally within 15 minutes.
+   * Clears the refresh_token cookie and acknowledges logout.
    */
   static async logout(req: Request, res: Response) {
     res.clearCookie(REFRESH_COOKIE, {
       httpOnly: true,
       secure: env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/api/auth",
+      sameSite: (env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax",
+      path: "/",
     });
     res.json({ message: "Logged out successfully" });
   }

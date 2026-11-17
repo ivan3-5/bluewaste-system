@@ -502,17 +502,20 @@ export function GenerateCleanupReportModal({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isExporting && onOpenChange(next)}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <div className="rounded-lg bg-indigo-50 dark:bg-indigo-950/60 p-2 text-indigo-600 dark:text-indigo-400">
+      <DialogContent
+        overlayClassName="bg-black/40 backdrop-blur-sm"
+        className="max-w-2xl w-[95vw] sm:w-full max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-2xl"
+      >
+        <DialogHeader className="shrink-0 px-6 sm:px-8 pt-6 pb-4 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 pr-14 text-left">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/60 p-2.5 text-indigo-600 dark:text-indigo-400 shrink-0">
               <FileText className="h-5 w-5" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
                 Generate Clean-up Drive Report
               </DialogTitle>
-              <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+              <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {isCombined
                   ? "Review or complete the clean-up drive details for this Combined Report, validate & submit, then export as PDF."
                   : "Review or fill in the details below, then export as PDF. Details not stored in BlueWaste are entered here."}
@@ -520,6 +523,9 @@ export function GenerateCleanupReportModal({
             </div>
           </div>
         </DialogHeader>
+
+        {/* Scrollable Form Body */}
+        <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-5 space-y-4">
 
         {isScheduleLoading && (
           <div className="flex flex-col items-center justify-center py-12 text-slate-500 dark:text-slate-400">
@@ -805,9 +811,10 @@ export function GenerateCleanupReportModal({
             </p>
           </div>
         )}
+        </div>
 
         {/* Modal Action Footer */}
-        <DialogFooter className="gap-2 sm:gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+        <DialogFooter className="shrink-0 px-6 sm:px-8 py-4 border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 gap-2 sm:gap-2 flex flex-row justify-end items-center">
           <button
             type="button"
             disabled={isExporting}

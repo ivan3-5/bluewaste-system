@@ -20,11 +20,7 @@ import {
   LayoutList,
   Search,
   Filter,
-  RotateCw,
   X,
-  Sparkles,
-  ShieldCheck,
-  Radio,
 } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
 import {
@@ -130,7 +126,6 @@ function SchedulesDashboard() {
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Queries
   const {
@@ -235,12 +230,6 @@ function SchedulesDashboard() {
       queryClient.invalidateQueries({ queryKey: ["schedules"] });
     },
   });
-
-  const handleManualRefresh = async () => {
-    setIsRefreshing(true);
-    await refetch();
-    setTimeout(() => setIsRefreshing(false), 600);
-  };
 
   const handleFormSubmit = async (data: any) => {
     if (editingSchedule?.id) {
@@ -351,61 +340,18 @@ function SchedulesDashboard() {
           <Button variant="ghost" size="sm" onClick={closeDetail}>Dismiss</Button>
         </div>
       )}
-      {/* ── Top Hero Command Banner ─────────────────────────────── */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900/80 dark:to-slate-800 rounded-3xl border border-gray-200/80 dark:border-slate-800 p-6 md:p-8 shadow-sm">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-100 dark:border-blue-900/40">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                LGU Coastal Care & Resource Management
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold border border-emerald-100 dark:border-emerald-900/40">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                Live Sync Active
-              </span>
-            </div>
-
-            <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-slate-100 tracking-tight flex items-center gap-3">
-              Cleanup Operations & Schedules
-            </h1>
-            <p className="text-gray-600 dark:text-slate-400 text-sm md:text-base max-w-2xl font-normal leading-relaxed">
-              Coordinate municipal beach sweeps, assign field workers, allocate
-              protective equipment, and monitor verified waste clearance across
-              Panabo City shorelines.
-            </p>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleManualRefresh}
-              title="Refresh operational data"
-              disabled={isRefreshing}
-              className="h-11 w-11 rounded-2xl border-gray-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 shadow-sm transition-transform active:scale-95"
-            >
-              <RotateCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin text-indigo-600 dark:text-indigo-400" : ""}`}
-              />
-            </Button>
-
-            <Button
-              onClick={() => {
-                setEditingSchedule(null);
-                setIsFormOpen(true);
-              }}
-              className="flex-1 sm:flex-none h-11 px-6 gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/25 transition-all duration-200 hover:scale-[1.02] active:scale-95 rounded-2xl font-bold text-sm border-none"
-            >
-              <Plus className="w-5 h-5 stroke-[2.5]" />
-              Create Cleanup Schedule
-            </Button>
-          </div>
-        </div>
+      {/* ── Top Header Actions ────────────────────────────────────── */}
+      <div className="flex items-center justify-end">
+        <Button
+          onClick={() => {
+            setEditingSchedule(null);
+            setIsFormOpen(true);
+          }}
+          className="flex-1 sm:flex-none h-11 px-6 gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-500/25 transition-all duration-200 hover:scale-[1.02] active:scale-95 rounded-2xl font-bold text-sm border-none"
+        >
+          <Plus className="w-5 h-5 stroke-[2.5]" />
+          Create Cleanup Schedule
+        </Button>
       </div>
 
       {/* ── Executive KPI Cards (With Click-to-Filter) ─────────────── */}
@@ -735,7 +681,7 @@ function SchedulesDashboard() {
       {/* ── Create / Edit Schedule Modal ──────────────────────────── */}
       {isFormOpen && !scheduleId && (
         <ScheduleForm
-          key={reportId ?? scheduleReportsParam ?? editingSchedule?.id ?? "new"}
+          key={`schedule-form-${reportId ?? scheduleReportsParam ?? editingSchedule?.id ?? "new"}`}
           isOpen={isFormOpen}
           onClose={() => {
             setIsFormOpen(false);
@@ -753,7 +699,7 @@ function SchedulesDashboard() {
       {/* ── Schedule Detail Mission Briefing Modal ────────────────── */}
       {activeSchedule && (
         <ScheduleDetail
-          key={activeSchedule.id}
+          key={`schedule-detail-${activeSchedule.id}`}
           isOpen={Boolean(scheduleId) || isDetailOpen}
           onClose={closeDetail}
           schedule={activeSchedule}
