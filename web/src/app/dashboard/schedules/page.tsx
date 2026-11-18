@@ -340,8 +340,8 @@ function SchedulesDashboard() {
           <Button variant="ghost" size="sm" onClick={closeDetail}>Dismiss</Button>
         </div>
       )}
-      {/* ── Top Header Actions ────────────────────────────────────── */}
-      <div className="flex items-center justify-end">
+      {/* ── Top Header Actions (Sticky) ─────────────────────────── */}
+      <div className="sticky top-16 z-20 flex items-center justify-end bg-gray-50/95 dark:bg-slate-950/95 backdrop-blur-md py-2.5 -my-2.5 transition-colors">
         <Button
           onClick={() => {
             setEditingSchedule(null);

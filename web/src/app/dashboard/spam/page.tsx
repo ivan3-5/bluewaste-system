@@ -13,7 +13,7 @@ import { PaginationControls } from "@/components/ui/pagination";
 const RETENTION_DAYS = 3;
 
 const TH_CLASS =
-  "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400";
+  "sticky top-0 z-10 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800 shadow-xs";
 
 function getAutoDeleteAt(spamMarkedAt?: string | null) {
   if (!spamMarkedAt) return null;
@@ -85,9 +85,9 @@ export default function SpamReportsPage() {
       />
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100dvh-280px)] min-h-[320px] scroll-smooth">
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-            <thead className="bg-slate-50 dark:bg-slate-800/60">
+            <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800 shadow-xs">
               <tr>
                 <th className={TH_CLASS}>Image</th>
                 <th className={TH_CLASS}>Report</th>

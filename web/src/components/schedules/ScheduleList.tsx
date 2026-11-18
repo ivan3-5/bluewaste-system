@@ -88,16 +88,16 @@ export function ScheduleList({
     <div className="space-y-4">
       {/* Desktop / Tablet Enterprise Table View (hidden on small mobile) */}
       <div className="hidden md:block bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 dark:border-slate-800 overflow-hidden transition-all">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100dvh-280px)] min-h-[320px] scroll-smooth">
           <table className="w-full text-sm text-left border-collapse">
-            <thead className="bg-gray-50/80 dark:bg-slate-800/60 text-gray-500 dark:text-slate-400 font-bold border-b border-gray-100 dark:border-slate-800 uppercase text-[11px] tracking-wider">
+            <thead className="sticky top-0 z-10 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-xs text-gray-500 dark:text-slate-400 font-bold border-b border-gray-200/80 dark:border-slate-800 uppercase text-[11px] tracking-wider shadow-xs">
               <tr>
-                <th className="px-6 py-4">Operation & Site</th>
-                <th className="px-6 py-4">Scheduled Window</th>
-                <th className="px-6 py-4">Assigned Workers</th>
-                <th className="px-6 py-4">Equipment & Reports</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Action</th>
+                <th className="sticky top-0 z-10 px-6 py-4 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-gray-200/80 dark:border-slate-800">Operation & Site</th>
+                <th className="sticky top-0 z-10 px-6 py-4 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-gray-200/80 dark:border-slate-800">Scheduled Window</th>
+                <th className="sticky top-0 z-10 px-6 py-4 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-gray-200/80 dark:border-slate-800">Assigned Workers</th>
+                <th className="sticky top-0 z-10 px-6 py-4 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-gray-200/80 dark:border-slate-800">Equipment & Reports</th>
+                <th className="sticky top-0 z-10 px-6 py-4 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-gray-200/80 dark:border-slate-800">Status</th>
+                <th className="sticky top-0 z-10 px-6 py-4 text-right bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-gray-200/80 dark:border-slate-800">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100/80 dark:divide-slate-800/60">

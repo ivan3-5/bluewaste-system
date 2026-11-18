@@ -227,15 +227,15 @@ export function DataTableSkeleton({
   return (
     <div
       className={cn(
-        "overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm",
+        "overflow-x-auto overflow-y-auto max-h-[calc(100dvh-280px)] min-h-[320px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm",
         className,
       )}
     >
       <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-800">
-        <thead className="bg-gray-50 dark:bg-slate-800/60">
+        <thead className="sticky top-0 z-10 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800 shadow-xs">
           <tr>
             {Array.from({ length: cols }).map((_, idx) => (
-              <th key={idx} className="px-4 py-3">
+              <th key={idx} className="sticky top-0 z-10 px-4 py-3 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800">
                 <Skeleton className="h-3 w-20" />
               </th>
             ))}
@@ -458,9 +458,12 @@ export function AdminOverviewDataSkeleton() {
 export function ReportsTableSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-9 w-40" />
-        <Skeleton className="h-4 w-72 max-w-full" />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-40" />
+          <Skeleton className="h-4 w-72 max-w-full" />
+        </div>
+        <Skeleton className="h-10 w-32 rounded-xl" />
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
@@ -474,13 +477,13 @@ export function ReportsTableSkeleton() {
         </div>
 
         {/* Table with 9 Columns */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100dvh-280px)] min-h-[320px]">
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-            <thead className="bg-slate-50 dark:bg-slate-800/60">
+            <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800 shadow-xs">
               <tr>
                 {["ID", "Reporter", "Category", "Severity", "Status", "Location", "Worker", "Date", "Action"].map(
                   (header, idx) => (
-                    <th key={idx} className="px-4 py-3 text-left">
+                    <th key={idx} className="sticky top-0 z-10 px-4 py-3 text-left bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800">
                       <Skeleton className="h-3 w-16" />
                     </th>
                   ),
@@ -719,13 +722,13 @@ export function UsersPageSkeleton() {
           <Skeleton className="h-10 w-[180px] rounded-xl" />
           <Skeleton className="h-10 w-64 max-w-sm flex-1 rounded-xl" />
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100dvh-280px)] min-h-[320px]">
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-            <thead className="bg-slate-50 dark:bg-slate-800/60">
+            <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800 shadow-xs">
               <tr>
                 {["Name", "Email", "Role", "Phone", "Status", "Joined", "Actions"].map(
                   (header, idx) => (
-                    <th key={idx} className="px-4 py-3 text-left">
+                    <th key={idx} className="sticky top-0 z-10 px-4 py-3 text-left bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800">
                       <Skeleton className="h-3 w-16" />
                     </th>
                   ),
@@ -766,13 +769,13 @@ export function SpamPageSkeleton() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100dvh-280px)] min-h-[320px]">
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-            <thead className="bg-slate-50 dark:bg-slate-800/60">
+            <thead className="sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800 shadow-xs">
               <tr>
                 {["Photo", "Location", "Category", "Reason", "Flagged At", "Auto-Delete", "Actions"].map(
                   (header, idx) => (
-                    <th key={idx} className="px-4 py-3 text-left">
+                    <th key={idx} className="sticky top-0 z-10 px-4 py-3 text-left bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-xs border-b border-slate-200/80 dark:border-slate-800">
                       <Skeleton className="h-3 w-16" />
                     </th>
                   ),
