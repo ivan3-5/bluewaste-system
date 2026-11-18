@@ -10,6 +10,7 @@ import { Menu, X, LogOut, User, Bell } from "lucide-react";
 import { LiveNotificationProvider } from "@/contexts/LiveNotificationContext";
 import { LiveNotificationPanel } from "@/components/LiveNotificationPanel";
 import { CitizenLayoutSkeleton } from "@/components/skeletons/page-skeletons";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const citizenLinks = [
   { href: "/citizen/report", label: "Submit Report", icon: "📝" },
@@ -102,18 +103,10 @@ export default function CitizenLayout({
 
             {/* Desktop User Info */}
             <div className="hidden md:flex items-center gap-3 relative">
-              <Link
+              <NotificationBell
                 href="/citizen/notifications"
-                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
-                title="Notifications"
-              >
-                <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-semibold text-white">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </Link>
+                className="h-10 w-10 flex items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm"
+              />
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
                 className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors focus:outline-none"
@@ -165,18 +158,10 @@ export default function CitizenLayout({
 
             {/* Mobile: User name + Menu button */}
             <div className="md:hidden flex items-center gap-2">
-              <Link
+              <NotificationBell
                 href="/citizen/notifications"
-                className="relative flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600"
-                title="Notifications"
-              >
-                <Bell className="w-4 h-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-semibold text-white">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </Link>
+                className="h-9 w-9 flex items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 p-1.5"
+              />
               <button className="p-1 rounded-full bg-blue-100 text-blue-700">
                 {user.avatarUrl ? (
                   <Image

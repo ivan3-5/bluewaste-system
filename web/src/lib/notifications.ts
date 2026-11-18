@@ -47,3 +47,61 @@ export function getNotificationReportHref(
   return null;
 }
 
+/**
+ * Resolves the target destination URL when a user clicks on a notification.
+ * Handles role-based routing (LGU_ADMIN, FIELD_WORKER, CITIZEN) as well as
+ * content-specific routing (spam alerts, cleanup operations/schedules, reports).
+ */
+export function getNotificationDestination(
+  notification: Partial<Notification> | null | undefined,
+  role?: string | null,
+): string {
+  if (!notification) {
+    if (role === "FIELD_WORKER") return "/field-worker/notifications";
+    if (role === "CITIZEN") return "/citizen/notifications";
+    return "/dashboard/notifications";
+  }
+
+  const title = (notification.title || "").toLowerCase();
+  const message = (notification.message || "").toLowerCase();
+  const isCleanupOrSchedule =
+    title.includes("schedule") ||
+    message.includes("schedule") ||
+    title.includes("cleanup") ||
+    message.includes("cleanup") ||
+    title.includes("mission") ||
+    message.includes("mission");
+
+  if (role === "FIELD_WORKER") {
+    if (notification.reportId) {
+      return `/field-worker/tasks/${notification.reportId}`;
+    }
+    if (isCleanupOrSchedule) {
+      return "/field-worker/schedules";
+    }
+    return "/field-worker/notifications";
+  }
+
+  if (role === "CITIZEN") {
+    if (notification.reportId || title.includes("report") || message.includes("report")) {
+      return "/citizen/my-reports";
+    }
+    return "/citizen/notifications";
+  }
+
+  // Admin / Default (LGU_ADMIN)
+  if (isSpamNotification(notification)) {
+    return "/dashboard/spam";
+  }
+
+  if (notification.reportId) {
+    return `/dashboard/reports/${notification.reportId}`;
+  }
+
+  if (isCleanupOrSchedule) {
+    return "/dashboard/schedules";
+  }
+
+  return "/dashboard/notifications";
+}
+
