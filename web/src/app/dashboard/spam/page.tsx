@@ -70,7 +70,6 @@ export default function SpamReportsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Spam Reports"
         description={
           <>
             Reports flagged as having no waste detected;

@@ -343,7 +343,6 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="User Management"
         description={
           <>
             Manage admin, field worker, and citizen accounts.

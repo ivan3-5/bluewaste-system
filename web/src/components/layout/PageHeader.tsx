@@ -1,20 +1,24 @@
 import { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
-  title: string;
+  title?: string;
   description?: ReactNode;
   actions?: ReactNode;
+  className?: string;
 }
 
-export function PageHeader({ title, description, actions }: PageHeaderProps) {
+export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className={cn("flex flex-wrap items-center justify-between gap-4", className)}>
       <div>
-        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-          {title}
-        </h1>
+        {title && (
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+            {title}
+          </h1>
+        )}
         {description && (
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className={cn("text-sm text-slate-500 dark:text-slate-400", title && "mt-2")}>
             {description}
           </p>
         )}
@@ -23,3 +27,4 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
     </div>
   );
 }
+

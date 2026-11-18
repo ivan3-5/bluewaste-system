@@ -10,7 +10,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 
 const ADMIN_PAGE_TITLES: Record<string, string> = {
-  "/dashboard": "Dashboard",
+  "/dashboard": "Admin Dashboard",
   "/dashboard/reports": "Report Management",
   "/dashboard/spam": "Spam",
   "/dashboard/schedules": "Cleanup Schedules",

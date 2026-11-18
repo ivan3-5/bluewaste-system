@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import {
   useNotifications,
   useMarkAsRead,
-  useMarkAllAsRead,
 } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { PaginationControls } from "@/components/ui/pagination";
@@ -25,7 +24,6 @@ import {
   Search,
   X,
   Filter,
-  ShieldCheck,
   FileText,
   Activity,
   ArrowRight,
@@ -127,7 +125,6 @@ export default function NotificationsPage() {
 
   const { data, isLoading } = useNotifications(page, pageSize);
   const markAsRead = useMarkAsRead();
-  const markAllAsRead = useMarkAllAsRead();
 
   const notifications = useMemo(() => data?.data || [], [data?.data]);
   const pagination = data?.pagination;
@@ -198,60 +195,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-7 pb-12 max-w-[1600px] mx-auto animate-in fade-in duration-300">
-      {/* ── 1. Top Hero Command Banner ────────────────────────────────────────── */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/20 rounded-3xl border border-gray-200/80 dark:border-slate-800 p-6 md:p-8 shadow-sm">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-100 dark:border-blue-900/60 shadow-2xs">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                Panabo City Operations & Coastal Care
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-semibold border border-emerald-100 dark:border-emerald-900/60 shadow-2xs">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                Live Sync Active (5s)
-              </span>
-            </div>
-
-            <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-slate-100 tracking-tight flex items-center gap-3">
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/25 shrink-0">
-                <BellRing className="w-5 h-5 md:w-6 md:h-6" />
-              </div>
-            </h1>
-
-            <p className="text-sm text-gray-500 dark:text-slate-400 max-w-2xl leading-relaxed">
-              Stay informed on real-time waste report submissions, coastal cleanup schedules, and verification milestones.
-            </p>
-          </div>
-
-          {/* Quick Mark All Read Action */}
-          <div className="flex items-center gap-3 self-stretch sm:self-auto shrink-0">
-            <Button
-              variant={stats.unread > 0 ? "default" : "outline"}
-              onClick={() => markAllAsRead.mutate()}
-              disabled={stats.unread === 0 || markAllAsRead.isPending}
-              className={cn(
-                "w-full sm:w-auto h-11 px-5 rounded-2xl font-bold text-xs gap-2 transition-all duration-200 shadow-sm",
-                stats.unread > 0
-                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20 active:scale-95"
-                  : "bg-white dark:bg-slate-800 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-700 cursor-not-allowed"
-              )}
-            >
-              <CheckCheck className="w-4 h-4" />
-              {markAllAsRead.isPending
-                ? "Marking as Read..."
-                : stats.unread > 0
-                ? `Mark All Read (${stats.unread})`
-                : "All Caught Up"}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 2. Executive Metric KPI Cards ───────────────────────────────────── */}
+      {/* ── Executive Metric KPI Cards ───────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Alerts */}
         <div
