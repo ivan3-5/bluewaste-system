@@ -6,12 +6,32 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
+
+const ADMIN_PAGE_TITLES: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/dashboard/reports": "Report Management",
+  "/dashboard/spam": "Spam",
+  "/dashboard/schedules": "Cleanup Schedules",
+  "/dashboard/map": "Waste Map",
+  "/dashboard/users": "User Management",
+  "/dashboard/notifications": "Notifications",
+  "/dashboard/profile": "Profile Settings",
+};
+
+function getAdminPageTitle(pathname: string): string {
+  if (ADMIN_PAGE_TITLES[pathname]) return ADMIN_PAGE_TITLES[pathname];
+  for (const [path, label] of Object.entries(ADMIN_PAGE_TITLES)) {
+    if (path !== "/dashboard" && pathname.startsWith(path)) return label;
+  }
+  return "Admin Dashboard";
+}
 
 export function Header() {
   const { user, logout, isAdmin } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
@@ -50,7 +70,7 @@ export function Header() {
         <div className="hidden md:block">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-slate-100">
             {isLGUAdmin
-              ? "Admin Dashboard"
+              ? getAdminPageTitle(pathname)
               : isFieldWorker
                 ? "Field Worker Portal"
                 : "Citizen Portal"}

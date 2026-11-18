@@ -220,7 +220,6 @@ export default function NotificationsPage() {
               <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/25 shrink-0">
                 <BellRing className="w-5 h-5 md:w-6 md:h-6" />
               </div>
-              Notifications Center
             </h1>
 
             <p className="text-sm text-gray-500 dark:text-slate-400 max-w-2xl leading-relaxed">

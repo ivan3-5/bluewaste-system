@@ -53,10 +53,7 @@ export default async function DashboardPage({
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-            Dashboard Overview
-          </h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Waste management for Panabo City coastal areas.
           </p>
         </div>
