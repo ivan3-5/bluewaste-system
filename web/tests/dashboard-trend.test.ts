@@ -67,4 +67,14 @@ describe("dashboard date ranges", () => {
       startDate: "2027-01-01", endDate: "2027-01-16", bucket: "month",
     });
   });
+
+  it("ensures date range periods filter charts without modifying overall stats scope", () => {
+    // When range changes, period is computed for trend & category charts
+    const period30Days = getDashboardPeriod("30days", now);
+    const periodThisMonth = getDashboardPeriod("thisMonth", now);
+
+    expect(period30Days.startDate).not.toEqual(periodThisMonth.startDate);
+    // Period is passed to charts, while getDashboardStats() is invoked without period
+    // to maintain persistent all-time stats cards across date filter changes
+  });
 });

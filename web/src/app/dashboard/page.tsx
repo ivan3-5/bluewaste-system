@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { DashboardDateFilter } from "@/components/DashboardDateFilter";
 import { DashboardInsights } from "@/components/DashboardInsights";
 import { StatsCards } from "@/components/StatsCards";
-import { AdminOverviewDataSkeleton } from "@/components/skeletons/page-skeletons";
+import { AdminOverviewChartsSkeleton } from "@/components/skeletons/page-skeletons";
 import { DEFAULT_DASHBOARD_RANGE, getDashboardPeriod, isDashboardRange, type DashboardRange } from "@/lib/dashboard-period";
 import {
   getDashboardCategoryDistribution,
@@ -12,15 +12,19 @@ import {
 
 export const dynamic = "force-dynamic";
 
-async function DashboardData({ range }: { range: DashboardRange }) {
+async function DashboardStatsSection() {
+  const stats = await getDashboardStats();
+  return <StatsCards {...stats} />;
+}
+
+async function DashboardChartsData({ range }: { range: DashboardRange }) {
   const period = getDashboardPeriod(range);
-  const [stats, trend, categories] = await Promise.allSettled([
-    getDashboardStats(period),
+  const [trend, categories] = await Promise.allSettled([
     getDashboardMonthlyTrend(period),
     getDashboardCategoryDistribution(period),
   ]);
 
-  if (stats.status === "rejected" || trend.status === "rejected" || categories.status === "rejected") {
+  if (trend.status === "rejected" || categories.status === "rejected") {
     return (
       <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
         Couldn’t load dashboard data for this date range. Refresh the page to try again.
@@ -29,14 +33,11 @@ async function DashboardData({ range }: { range: DashboardRange }) {
   }
 
   return (
-    <>
-      <StatsCards {...stats.value} />
-      <DashboardInsights
-        trendData={trend.value}
-        categories={categories.value}
-        showDaily={period.bucket === "day"}
-      />
-    </>
+    <DashboardInsights
+      trendData={trend.value}
+      categories={categories.value}
+      showDaily={period.bucket === "day"}
+    />
   );
 }
 
@@ -68,8 +69,10 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <Suspense key={range} fallback={<AdminOverviewDataSkeleton />}>
-        <DashboardData range={range} />
+      <DashboardStatsSection />
+
+      <Suspense key={range} fallback={<AdminOverviewChartsSkeleton />}>
+        <DashboardChartsData range={range} />
       </Suspense>
     </div>
   );

@@ -394,6 +394,43 @@ export function AdminOverviewSkeleton() {
   );
 }
 
+export function AdminOverviewChartsSkeleton() {
+  return (
+    <div className="grid gap-6 lg:grid-cols-2" role="status" aria-label="Loading charts data">
+      {/* Trend Bar Chart */}
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4">
+        <div className="space-y-1">
+          <Skeleton className="h-6 w-52" />
+          <Skeleton className="h-3 w-40" />
+        </div>
+        <ChartBarsSkeleton />
+      </div>
+
+      {/* Categories Donut Chart */}
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4">
+        <div className="space-y-1">
+          <Skeleton className="h-6 w-44" />
+          <Skeleton className="h-3 w-56" />
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-6">
+          <Skeleton className="h-44 w-44 rounded-full shrink-0" />
+          <div className="space-y-3 w-full sm:w-48">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-3 w-3 rounded-full" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+                <Skeleton className="h-3 w-8" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminOverviewDataSkeleton() {
   return (
     <div className="space-y-8" role="status" aria-label="Loading dashboard data">
@@ -413,38 +450,7 @@ export function AdminOverviewDataSkeleton() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Trend Bar Chart */}
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4">
-          <div className="space-y-1">
-            <Skeleton className="h-6 w-52" />
-            <Skeleton className="h-3 w-40" />
-          </div>
-          <ChartBarsSkeleton />
-        </div>
-
-        {/* Categories Donut Chart */}
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4">
-          <div className="space-y-1">
-            <Skeleton className="h-6 w-44" />
-            <Skeleton className="h-3 w-56" />
-          </div>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-6">
-            <Skeleton className="h-44 w-44 rounded-full shrink-0" />
-            <div className="space-y-3 w-full sm:w-48">
-              {Array.from({ length: 3 }).map((_, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="h-3 w-3 rounded-full" />
-                    <Skeleton className="h-3 w-20" />
-                  </div>
-                  <Skeleton className="h-3 w-8" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <AdminOverviewChartsSkeleton />
     </div>
   );
 }
