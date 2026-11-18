@@ -5,8 +5,8 @@ import { StatsCards } from "@/components/StatsCards";
 import { AdminOverviewChartsSkeleton } from "@/components/skeletons/page-skeletons";
 import { DEFAULT_DASHBOARD_RANGE, getDashboardPeriod, isDashboardRange, type DashboardRange } from "@/lib/dashboard-period";
 import {
-  getDashboardCategoryDistribution,
   getDashboardMonthlyTrend,
+  getDashboardSeverityDistribution,
   getDashboardStats,
 } from "@/lib/dashboard-reports";
 
@@ -19,12 +19,12 @@ async function DashboardStatsSection() {
 
 async function DashboardChartsData({ range }: { range: DashboardRange }) {
   const period = getDashboardPeriod(range);
-  const [trend, categories] = await Promise.allSettled([
+  const [trend, severities] = await Promise.allSettled([
     getDashboardMonthlyTrend(period),
-    getDashboardCategoryDistribution(period),
+    getDashboardSeverityDistribution(period),
   ]);
 
-  if (trend.status === "rejected" || categories.status === "rejected") {
+  if (trend.status === "rejected" || severities.status === "rejected") {
     return (
       <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
         Couldn’t load dashboard data for this date range. Refresh the page to try again.
@@ -35,7 +35,7 @@ async function DashboardChartsData({ range }: { range: DashboardRange }) {
   return (
     <DashboardInsights
       trendData={trend.value}
-      categories={categories.value}
+      severities={severities.value}
       showDaily={period.bucket === "day"}
     />
   );

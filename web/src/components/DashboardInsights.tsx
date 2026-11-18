@@ -6,13 +6,14 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
   type ChartOptions,
   type ChartData,
 } from "chart.js";
-import { Bar } from "react-chartjs-2";
+import { Bar, Doughnut } from "react-chartjs-2";
 import { Inbox } from "lucide-react";
 import { ChartBarsSkeleton } from "@/components/skeletons/page-skeletons";
 import type { MonthlyTrendPoint } from "@/lib/dashboard-reports";
@@ -21,44 +22,44 @@ ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
 );
 
-type CategoryPoint = {
+export type SeverityPoint = {
   key: string;
-  label: string;
+  label: "Low" | "Medium" | "High" | string;
   count: number;
+  percentage?: number;
 };
 
 type DashboardInsightsProps = {
   trendData: MonthlyTrendPoint[];
-  categories: CategoryPoint[];
+  severities?: SeverityPoint[];
+  categories?: SeverityPoint[];
   showDaily: boolean;
 };
 
-const CATEGORY_COLORS = ["#3b82f6", "#84cc16"];
-
-function toDonutGradient(categories: CategoryPoint[]) {
-  const total = categories.reduce((sum, item) => sum + item.count, 0);
-  if (total <= 0) {
-    return "conic-gradient(#cbd5e1 0deg 360deg)";
-  }
-
-  let cursor = 0;
-  const segments = categories.map((item, index) => {
-    const sweep = (item.count / total) * 360;
-    const start = cursor;
-    cursor += sweep;
-    return `${CATEGORY_COLORS[index % CATEGORY_COLORS.length]} ${start}deg ${cursor}deg`;
-  });
-
-  return `conic-gradient(${segments.join(", ")})`;
-}
+const SEVERITY_COLORS: Record<string, { bg: string; hover: string }> = {
+  low: {
+    bg: "#22C55E", // Green
+    hover: "#16A34A",
+  },
+  medium: {
+    bg: "#F97316", // Orange
+    hover: "#EA580C",
+  },
+  high: {
+    bg: "#EF4444", // Red
+    hover: "#DC2626",
+  },
+};
 
 export function DashboardInsights({
   trendData,
+  severities,
   categories,
   showDaily,
 }: DashboardInsightsProps) {
@@ -82,8 +83,96 @@ export function DashboardInsights({
     return () => observer.disconnect();
   }, []);
 
-  const totalReports = categories.reduce((sum, item) => sum + item.count, 0);
-  const donutGradient = toDonutGradient(categories);
+  const rawItems = severities ?? categories ?? [];
+  const orderMap: Record<string, number> = { low: 1, medium: 2, high: 3 };
+  const items = useMemo(() => {
+    if (rawItems.length === 0) {
+      return [
+        { key: "low", label: "Low" as const, count: 0, percentage: 0 },
+        { key: "medium", label: "Medium" as const, count: 0, percentage: 0 },
+        { key: "high", label: "High" as const, count: 0, percentage: 0 },
+      ];
+    }
+    return [...rawItems].sort((a, b) => {
+      const orderA = orderMap[a.key.toLowerCase()] ?? 99;
+      const orderB = orderMap[b.key.toLowerCase()] ?? 99;
+      return orderA - orderB;
+    });
+  }, [rawItems]);
+
+  const totalReports = useMemo(
+    () => items.reduce((sum, item) => sum + item.count, 0),
+    [items],
+  );
+
+  const doughnutData: ChartData<"doughnut"> = useMemo(() => {
+    if (totalReports === 0) {
+      return {
+        labels: ["No Reports"],
+        datasets: [
+          {
+            data: [1],
+            backgroundColor: [isDark ? "#334155" : "#e2e8f0"],
+            hoverBackgroundColor: [isDark ? "#334155" : "#e2e8f0"],
+            borderWidth: 0,
+          },
+        ],
+      };
+    }
+
+    return {
+      labels: items.map((item) => item.label),
+      datasets: [
+        {
+          data: items.map((item) => item.count),
+          backgroundColor: items.map(
+            (item) => SEVERITY_COLORS[item.key.toLowerCase()]?.bg ?? "#94a3b8",
+          ),
+          hoverBackgroundColor: items.map(
+            (item) => SEVERITY_COLORS[item.key.toLowerCase()]?.hover ?? "#64748b",
+          ),
+          borderColor: isDark ? "#0f172a" : "#ffffff",
+          borderWidth: 2,
+          hoverOffset: 4,
+        },
+      ],
+    };
+  }, [items, totalReports, isDark]);
+
+  const doughnutOptions: ChartOptions<"doughnut"> = useMemo(() => {
+    return {
+      responsive: true,
+      maintainAspectRatio: true,
+      cutout: "70%",
+      animation: {
+        duration: 400,
+      },
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          enabled: totalReports > 0,
+          backgroundColor: isDark ? "#0f172a" : "#1e293b",
+          titleColor: "#f8fafc",
+          bodyColor: "#e2e8f0",
+          borderColor: isDark ? "#334155" : "#475569",
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 8,
+          usePointStyle: true,
+          callbacks: {
+            label: (context) => {
+              const label = context.label || "";
+              const val = Number(context.parsed) || 0;
+              const pct = totalReports > 0 ? ((val / totalReports) * 100).toFixed(1) : "0";
+              return `  ${label}: ${val} ${val === 1 ? "report" : "reports"} (${pct}%)`;
+            },
+          },
+        },
+      },
+    };
+  }, [isDark, totalReports]);
 
   const totalInPeriod = useMemo(
     () => trendData.reduce((sum, item) => sum + item.totalCount, 0),
@@ -281,57 +370,86 @@ export function DashboardInsights({
         </div>
       </section>
 
-      {/* Waste Category Distribution Section */}
+      {/* Waste Severity Distribution Section */}
       <section className="flex flex-col justify-between rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
         <div>
           <div className="mb-4">
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
-              Waste Category Distribution
+              Waste Severity Distribution
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Breakdown by classification
+              Breakdown by severity level
             </p>
           </div>
 
-          <div className="space-y-5">
-            <div className="flex items-center justify-center">
-              <div
-                className="relative h-40 w-40 rounded-full"
-                style={{ backgroundImage: donutGradient }}
-                aria-label="Waste category distribution donut chart"
-              >
-                <div className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white dark:bg-slate-900 text-center text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-inner">
-                  {totalReports} reports
-                </div>
+          <div className="space-y-6">
+            {/* Doughnut Chart */}
+            <div className="relative mx-auto flex h-48 w-48 sm:h-52 sm:w-52 items-center justify-center">
+              {!isMounted ? (
+                <div className="h-44 w-44 rounded-full border-4 border-dashed border-slate-200 dark:border-slate-800 animate-pulse" />
+              ) : (
+                <Doughnut
+                  data={doughnutData}
+                  options={doughnutOptions}
+                  aria-label="Waste severity distribution doughnut chart"
+                />
+              )}
+              {/* Total Report Count in Center */}
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+                  {totalReports}
+                </span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {totalReports === 1 ? "report" : "reports"}
+                </span>
               </div>
             </div>
 
+            {/* Severity Breakdown List */}
             <div className="space-y-2">
-              {categories.map((item, index) => {
+              {items.map((item) => {
+                const colorConfig =
+                  SEVERITY_COLORS[item.key.toLowerCase()] ?? {
+                    bg: "#94a3b8",
+                    hover: "#64748b",
+                  };
+                const percentage =
+                  item.percentage !== undefined
+                    ? item.percentage
+                    : totalReports > 0
+                    ? Math.round((item.count / totalReports) * 1000) / 10
+                    : 0;
+                const formattedPct = Number.isInteger(percentage)
+                  ? `${percentage}%`
+                  : `${percentage.toFixed(1)}%`;
+
                 return (
                   <div
                     key={item.key}
-                    className="flex items-center justify-between py-1"
+                    className="flex items-center justify-between py-1.5 px-2.5 rounded-lg transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
                   >
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    <div className="flex items-center gap-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
                       <span
-                        className="inline-block h-2.5 w-2.5 rounded-full"
-                        style={{
-                          backgroundColor:
-                            CATEGORY_COLORS[index % CATEGORY_COLORS.length],
-                        }}
+                        className="inline-block h-3 w-3 rounded-full shadow-sm"
+                        style={{ backgroundColor: colorConfig.bg }}
+                        aria-hidden="true"
                       />
-                      {item.label}
+                      <span>{item.label}</span>
                     </div>
-                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                      {item.count}
-                    </span>
+                    <div className="flex items-center gap-2 font-mono">
+                      <span className="text-sm font-bold text-slate-900 dark:text-slate-100 font-sans">
+                        {item.count} {item.count === 1 ? "report" : "reports"}
+                      </span>
+                      <span className="inline-flex min-w-[3.5rem] justify-end text-xs font-medium text-slate-500 dark:text-slate-400">
+                        ({formattedPct})
+                      </span>
+                    </div>
                   </div>
                 );
               })}
               {totalReports === 0 && (
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  No reports for the selected date range.
+                <p className="text-center text-sm text-slate-500 dark:text-slate-400 py-1">
+                  No waste reports for the selected date range.
                 </p>
               )}
             </div>

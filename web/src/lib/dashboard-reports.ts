@@ -71,6 +71,19 @@ type DashboardCategoryRow = {
   count: bigint | number;
 };
 
+type DashboardSeverityRow = {
+  severity: string;
+  label: string;
+  count: bigint | number;
+};
+
+export type DashboardSeverityPoint = {
+  key: string;
+  label: "Low" | "Medium" | "High";
+  count: number;
+  percentage: number;
+};
+
 type DashboardMonthlyTrendRow = {
   month_date: Date;
   month_name: string;
@@ -699,6 +712,79 @@ export async function getDashboardCategoryDistribution(period?: DashboardPeriod)
     label: WASTE_BUCKET_LABELS[row.bucket] ?? row.bucket,
     count: toNumber(row.count),
   }));
+}
+
+export async function getDashboardSeverityDistribution(
+  period?: DashboardPeriod,
+): Promise<DashboardSeverityPoint[]> {
+  const rows = period
+    ? await prisma.$queryRaw<DashboardSeverityRow[]>`
+        WITH bucketed AS (
+          SELECT
+            CASE
+              WHEN UPPER(r.severity::text) = 'LOW' THEN 'LOW'
+              WHEN UPPER(r.severity::text) IN ('MODERATE', 'MEDIUM') THEN 'MEDIUM'
+              WHEN UPPER(r.severity::text) IN ('HIGH', 'CRITICAL') THEN 'HIGH'
+              WHEN r."analysisWasteCount" >= 26 THEN 'HIGH'
+              WHEN r."analysisWasteCount" >= 14 THEN 'MEDIUM'
+              ELSE 'LOW'
+            END AS severity,
+            COUNT(*)::bigint AS count
+          FROM "Report" r
+          WHERE r."isDeleted" = false
+            AND r."isSpam" = false
+            AND (r.severity IS NULL OR r.severity <> 'SPAM')
+            AND r."createdAt" >= ((${period.startDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+            AND r."createdAt" < ((${period.endDate}::timestamp AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'UTC')
+          GROUP BY 1
+        )
+        SELECT
+          base.severity,
+          base.label,
+          COALESCE(bucketed.count, 0)::bigint AS count
+        FROM (VALUES ('LOW', 'Low', 1), ('MEDIUM', 'Medium', 2), ('HIGH', 'High', 3)) AS base(severity, label, sort_order)
+        LEFT JOIN bucketed ON bucketed.severity = base.severity
+        ORDER BY base.sort_order ASC
+      `
+    : await prisma.$queryRaw<DashboardSeverityRow[]>`
+        WITH bucketed AS (
+          SELECT
+            CASE
+              WHEN UPPER(r.severity::text) = 'LOW' THEN 'LOW'
+              WHEN UPPER(r.severity::text) IN ('MODERATE', 'MEDIUM') THEN 'MEDIUM'
+              WHEN UPPER(r.severity::text) IN ('HIGH', 'CRITICAL') THEN 'HIGH'
+              WHEN r."analysisWasteCount" >= 26 THEN 'HIGH'
+              WHEN r."analysisWasteCount" >= 14 THEN 'MEDIUM'
+              ELSE 'LOW'
+            END AS severity,
+            COUNT(*)::bigint AS count
+          FROM "Report" r
+          WHERE r."isDeleted" = false
+            AND r."isSpam" = false
+            AND (r.severity IS NULL OR r.severity <> 'SPAM')
+          GROUP BY 1
+        )
+        SELECT
+          base.severity,
+          base.label,
+          COALESCE(bucketed.count, 0)::bigint AS count
+        FROM (VALUES ('LOW', 'Low', 1), ('MEDIUM', 'Medium', 2), ('HIGH', 'High', 3)) AS base(severity, label, sort_order)
+        LEFT JOIN bucketed ON bucketed.severity = base.severity
+        ORDER BY base.sort_order ASC
+      `;
+
+  const total = rows.reduce((sum, row) => sum + toNumber(row.count), 0);
+
+  return rows.map((row) => {
+    const count = toNumber(row.count);
+    const percentage = total > 0 ? Math.round((count / total) * 1000) / 10 : 0;
+    return {
+      key: row.severity.toLowerCase(),
+      label: row.label as "Low" | "Medium" | "High",
+      count,
+      percentage,
+    };
+  });
 }
 
 type PrismaTransactionClient = Omit<

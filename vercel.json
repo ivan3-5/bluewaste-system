@@ -33,6 +33,10 @@
       "dest": "/web/api/dashboard/trend"
     },
     {
+      "src": "/api/dashboard/severity$",
+      "dest": "/web/api/dashboard/severity"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/[...path].ts"
     },
