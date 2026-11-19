@@ -210,7 +210,7 @@ void main() {
     "retry keeps a photo the server received before the disconnect",
     () async {
       final photo = await File(
-        "${directory.path}/report.jpg",
+        "${directory.path}${Platform.pathSeparator}report.jpg",
       ).writeAsString("photo");
       await service.queueReport(
         data: reportData,
@@ -253,7 +253,7 @@ void main() {
 
   test("large photos are resized below the per-request upload limit", () async {
     final photo = await File("assets/images/logo-final.png")
-        .copy("${directory.path}/oversized.png");
+        .copy("${directory.path}${Platform.pathSeparator}oversized.png");
     await photo.writeAsBytes(Uint8List(4 * 1024 * 1024), mode: FileMode.append);
 
     final upload = await prepareUploadPhoto(photo.path);
@@ -301,7 +301,7 @@ void main() {
     "cleanup sync keeps accepted progress and reuses the interrupted photo key",
     () async {
       final photo = await File(
-        "${directory.path}/cleanup.png",
+        "${directory.path}${Platform.pathSeparator}cleanup.png",
       ).writeAsString("photo");
       final id = await service.queueCleanupPhotos("report-id", [
         photo.path,
@@ -349,7 +349,7 @@ void main() {
       );
       final disguisedPhoto = await File(
         "assets/images/logo-final.png",
-      ).copy("${directory.path}/image.tmp");
+      ).copy("${directory.path}${Platform.pathSeparator}image.tmp");
       final photo = XFile(disguisedPhoto.path);
       final result = await ReportService(dio).submitFullReport(
         data: {

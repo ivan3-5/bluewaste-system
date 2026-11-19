@@ -105,7 +105,7 @@ class AuthController extends StateNotifier<AuthState> {
     state = state.copyWith(clearError: true);
 
     try {
-      final session = await _authService.register(
+      await _authService.register(
         email: email,
         password: password,
         firstName: firstName,
@@ -114,21 +114,31 @@ class AuthController extends StateNotifier<AuthState> {
         address: address,
       );
 
+      state = const AuthState(isLoading: false);
+    } catch (error) {
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
+      rethrow;
+    }
+  }
+
+  Future<void> verifyEmail({required String email, required String code}) async {
+    state = state.copyWith(clearError: true);
+    try {
+      final session = await _authService.verifyEmail(email: email, code: code);
       await _storage.writeSession(
         token: session.token,
         user: session.user.toJson(),
         refreshToken: session.refreshToken,
       );
-
-      state = AuthState(
-        isLoading: false,
-        token: session.token,
-        user: session.user,
-      );
+      state = AuthState(isLoading: false, token: session.token, user: session.user);
     } catch (error) {
       state = state.copyWith(isLoading: false, errorMessage: error.toString());
       rethrow;
     }
+  }
+
+  Future<int> resendEmailVerification({required String email}) {
+    return _authService.resendVerification(email: email);
   }
 
   Future<void> refreshProfile() async {

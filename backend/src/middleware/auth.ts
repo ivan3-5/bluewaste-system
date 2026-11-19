@@ -23,6 +23,8 @@ export interface CachedUserData {
   firstName: string;
   lastName: string;
   isActive: boolean;
+  // Optional for cached entries written by releases before email verification.
+  emailVerified?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +138,7 @@ export const authenticate = async (
           firstName: true,
           lastName: true,
           isActive: true,
+          emailVerified: true,
         },
       });
       if (user) {
@@ -143,7 +146,7 @@ export const authenticate = async (
       }
     }
 
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.emailVerified === false) {
       return sendError(res, 401, "Invalid or expired token.", "UNAUTHORIZED");
     }
 
@@ -189,6 +192,7 @@ export const optionalAuth = async (
           firstName: true,
           lastName: true,
           isActive: true,
+          emailVerified: true,
         },
       });
       if (user) {
@@ -196,7 +200,7 @@ export const optionalAuth = async (
       }
     }
 
-    if (user && user.isActive) {
+    if (user && user.isActive && user.emailVerified !== false) {
       req.user = {
         id: user.id,
         email: user.email,

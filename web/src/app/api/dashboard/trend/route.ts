@@ -6,6 +6,8 @@ import {
 } from "@/lib/dashboard-reports";
 import { isDashboardRange } from "@/lib/dashboard-period";
 
+export const dynamic = "force-dynamic";
+
 export async function OPTIONS() {
   return corsEmptyResponse();
 }

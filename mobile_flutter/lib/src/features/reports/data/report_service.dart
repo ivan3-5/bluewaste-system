@@ -14,6 +14,13 @@ class ReportService {
 
   final Dio _dio;
 
+  Options get _freshMapRequest => Options(
+    headers: const {
+      "Cache-Control": "no-cache, no-store",
+      "Pragma": "no-cache",
+    },
+  );
+
   bool _shouldTryLegacyRoute(DioException error) {
     final status = error.response?.statusCode;
     return status == 404 || status == 405;
@@ -148,8 +155,11 @@ class ReportService {
       return created;
     } on ApiException catch (e) {
       final reportExists = created != null;
-      if (e.isTimeoutOrNetworkError || (e.statusCode ?? 0) >= 500 ||
-          e.statusCode == 408 || e.statusCode == 429 || reportExists) {
+      if (e.isTimeoutOrNetworkError ||
+          (e.statusCode ?? 0) >= 500 ||
+          e.statusCode == 408 ||
+          e.statusCode == 429 ||
+          reportExists) {
         // Keep the server-side id and progress so the retry only finishes
         // what is missing instead of creating a duplicate report.
         await offlineService.queueReport(
@@ -207,9 +217,14 @@ class ReportService {
         },
       );
 
-      final report = ReportRecord.fromJson(response.data ?? <String, dynamic>{});
+      final report = ReportRecord.fromJson(
+        response.data ?? <String, dynamic>{},
+      );
       if (report.id.isEmpty) {
-        throw ApiException("The server did not return a report ID.", statusCode: 502);
+        throw ApiException(
+          "The server did not return a report ID.",
+          statusCode: 502,
+        );
       }
       return report;
     } on DioException catch (error) {
@@ -232,7 +247,8 @@ class ReportService {
         final formData = FormData.fromMap({
           "images": await prepareUploadPhoto(images[index].path),
           "type": type,
-          if (clientUploadId != null) "clientUploadId": "$clientUploadId-$index",
+          if (clientUploadId != null)
+            "clientUploadId": "$clientUploadId-$index",
         });
         await _dio.post<void>("/reports/$reportId/images", data: formData);
       }
@@ -321,6 +337,7 @@ class ReportService {
       final response = await _dio.get<dynamic>(
         "/reports/incidents/map",
         queryParameters: queryParameters,
+        options: _freshMapRequest,
       );
 
       final payload = response.data;
@@ -328,6 +345,65 @@ class ReportService {
         return payload
             .whereType<Map<String, dynamic>>()
             .map(IncidentMapData.fromJson)
+            .toList(growable: false);
+      }
+      return const [];
+    } on DioException catch (error) {
+      throw ApiException.fromDioError(error);
+    }
+  }
+
+  /// Reads database-backed status totals shared by the web/admin reporting rules.
+  Future<Map<String, int>> getMapStatusCounts({
+    ReportMapDateWindow? dateWindow,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        "/reports/map/counts",
+        queryParameters: dateWindow?.queryParameters,
+        options: _freshMapRequest,
+      );
+      final payload = response.data;
+      if (payload is Map<String, dynamic>) {
+        return payload.map(
+          (key, value) => MapEntry(
+            key.toUpperCase(),
+            value is num ? value.toInt() : int.tryParse(value.toString()) ?? 0,
+          ),
+        );
+      }
+      return const {};
+    } on DioException catch (error) {
+      throw ApiException.fromDioError(error);
+    }
+  }
+
+  /// Fetches the backend's shared 50m report grouping for map radius overlays.
+  Future<List<RadiusReportGroup>> getRadiusGroups({
+    int radius = 50,
+    int limit = 500,
+    ReportMapDateWindow? dateWindow,
+    String? status,
+    String? excludeStatus,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        "/reports/radius-groups",
+        queryParameters: {
+          "radius": radius,
+          "limit": limit,
+          if (status != null && status.isNotEmpty) "status": status,
+          if (excludeStatus != null && excludeStatus.isNotEmpty)
+            "excludeStatus": excludeStatus,
+          ...?dateWindow?.queryParameters,
+        },
+        options: _freshMapRequest,
+      );
+      final payload = response.data;
+      if (payload is Map<String, dynamic> && payload["groups"] is List) {
+        return (payload["groups"] as List<dynamic>)
+            .whereType<Map<String, dynamic>>()
+            .map(RadiusReportGroup.fromJson)
             .toList(growable: false);
       }
       return const [];
@@ -353,6 +429,7 @@ class ReportService {
       final response = await _dio.get<dynamic>(
         "/reports/map",
         queryParameters: queryParameters,
+        options: _freshMapRequest,
       );
 
       return _parseMapRows(response.data);
@@ -362,6 +439,7 @@ class ReportService {
           final legacy = await _dio.get<dynamic>(
             "/waste-reports/map",
             queryParameters: queryParameters,
+            options: _freshMapRequest,
           );
           return _parseMapRows(legacy.data);
         } on DioException catch (legacyError) {

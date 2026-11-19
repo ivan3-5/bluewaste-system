@@ -18,6 +18,22 @@ const filters = {
 const createdAt = { gte: new Date(filters.createdFrom), lt: new Date(filters.createdBefore) };
 
 describe("report map date filters", () => {
+  it("counts active database reports by current status in the selected date range", async () => {
+    prismaMock.report.groupBy.mockResolvedValue([
+      { status: "PENDING", _count: { _all: 0 } },
+      { status: "CLEANED", _count: { _all: 2 } },
+    ] as never);
+
+    const counts = await ReportGeoService.getMapStatusCounts(filters);
+
+    expect(prismaMock.report.groupBy).toHaveBeenCalledWith({
+      by: ["status"],
+      where: { isDeleted: false, isSpam: false, createdAt },
+      _count: { _all: true },
+    });
+    expect(counts).toEqual({ PENDING: 0, CLEANED: 2 });
+  });
+
   it("validates bounds for both public and assigned maps", () => {
     for (const schema of [mapFilterSchema, assignedReportFilterSchema]) {
       expect(schema.parse(filters)).toEqual(filters);
@@ -28,6 +44,15 @@ describe("report map date filters", () => {
   it("filters raw markers before the fetch limit", async () => {
     prismaMock.report.findMany.mockResolvedValue([]);
     await ReportGeoService.getMapData({ ...filters, limit: "500" });
+    expect(prismaMock.report.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { isDeleted: false, isSpam: false, createdAt },
+      take: 500,
+    }));
+  });
+
+  it("applies the map date window to backend radius groups", async () => {
+    prismaMock.report.findMany.mockResolvedValue([]);
+    await ReportGeoService.getRadiusGroupedReports({ ...filters, limit: "500", radius: "50" });
     expect(prismaMock.report.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { isDeleted: false, isSpam: false, createdAt },
       take: 500,
@@ -69,5 +94,49 @@ describe("report map date filters", () => {
     };
     expect(prismaMock.report.findMany).toHaveBeenCalledWith(expect.objectContaining({ where, take: 100 }));
     expect(prismaMock.report.count).toHaveBeenCalledWith({ where });
+  });
+
+  it("excludes cleaned reports for the web-compatible Active radius filter", async () => {
+    prismaMock.report.findMany.mockResolvedValue([]);
+    await ReportGeoService.getRadiusGroupedReports({
+      ...filters,
+      limit: "500",
+      radius: "50",
+      excludeStatus: "CLEANED",
+    });
+    expect(prismaMock.report.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { isDeleted: false, isSpam: false, createdAt, status: { not: "CLEANED" } },
+      take: 500,
+    }));
+  });
+
+  it("keeps cleaned and active reports in separate web map areas", async () => {
+    prismaMock.report.findMany.mockResolvedValue([
+      {
+        id: "active-report",
+        status: "PENDING",
+        latitude: 7.31,
+        longitude: 125.68,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+      },
+      {
+        id: "cleaned-report",
+        status: "CLEANED",
+        latitude: 7.31,
+        longitude: 125.68,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+      },
+    ] as never);
+
+    const result = await ReportGeoService.getRadiusGroupedReports({
+      ...filters,
+      radius: "50",
+    });
+
+    expect(result.groups).toHaveLength(2);
+    expect(result.groups.map((group) => group.reports.map((report) => report.status))).toEqual([
+      ["PENDING"],
+      ["CLEANED"],
+    ]);
   });
 });

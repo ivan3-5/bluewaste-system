@@ -86,8 +86,11 @@ model User {
   role      Role     @default(CITIZEN)
   avatarUrl String?
   isActive  Boolean  @default(true)
+  emailVerified Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  emailVerification EmailVerification?
 
   reports              Report[]                @relation("ReporterReports")
   assignedReports      Report[]                @relation("AssignedReports")
@@ -102,6 +105,21 @@ model User {
   @@index([role])
   @@index([role, isActive])
   @@index([email])
+}
+
+model EmailVerification {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  codeHash  String
+  expiresAt DateTime
+  lastSentAt DateTime @default(now())
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
 }
 
 model Report {

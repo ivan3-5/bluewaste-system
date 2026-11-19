@@ -215,7 +215,9 @@ class OfflineService {
 
   Future<Directory> _reportDir(String id) async {
     final root = await getApplicationDocumentsDirectory();
-    return Directory("${root.path}/offline_reports/$id");
+    return Directory(
+      "${root.path}${Platform.pathSeparator}offline_reports${Platform.pathSeparator}$id",
+    );
   }
 
   Future<List<String>> _copyImages(String id, List<String> sourcePaths, {required bool requireDurable}) async {
@@ -225,9 +227,9 @@ class OfflineService {
     final copied = <String>[];
     for (var i = 0; i < sourcePaths.length; i++) {
       final source = sourcePaths[i];
+      final name = source.split(RegExp(r'[/\\]')).last;
+      final target = "${dir.path}${Platform.pathSeparator}${i}_$name";
       try {
-        final name = source.split(Platform.pathSeparator).last;
-        final target = "${dir.path}/${i}_$name";
         await File(source).copy(target);
         copied.add(target);
       } catch (e) {

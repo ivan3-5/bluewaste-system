@@ -57,6 +57,8 @@ const SEVERITY_COLORS: Record<string, { bg: string; hover: string }> = {
   },
 };
 
+const SEVERITY_ORDER: Record<string, number> = { low: 1, medium: 2, high: 3 };
+
 export function DashboardInsights({
   trendData,
   severities,
@@ -83,9 +85,8 @@ export function DashboardInsights({
     return () => observer.disconnect();
   }, []);
 
-  const rawItems = severities ?? categories ?? [];
-  const orderMap: Record<string, number> = { low: 1, medium: 2, high: 3 };
   const items = useMemo(() => {
+    const rawItems = severities ?? categories ?? [];
     if (rawItems.length === 0) {
       return [
         { key: "low", label: "Low" as const, count: 0, percentage: 0 },
@@ -94,11 +95,11 @@ export function DashboardInsights({
       ];
     }
     return [...rawItems].sort((a, b) => {
-      const orderA = orderMap[a.key.toLowerCase()] ?? 99;
-      const orderB = orderMap[b.key.toLowerCase()] ?? 99;
+      const orderA = SEVERITY_ORDER[a.key.toLowerCase()] ?? 99;
+      const orderB = SEVERITY_ORDER[b.key.toLowerCase()] ?? 99;
       return orderA - orderB;
     });
-  }, [rawItems]);
+  }, [severities, categories]);
 
   const totalReports = useMemo(
     () => items.reduce((sum, item) => sum + item.count, 0),

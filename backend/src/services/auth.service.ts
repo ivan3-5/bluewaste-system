@@ -6,6 +6,7 @@ import {
   verifyRefreshToken,
 } from "../utils/jwt";
 import { Role } from "@prisma/client";
+import { EmailVerificationError, EmailVerificationService } from "./email-verification.service";
 
 export class AuthService {
   static async register(data: {
@@ -16,8 +17,8 @@ export class AuthService {
     phone?: string;
     address?: string;
   }) {
-    const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: data.email, mode: "insensitive" } },
     });
     if (existingUser) {
       throw new Error("Email already registered");
@@ -25,42 +26,59 @@ export class AuthService {
 
     const hashedPassword = await hashPassword(data.password);
 
-    const user = await prisma.user.create({
-      data: {
-        email: data.email,
-        password: hashedPassword,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        address: data.address || "",
-        role: Role.CITIZEN,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        phone: true,
-        avatarUrl: true,
-        address: true,
-        createdAt: true,
-      },
-    });
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: {
+          email: data.email,
+          password: hashedPassword,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone,
+          address: data.address || "",
+          role: Role.CITIZEN,
+          emailVerified: false,
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          phone: true,
+          avatarUrl: true,
+          address: true,
+          createdAt: true,
+        },
+      });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+        throw new Error("Email already registered");
+      }
+      throw error;
+    }
 
-    const token = generateToken(user.id);
-    const refreshToken = generateRefreshToken(user.id);
-    return { user, token, refreshToken };
+    await EmailVerificationService.issueCode(user, true);
+    return { user, verificationRequired: true };
   }
 
   static async login(email: string, password: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+    });
     // Always run bcrypt compare to prevent timing-based email enumeration.
     // Without this, a missing user returns instantly while a valid user takes
     // ~100ms for bcrypt — leaking which emails are registered.
     const isValid = user ? await comparePassword(password, user.password) : false;
     if (!user || !user.isActive || !isValid) {
       throw new Error("Invalid email or password");
+    }
+    if (!user.emailVerified) {
+      throw new EmailVerificationError(
+        "Please verify your email address before logging in.",
+        403,
+        "EMAIL_NOT_VERIFIED",
+      );
     }
 
     const token = generateToken(user.id);
@@ -82,6 +100,17 @@ export class AuthService {
     };
   }
 
+  static async verifyEmail(email: string, code: string) {
+    const user = await EmailVerificationService.verify(email, code);
+    const token = generateToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
+    return { user, token, refreshToken };
+  }
+
+  static async resendVerification(email: string) {
+    return EmailVerificationService.resend(email);
+  }
+
   /**
    * Verify a refresh token and issue a new short-lived access token.
    * The refresh token itself is not rotated here — rotation can be added
@@ -97,10 +126,10 @@ export class AuthService {
 
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, isActive: true },
+      select: { id: true, isActive: true, emailVerified: true },
     });
 
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || !user.emailVerified) {
       throw new Error("Invalid or expired refresh token");
     }
 

@@ -43,6 +43,23 @@ export type IncidentMapData = {
 };
 
 export class ReportGeoService {
+  static async getMapStatusCounts(filters?: ReportDateFilter) {
+    const createdAt = getReportDateFilter(filters ?? {});
+    const groups = await prisma.report.groupBy({
+      by: ["status"],
+      where: {
+        isDeleted: false,
+        isSpam: false,
+        ...(createdAt && { createdAt }),
+      },
+      _count: { _all: true },
+    });
+
+    return Object.fromEntries(
+      groups.map((group) => [group.status, Number(group._count._all)]),
+    );
+  }
+
   static async getMapData(filters?: ReportDateFilter & {
     status?: ReportStatus;
     category?: WasteCategory;
@@ -54,18 +71,6 @@ export class ReportGeoService {
       ? Math.min(Math.max(parsedLimit, 1), 5000)
       : 2000;
     const createdAt = getReportDateFilter(filters ?? {});
-
-    const cacheKey = `bluewaste:geo:v2:map:${JSON.stringify({
-      status: filters?.status || null,
-      category: filters?.category || null,
-      createdAt,
-      limit,
-    })}`;
-
-    const cached = await GeoCache.get<ReportMapData[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
     const where: Prisma.ReportWhereInput = {
       isDeleted: false,
@@ -123,8 +128,6 @@ export class ReportGeoService {
 
       console.warn("getMapData fallback query used:", error);
     }
-
-    await GeoCache.set(cacheKey, reports);
 
     return reports;
   }
@@ -190,18 +193,6 @@ export class ReportGeoService {
       : 2000;
     const createdAt = getReportDateFilter(filters ?? {});
     const visibleReports = { isDeleted: false, isSpam: false, createdAt };
-
-    const cacheKey = `bluewaste:geo:v2:incidents:${JSON.stringify({
-      status: filters?.status || null,
-      category: filters?.category || null,
-      createdAt,
-      limit,
-    })}`;
-
-    const cached = await GeoCache.get<IncidentMapData[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
     const where: Prisma.WasteIncidentWhereInput = {};
     if (filters?.status) where.status = filters.status;
@@ -278,7 +269,6 @@ export class ReportGeoService {
       }));
     }
 
-    await GeoCache.set(cacheKey, incidents);
     return incidents;
   }
 
@@ -291,8 +281,9 @@ export class ReportGeoService {
    * Avoids duplicate grouping, calculates accurate pairwise distances using the
    * Haversine formula, and preserves all original citizen submission details.
    */
-  static async getRadiusGroupedReports(filters?: {
+  static async getRadiusGroupedReports(filters?: ReportDateFilter & {
     status?: ReportStatus;
+    excludeStatus?: ReportStatus;
     category?: WasteCategory;
     radius?: string | number;
     hasCleanupSchedule?: string | boolean;
@@ -317,9 +308,11 @@ export class ReportGeoService {
     const where: Prisma.ReportWhereInput = {
       isDeleted: false,
       isSpam: false,
+      createdAt: getReportDateFilter(filters ?? {}),
     };
 
     if (filters?.status) where.status = filters.status;
+    if (filters?.excludeStatus) where.status = { not: filters.excludeStatus };
     if (filters?.category) where.category = filters.category;
 
     if (filters?.hasCleanupSchedule !== undefined) {
@@ -371,8 +364,19 @@ export class ReportGeoService {
       take: limit,
     });
 
-    // Group reports by the specified radius (default: 50 meters)
-    const groups = groupReportsByRadius(reports as any[], radiusMeters);
+    // Match the web Waste Map: active and cleaned reports form separate areas
+    // even when their coordinates overlap, so status colors stay meaningful.
+    const reportRows = reports as any[];
+    const activeReports = reportRows.filter(
+      (report) => report.status !== ReportStatus.CLEANED,
+    );
+    const cleanedReports = reportRows.filter(
+      (report) => report.status === ReportStatus.CLEANED,
+    );
+    const groups = [
+      ...groupReportsByRadius(activeReports, radiusMeters),
+      ...groupReportsByRadius(cleanedReports, radiusMeters),
+    ];
 
     return {
       radiusMeters,

@@ -17,6 +17,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
+  verifyEmail: (email: string, code: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<void>;
   logout: () => void;
   updateUser: (updatedUser: Partial<User>) => void;
   /** True for both LGU_ADMIN and FIELD_WORKER — general admin dashboard access */
@@ -78,18 +80,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const register = useCallback(async (registerData: RegisterData) => {
-    try {
-      const { data } = await api.post("/auth/register", registerData);
-      setUser(data.user);
-      setToken(data.token);
-      localStorage.setItem(AUTH_KEYS.TOKEN, data.token);
-      if (data.refreshToken) {
-        localStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
-      }
-      localStorage.setItem(AUTH_KEYS.USER, JSON.stringify(data.user));
-    } catch (error) {
-      throw error;
-    }
+    await api.post("/auth/register", registerData);
+  }, []);
+
+  const verifyEmail = useCallback(async (email: string, code: string) => {
+    const { data } = await api.post("/auth/verify-email", { email, code });
+    setUser(data.user);
+    setToken(data.token);
+    localStorage.setItem(AUTH_KEYS.TOKEN, data.token);
+    if (data.refreshToken) localStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
+    localStorage.setItem(AUTH_KEYS.USER, JSON.stringify(data.user));
+  }, []);
+
+  const resendVerification = useCallback(async (email: string) => {
+    await api.post("/auth/resend-verification", { email });
   }, []);
 
   const logout = useCallback(() => {
@@ -121,6 +125,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         register,
+        verifyEmail,
+        resendVerification,
         logout,
         updateUser,
         isAdmin,

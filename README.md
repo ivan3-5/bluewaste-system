@@ -55,15 +55,25 @@ Then update the values in each file.
 ```dotenv
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/bluewaste?schema=public"
 JWT_SECRET="replace-with-a-long-random-secret"
+REFRESH_TOKEN_SECRET="replace-with-another-long-random-secret"
 CLOUDINARY_CLOUD_NAME="your-cloudinary-cloud-name"
 CLOUDINARY_API_KEY="your-cloudinary-api-key"
 CLOUDINARY_API_SECRET="your-cloudinary-api-secret"
+BREVO_API_KEY="your-brevo-api-key"
+BREVO_SENDER_EMAIL="verified-sender@your-domain.example"
+BREVO_SENDER_NAME="BlueWaste"
 PORT="5000"
 NODE_ENV="development"
 WEB_URL="http://localhost:3000"
 MOBILE_URL="http://localhost:8081"
 ALLOWED_ORIGINS="http://localhost:19006,http://127.0.0.1:19006"
 ```
+
+New registrations receive a six-digit email verification code through Brevo
+Transactional Email. Verify the sender address/domain in Brevo and configure
+`BREVO_API_KEY` and `BREVO_SENDER_EMAIL` in the backend environment. Codes expire
+after 10 minutes, allow five attempts, and can be resent once per minute. Accounts
+that existed before the email-verification migration remain verified.
 
 ### Web env (`web/.env.local`)
 

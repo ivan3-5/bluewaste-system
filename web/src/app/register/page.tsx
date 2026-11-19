@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -21,7 +21,16 @@ import {
   MapPin,
   BarChart3,
   CheckCircle2,
+  Timer,
+  ShieldCheck,
+  ArrowLeft,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { limitPhoneDigits, phoneError, phonePattern } from "@/lib/phone";
 
@@ -48,13 +57,30 @@ const features = [
   { icon: BarChart3, label: "Track your environmental impact" },
 ];
 
+const OTP_EXPIRY_SECONDS = 10 * 60;
+const OTP_RESEND_SECONDS = 60;
+
+function formatCountdown(seconds: number) {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const remainingSeconds = (seconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${remainingSeconds}`;
+}
+
 export default function RegisterPage() {
-  const { register: registerUser } = useAuth();
+  const { register: registerUser, verifyEmail, resendVerification } = useAuth();
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [verificationDigits, setVerificationDigits] = useState<string[]>(Array(6).fill(""));
+  const [verificationError, setVerificationError] = useState("");
+  const [verificationMessage, setVerificationMessage] = useState("");
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [otpExpiresIn, setOtpExpiresIn] = useState(OTP_EXPIRY_SECONDS);
+  const [resendIn, setResendIn] = useState(OTP_RESEND_SECONDS);
+  const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const {
     register,
@@ -65,6 +91,22 @@ export default function RegisterPage() {
   });
 
   const phoneField = register("phone");
+  const verificationCode = verificationDigits.join("");
+
+  useEffect(() => {
+    if (!verificationEmail) return;
+
+    const focusFrame = window.requestAnimationFrame(() => otpInputRefs.current[0]?.focus());
+    const timer = window.setInterval(() => {
+      setOtpExpiresIn((seconds) => Math.max(0, seconds - 1));
+      setResendIn((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      window.clearInterval(timer);
+    };
+  }, [verificationEmail]);
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -78,13 +120,95 @@ export default function RegisterPage() {
         phone: data.phone,
         address: data.address,
       });
-      router.push("/citizen/report");
+      setVerificationDigits(Array(6).fill(""));
+      setVerificationError("");
+      setVerificationMessage("");
+      setOtpExpiresIn(OTP_EXPIRY_SECONDS);
+      setResendIn(OTP_RESEND_SECONDS);
+      setVerificationEmail(data.email.trim().toLowerCase());
     } catch (err: any) {
+      const apiError = err.response?.data?.error;
       setError(
-        err.response?.data?.error || "Registration failed. Please try again.",
+        (typeof apiError === "string" ? apiError : apiError?.message) ||
+          err.response?.data?.message ||
+          "Registration failed. Please try again.",
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const submitVerification = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setVerificationLoading(true);
+    setVerificationError("");
+    setVerificationMessage("");
+    try {
+      await verifyEmail(verificationEmail, verificationCode);
+      router.push("/citizen/report");
+    } catch (err: any) {
+      setVerificationError(err.response?.data?.message || err.response?.data?.error?.message || "That code could not be verified.");
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+
+  const resendCode = async () => {
+    if (resendIn > 0 || verificationLoading) return;
+    setVerificationLoading(true);
+    setVerificationError("");
+    setVerificationMessage("");
+    try {
+      await resendVerification(verificationEmail);
+      setVerificationMessage("If this account still needs verification, a new code has been sent.");
+      setVerificationDigits(Array(6).fill(""));
+      setOtpExpiresIn(OTP_EXPIRY_SECONDS);
+      setResendIn(OTP_RESEND_SECONDS);
+      otpInputRefs.current[0]?.focus();
+    } catch (err: any) {
+      const retryAfter = Number(err.response?.headers?.["retry-after"]);
+      if (Number.isFinite(retryAfter) && retryAfter > 0) setResendIn(retryAfter);
+      setVerificationError(err.response?.data?.message || err.response?.data?.error?.message || "Could not resend the code. Please try again shortly.");
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+
+  const setOtpDigit = (index: number, value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) {
+      setVerificationDigits((current) => current.map((digit, position) => position === index ? "" : digit));
+      setVerificationError("");
+      return;
+    }
+
+    const nextCode = [...verificationDigits];
+    digits.slice(0, 6 - index).split("").forEach((digit, offset) => {
+      nextCode[index + offset] = digit;
+    });
+    setVerificationDigits(nextCode);
+    setVerificationError("");
+    otpInputRefs.current[Math.min(index + digits.length, 5)]?.focus();
+  };
+
+  const pasteOtp = (event: React.ClipboardEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    const pastedCode = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pastedCode) return;
+    setVerificationDigits(Array.from({ length: 6 }, (_, index) => pastedCode[index] || ""));
+    setVerificationError("");
+    otpInputRefs.current[Math.min(pastedCode.length, 5)]?.focus();
+  };
+
+  const handleOtpKeyDown = (index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Backspace" && !verificationDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    } else if (event.key === "ArrowLeft" && index > 0) {
+      event.preventDefault();
+      otpInputRefs.current[index - 1]?.focus();
+    } else if (event.key === "ArrowRight" && index < 5) {
+      event.preventDefault();
+      otpInputRefs.current[index + 1]?.focus();
     }
   };
 
@@ -462,6 +586,132 @@ export default function RegisterPage() {
           </section>
         </div>
       </div>
+
+      <Dialog
+        open={Boolean(verificationEmail)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setVerificationEmail("");
+            setVerificationDigits(Array(6).fill(""));
+            setVerificationError("");
+            setVerificationMessage("");
+          }
+        }}
+      >
+        <DialogContent
+          overlayClassName="bg-slate-950/45 backdrop-blur-[5px] data-[state=open]:duration-300"
+          className="max-h-[calc(100dvh-1.5rem)] w-[calc(100%-1.5rem)] max-w-[480px] gap-0 overflow-y-auto rounded-[28px] border border-white/70 bg-white p-0 text-slate-900 shadow-[0_32px_100px_-28px_rgba(2,32,71,0.55)] duration-300 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-bottom-3 sm:max-h-[calc(100dvh-3rem)] sm:rounded-[32px]"
+        >
+          <div className="relative overflow-hidden px-5 pb-6 pt-8 sm:px-9 sm:pb-8 sm:pt-9">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-[radial-gradient(ellipse_at_top,rgba(14,165,233,0.15),transparent_72%)]" />
+            <div className="relative flex flex-col items-center text-center">
+              <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] bg-gradient-to-br from-sky-100 to-blue-50 text-primary shadow-inner ring-1 ring-sky-200/70">
+                <Mail className="h-7 w-7" strokeWidth={1.8} />
+              </div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
+                BlueWaste account security
+              </p>
+              <DialogTitle className="mt-2 text-[26px] font-bold tracking-tight text-slate-950 sm:text-[30px]">
+                Verify your email
+              </DialogTitle>
+              <DialogDescription className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
+                Enter the six-digit code we sent to
+                <span className="mt-0.5 block break-all font-semibold text-slate-800">{verificationEmail}</span>
+              </DialogDescription>
+            </div>
+
+            <form className="relative mt-7 space-y-5 sm:mt-8" onSubmit={submitVerification}>
+              <div>
+                <div className="mb-2.5 flex items-center justify-between gap-3">
+                  <Label className="text-sm font-semibold text-slate-700" htmlFor="verification-digit-0">
+                    Verification code
+                  </Label>
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${otpExpiresIn === 0 ? "text-rose-600" : "text-slate-500"}`} aria-live="polite">
+                    <Timer className="h-3.5 w-3.5" />
+                    {otpExpiresIn === 0 ? "Code expired" : `Expires in ${formatCountdown(otpExpiresIn)}`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-6 gap-2 sm:gap-3" role="group" aria-label="Six-digit email verification code">
+                  {verificationDigits.map((digit, index) => (
+                    <Input
+                      key={index}
+                      ref={(element) => { otpInputRefs.current[index] = element; }}
+                      id={index === 0 ? "verification-digit-0" : undefined}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete={index === 0 ? "one-time-code" : "off"}
+                      maxLength={index === 0 ? 6 : 1}
+                      aria-label={`Digit ${index + 1} of 6`}
+                      aria-invalid={Boolean(verificationError)}
+                      value={digit}
+                      onChange={(event) => setOtpDigit(index, event.target.value)}
+                      onPaste={pasteOtp}
+                      onKeyDown={(event) => handleOtpKeyDown(index, event)}
+                      className="h-12 min-w-0 rounded-xl border-slate-200 bg-slate-50/80 p-0 text-center text-xl font-bold text-slate-900 shadow-sm transition duration-150 focus-visible:border-sky-500 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-sky-100 sm:h-14 sm:rounded-2xl sm:text-2xl"
+                    />
+                  ))}
+                </div>
+                <p className="mt-2.5 text-center text-xs text-slate-500">The code is valid for 10 minutes.</p>
+              </div>
+
+              {verificationError && (
+                <p role="alert" aria-live="assertive" className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-sm leading-5 text-rose-700">
+                  {verificationError}
+                </p>
+              )}
+              {verificationMessage && (
+                <p role="status" aria-live="polite" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm leading-5 text-emerald-700">
+                  {verificationMessage}
+                </p>
+              )}
+
+              <Button
+                type="submit"
+                disabled={verificationLoading || verificationCode.length !== 6 || otpExpiresIn === 0}
+                className="h-12 w-full rounded-xl bg-primary text-sm font-semibold text-white shadow-[0_10px_22px_-10px_rgba(2,132,199,0.85)] transition-all hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-[0_14px_26px_-10px_rgba(2,132,199,0.8)] disabled:translate-y-0 disabled:shadow-none"
+              >
+                {verificationLoading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Verifying your email…
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Verify email and continue</span>
+                )}
+              </Button>
+            </form>
+
+            <div className="relative mt-5 flex min-h-10 flex-col items-center justify-between gap-2 border-t border-slate-100 pt-4 text-sm sm:flex-row">
+              <button
+                type="button"
+                onClick={resendCode}
+                disabled={verificationLoading || resendIn > 0}
+                className="rounded-md px-2 py-1 font-semibold text-primary transition-colors hover:bg-sky-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              >
+                {resendIn > 0 ? `Resend code in ${formatCountdown(resendIn)}` : "Resend code"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setVerificationEmail("");
+                  setVerificationDigits(Array(6).fill(""));
+                  setVerificationError("");
+                  setVerificationMessage("");
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" /> Back to registration
+              </button>
+            </div>
+
+            <div className="relative mt-5 flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3 text-xs leading-5 text-slate-500 ring-1 ring-slate-100">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+              <p>Check your inbox and spam folder. For your security, never share this code with anyone.</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

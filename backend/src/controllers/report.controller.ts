@@ -7,6 +7,24 @@ import { AuthRequest } from "../middleware/auth";
 import { handleControllerError, QueryFilters, sendError } from "../utils/http";
 
 export class ReportController {
+  static async getMapStatusCounts(req: AuthRequest, res: Response) {
+    try {
+      const counts = await ReportGeoService.getMapStatusCounts(
+        (req.query || {}) as QueryFilters,
+      );
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.json(counts);
+    } catch (error) {
+      handleControllerError(
+        res,
+        error,
+        "Failed to fetch map status counts",
+        "MAP_STATUS_COUNTS_FETCH_FAILED",
+      );
+    }
+  }
+
   static async create(req: AuthRequest, res: Response) {
     try {
       const report = await ReportCrudService.create({
@@ -108,7 +126,8 @@ export class ReportController {
     try {
       const query = (req.query || {}) as QueryFilters;
       const reports = await ReportGeoService.getMapData(query);
-      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
       res.json(reports);
     } catch (error) {
       handleControllerError(res, error, "Failed to fetch map data", "MAP_DATA_FETCH_FAILED");
@@ -140,7 +159,8 @@ export class ReportController {
     try {
       const query = (req.query || {}) as QueryFilters;
       const incidents = await ReportGeoService.getIncidentMapData(query);
-      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
       res.json(incidents);
     } catch (error) {
       handleControllerError(
@@ -165,6 +185,8 @@ export class ReportController {
         hasCleanupSchedule?: string;
       };
       const result = await ReportGeoService.getRadiusGroupedReports(query as any);
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
       res.json(result);
     } catch (error) {
       handleControllerError(

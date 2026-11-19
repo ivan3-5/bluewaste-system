@@ -7,6 +7,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "auth_controller.dart";
+import "email_verification_screen.dart";
 import "widgets/auth_components.dart";
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -368,31 +369,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           );
 
       if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: const [
-                Icon(Icons.check_circle_rounded,
-                    color: Colors.white, size: 20),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "Account created successfully! Welcome to BlueWaste.",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: AppColors.success,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            duration: const Duration(seconds: 4),
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => EmailVerificationScreen(email: email),
           ),
         );
       }
