@@ -85,8 +85,12 @@ model User {
   role      Role     @default(CITIZEN)
   avatarUrl String?
   isActive  Boolean  @default(true)
+  // Existing accounts stay verified; new registrations explicitly set false.
+  emailVerified Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  emailVerification EmailVerification?
 
   // Reports submitted by the user
   reports         Report[]        @relation("ReporterReports")
@@ -115,6 +119,21 @@ model User {
   @@index([role])
   @@index([role, isActive])
   @@index([email])
+}
+
+model EmailVerification {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  codeHash  String
+  expiresAt DateTime
+  lastSentAt DateTime @default(now())
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
 }
 
 model Report {

@@ -64,7 +64,7 @@ class AuthService {
     }
   }
 
-  Future<AuthSession> register({
+  Future<void> register({
     required String email,
     required String password,
     required String firstName,
@@ -73,7 +73,7 @@ class AuthService {
     required String address,
   }) async {
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
+      await _dio.post<Map<String, dynamic>>(
         "/auth/register",
         data: {
           "email": email,
@@ -85,10 +85,34 @@ class AuthService {
         },
       );
 
+      return;
+    } on DioException catch (error) {
+      throw ApiException.fromDioError(error);
+    }
+  }
+
+  Future<AuthSession> verifyEmail({required String email, required String code}) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        "/auth/verify-email",
+        data: {"email": email, "code": code},
+      );
       return AuthSession.fromJson(
         response.data ?? <String, dynamic>{},
         refreshToken: extractRefreshToken(response.headers),
       );
+    } on DioException catch (error) {
+      throw ApiException.fromDioError(error);
+    }
+  }
+
+  Future<int> resendVerification({required String email}) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        "/auth/resend-verification",
+        data: {"email": email},
+      );
+      return int.tryParse("${response.data?["retryAfterSeconds"] ?? 0}") ?? 0;
     } on DioException catch (error) {
       throw ApiException.fromDioError(error);
     }

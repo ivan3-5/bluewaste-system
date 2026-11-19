@@ -35,11 +35,16 @@ const features = [
 ];
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, verifyEmail, resendVerification } = useAuth();
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationError, setVerificationError] = useState("");
+  const [verificationMessage, setVerificationMessage] = useState("");
+  const [verificationLoading, setVerificationLoading] = useState(false);
 
   const {
     register,
@@ -67,6 +72,11 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       const apiError = err.response?.data?.error;
+      if (apiError?.code === "EMAIL_NOT_VERIFIED") {
+        setVerificationEmail(data.email.trim().toLowerCase());
+        setError("");
+        return;
+      }
       const errorMessage =
         typeof apiError === "string"
           ? apiError
@@ -78,6 +88,60 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  const submitVerification = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setVerificationLoading(true);
+    setVerificationError("");
+    try {
+      await verifyEmail(verificationEmail, verificationCode);
+      router.push("/citizen/report");
+    } catch (err: any) {
+      setVerificationError(err.response?.data?.message || err.response?.data?.error?.message || "That code could not be verified.");
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+
+  const resendCode = async () => {
+    setVerificationLoading(true);
+    setVerificationError("");
+    setVerificationMessage("");
+    try {
+      await resendVerification(verificationEmail);
+      setVerificationMessage("If this account still needs verification, a new code has been sent.");
+    } catch (err: any) {
+      setVerificationError(err.response?.data?.message || "Could not resend the code. Please try again shortly.");
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+
+  if (verificationEmail) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+        <section className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Mail className="h-6 w-6" /></div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Email verification</p>
+          <h1 className="mt-2 text-2xl font-bold text-slate-900">Check your inbox</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Enter the six-digit code sent to <strong>{verificationEmail}</strong>.</p>
+          <form className="mt-6 space-y-4" onSubmit={submitVerification}>
+            <div className="space-y-2">
+              <Label htmlFor="verification-code">Verification code</Label>
+              <Input id="verification-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" required value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))} className="h-12 text-center text-xl tracking-[0.45em]" />
+            </div>
+            {verificationError && <p role="alert" className="text-sm text-red-600">{verificationError}</p>}
+            {verificationMessage && <p role="status" className="text-sm text-emerald-700">{verificationMessage}</p>}
+            <Button type="submit" disabled={verificationLoading || verificationCode.length !== 6} className="h-11 w-full">{verificationLoading ? "Verifying..." : "Verify email and continue"}</Button>
+          </form>
+          <div className="mt-5 flex items-center justify-between gap-4 text-sm">
+            <button type="button" onClick={resendCode} disabled={verificationLoading} className="font-semibold text-primary disabled:opacity-50">Resend code</button>
+            <button type="button" onClick={() => setVerificationEmail("")} className="text-slate-500 hover:text-slate-800">Back to sign in</button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-white text-gray-900">

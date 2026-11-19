@@ -3,6 +3,8 @@ import { corsEmptyResponse, corsResponse } from "@/lib/cors";
 import { getDashboardSeverityDistribution } from "@/lib/dashboard-reports";
 import { getDashboardPeriod, isDashboardRange } from "@/lib/dashboard-period";
 
+export const dynamic = "force-dynamic";
+
 export async function OPTIONS() {
   return corsEmptyResponse();
 }

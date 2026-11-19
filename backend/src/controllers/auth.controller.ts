@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AuthService } from "../services/auth.service";
 import { AuthRequest } from "../middleware/auth";
 import { env } from "../config/env";
+import { EmailVerificationError } from "../services/email-verification.service";
 
 /** Cookie name for the long-lived refresh token */
 const REFRESH_COOKIE = "refresh_token";
@@ -18,15 +19,58 @@ const refreshCookieOptions = {
 export class AuthController {
   static async register(req: Request, res: Response) {
     try {
-      const { refreshToken, ...result } = await AuthService.register(req.body);
-      res.cookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions);
-      res.status(201).json({ ...result, refreshToken });
+      const result = await AuthService.register(req.body);
+      res.status(201).json(result);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Registration failed";
       if (message === "Email already registered") {
         return res.status(409).json({ error: message });
       }
+      if (error instanceof EmailVerificationError) {
+        return res.status(error.statusCode).json({
+          error: { code: error.code, message: error.message },
+          message: error.message,
+        });
+      }
       res.status(500).json({ error: "Registration failed" });
+    }
+  }
+
+  static async verifyEmail(req: Request, res: Response) {
+    try {
+      const { refreshToken, ...result } = await AuthService.verifyEmail(req.body.email, req.body.code);
+      res.cookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions);
+      res.json({ ...result, refreshToken });
+    } catch (error: unknown) {
+      if (error instanceof EmailVerificationError) {
+        if (error.retryAfterSeconds) res.setHeader("Retry-After", error.retryAfterSeconds);
+        return res.status(error.statusCode).json({
+          error: { code: error.code, message: error.message },
+          message: error.message,
+          ...(error.retryAfterSeconds ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
+        });
+      }
+      return res.status(500).json({ error: "Email verification failed." });
+    }
+  }
+
+  static async resendVerification(req: Request, res: Response) {
+    try {
+      const result = await AuthService.resendVerification(req.body.email);
+      res.json({
+        message: "If the address needs verification, a code has been sent.",
+        ...result,
+      });
+    } catch (error: unknown) {
+      if (error instanceof EmailVerificationError) {
+        if (error.retryAfterSeconds) res.setHeader("Retry-After", error.retryAfterSeconds);
+        return res.status(error.statusCode).json({
+          error: { code: error.code, message: error.message },
+          message: error.message,
+          ...(error.retryAfterSeconds ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
+        });
+      }
+      return res.status(500).json({ error: "Could not resend verification code." });
     }
   }
 
@@ -42,6 +86,12 @@ export class AuthController {
       if (message === "Invalid email or password") {
         return res.status(401).json({ 
           error: { code: "UNAUTHORIZED", message } 
+        });
+      }
+      if (error instanceof EmailVerificationError) {
+        return res.status(error.statusCode).json({
+          error: { code: error.code, message: error.message },
+          message: error.message,
         });
       }
       res.status(500).json({ 

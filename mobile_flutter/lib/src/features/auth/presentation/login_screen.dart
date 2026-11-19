@@ -7,6 +7,7 @@ import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "auth_controller.dart";
 import "register_screen.dart";
+import "email_verification_screen.dart";
 import "widgets/auth_components.dart";
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -131,6 +132,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
 
       final rawError = error.toString();
+      if (rawError.toLowerCase().contains("verify your email")) {
+        Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => EmailVerificationScreen(email: email),
+        ));
+        return;
+      }
       String friendlyMessage = "Invalid email or password. Please try again.";
 
       if (rawError.toLowerCase().contains("invalid") ||
