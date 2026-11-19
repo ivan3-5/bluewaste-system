@@ -398,6 +398,15 @@ export default function MapView({
 }: MapViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const refreshMapData = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    const intervalId = window.setInterval(refreshMapData, 45_000);
+    return () => window.clearInterval(intervalId);
+  }, [router]);
+
   const [nextDateRange, setNextDateRange] = useState(dateRange);
   const [isDatePending, startDateTransition] = useTransition();
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);

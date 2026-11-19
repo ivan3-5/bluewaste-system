@@ -49,5 +49,6 @@ export const GeoCache = {
   async invalidateAll() {
     await this.del("bluewaste:geo:map:*");
     await this.del("bluewaste:geo:heatmap:*");
+    await this.del("bluewaste:geo:v2:incidents:*");
   },
 };

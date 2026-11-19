@@ -911,6 +911,14 @@ export async function updateDashboardReportStatus(
           AND id != ${id}
           AND "isDeleted" = false
       `;
+
+      await tx.$executeRaw`
+        UPDATE "WasteIncident"
+        SET status = ${status}::"ReportStatus",
+            "isResolved" = ${status === "CLEANED" || status === "REJECTED"},
+            "updatedAt" = NOW()
+        WHERE id = ${incidentId}
+      `;
     }
 
     // Create a notification for the reporter if they exist

@@ -101,10 +101,13 @@ class ReportRecord {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<ReportImage> images;
+
   /// Severity level (HIGH / MODERATE / LOW), with SPAM for no waste.
   final String? severity;
+
   /// Total number of waste items detected by the analysis.
   final int? analysisWasteCount;
+
   /// AI Analysis details reason string from Gemini/Vision AI
   final String? aiReason;
 
@@ -164,7 +167,8 @@ class ReportRecord {
       images: imageList,
       severity: json["severity"]?.toString(),
       analysisWasteCount: (json["analysisWasteCount"] as num?)?.toInt(),
-      aiReason: json["aiReason"]?.toString() ??
+      aiReason:
+          json["aiReason"]?.toString() ??
           json["analysisDetails"]?.toString() ??
           json["spamReason"]?.toString(),
     );
@@ -173,9 +177,18 @@ class ReportRecord {
 
 String _cleanWasteTitle(String raw) {
   var cleaned = raw.trim();
-  cleaned = cleaned.replaceAll(RegExp(r'\s*-\s*with[\s_]*waste\b', caseSensitive: false), '');
-  cleaned = cleaned.replaceAll(RegExp(r'\s*-\s*no[\s_]*waste\b', caseSensitive: false), '');
-  cleaned = cleaned.replaceAll(RegExp(r'\bwith[\s_]*waste\b', caseSensitive: false), '');
+  cleaned = cleaned.replaceAll(
+    RegExp(r'\s*-\s*with[\s_]*waste\b', caseSensitive: false),
+    '',
+  );
+  cleaned = cleaned.replaceAll(
+    RegExp(r'\s*-\s*no[\s_]*waste\b', caseSensitive: false),
+    '',
+  );
+  cleaned = cleaned.replaceAll(
+    RegExp(r'\bwith[\s_]*waste\b', caseSensitive: false),
+    '',
+  );
   cleaned = cleaned.trim();
   if (cleaned.isEmpty || cleaned == "-" || cleaned == "Waste report -") {
     return "Waste report";
@@ -284,6 +297,62 @@ class IncidentMapData {
       reportIds: ids,
       imageUrl: json["imageUrl"]?.toString(),
       createdAt: parseDate(json["createdAt"]),
+    );
+  }
+}
+
+/// Backend-calculated 50m radius groups used to draw the Waste Map areas.
+class RadiusReportGroup {
+  const RadiusReportGroup({
+    required this.id,
+    required this.latitude,
+    required this.longitude,
+    required this.radiusMeters,
+    required this.statuses,
+    required this.isGrouped,
+    required this.reports,
+    required this.reportCount,
+    required this.citizenCount,
+  });
+
+  final String id;
+  final double latitude;
+  final double longitude;
+  final double radiusMeters;
+  final List<String> statuses;
+  final bool isGrouped;
+  final List<ReportRecord> reports;
+  final int reportCount;
+  final int citizenCount;
+
+  factory RadiusReportGroup.fromJson(Map<String, dynamic> json) {
+    double parseDouble(dynamic value, double fallback) {
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString() ?? "") ?? fallback;
+    }
+
+    final center = json["center"] as Map<String, dynamic>? ?? const {};
+    final reports = (json["reports"] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
+    final parsedReports = reports
+        .map(ReportRecord.fromJson)
+        .toList(growable: false);
+
+    return RadiusReportGroup(
+      id: (json["id"] ?? "").toString(),
+      latitude: parseDouble(center["latitude"], 0),
+      longitude: parseDouble(center["longitude"], 0),
+      radiusMeters: parseDouble(json["radiusMeters"], 50),
+      statuses: parsedReports
+          .map((report) => report.status)
+          .toList(growable: false),
+      isGrouped: json["isGrouped"] == true,
+      reports: parsedReports,
+      reportCount:
+          (json["reportCount"] as num?)?.toInt() ?? parsedReports.length,
+      citizenCount:
+          (json["citizenCount"] as num?)?.toInt() ?? parsedReports.length,
     );
   }
 }

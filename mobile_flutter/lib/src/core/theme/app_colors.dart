@@ -28,19 +28,21 @@ class AppColors {
   static const Color neutral = Color(0xFF6B7280);
 
   static Color statusColor(String status) {
-    switch (status) {
+    switch (status.trim().toUpperCase()) {
+      case "PENDING":
+        return orange;
+      case "VERIFIED":
+        return const Color(0xFF2563EB);
       case "CLEANED":
         return success;
       case "IN_PROGRESS":
-        return orange;
-      case "VERIFIED":
-        return info;
+        return const Color(0xFFEAB308);
       case "CLEANUP_SCHEDULED":
         return purple;
       case "REJECTED":
         return destructive;
       default:
-        return warning;
+        return orange;
     }
   }
 

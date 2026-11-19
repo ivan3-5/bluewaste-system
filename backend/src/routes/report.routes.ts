@@ -18,6 +18,12 @@ const router = Router();
 
 // Public / optional auth routes
 router.get(
+  "/map/counts",
+  optionalAuth,
+  validate(mapFilterSchema, "query"),
+  ReportController.getMapStatusCounts,
+);
+router.get(
   "/map",
   optionalAuth,
   validate(mapFilterSchema, "query"),

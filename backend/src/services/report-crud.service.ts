@@ -377,8 +377,6 @@ export class ReportCrudService {
       );
     }
 
-    await GeoCache.invalidateAll();
-
     // ── Sync parent WasteIncident status ─────────────────────────────────────
     let incidentId: string | null = null;
     try {
@@ -446,6 +444,8 @@ export class ReportCrudService {
       }
     }
 
+    // Clear geo responses after the incident and sibling statuses have synced.
+    await GeoCache.invalidateAll();
     return sanitizeReportForPrivacy(updatedReport);
   }
 

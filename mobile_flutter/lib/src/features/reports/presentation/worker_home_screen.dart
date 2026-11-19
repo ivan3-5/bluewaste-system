@@ -12,16 +12,13 @@ import "../domain/report_models.dart";
 
 final workerAssignedReportsProvider =
     FutureProvider.autoDispose<List<ReportRecord>>((ref) async {
-  final service = ref.watch(reportServiceProvider);
-  final result = await service.getAssignedReports(page: 1, limit: 100);
-  return result.data;
-});
+      final service = ref.watch(reportServiceProvider);
+      final result = await service.getAssignedReports(page: 1, limit: 100);
+      return result.data;
+    });
 
 class WorkerHomeScreen extends ConsumerWidget {
-  const WorkerHomeScreen({
-    super.key,
-    required this.onSelectTab,
-  });
+  const WorkerHomeScreen({super.key, required this.onSelectTab});
 
   final ValueChanged<int> onSelectTab;
 
@@ -43,10 +40,7 @@ class WorkerHomeScreen extends ConsumerWidget {
           vertical: AppSpacing.sm,
         ),
         children: [
-          _WorkerHeroHeader(
-            name: greetingName,
-            reportsAsync: reportsAsync,
-          ),
+          _WorkerHeroHeader(name: greetingName, reportsAsync: reportsAsync),
           const SizedBox(height: AppSpacing.md),
           _ActiveTaskPreviewCard(
             reportsAsync: reportsAsync,
@@ -72,10 +66,7 @@ class WorkerHomeScreen extends ConsumerWidget {
 }
 
 class _WorkerHeroHeader extends StatelessWidget {
-  const _WorkerHeroHeader({
-    required this.name,
-    required this.reportsAsync,
-  });
+  const _WorkerHeroHeader({required this.name, required this.reportsAsync});
 
   final String name;
   final AsyncValue<List<ReportRecord>> reportsAsync;
@@ -257,7 +248,7 @@ class _WorkerHeroHeader extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Hello, $name 🛠️",
+                            "Hello, $name",
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 22,
@@ -276,7 +267,9 @@ class _WorkerHeroHeader extends StatelessWidget {
                           Text(
                             "Ready to tackle cleanup operations today?",
                             style: TextStyle(
-                              color: const Color(0xFFE0F2FE).withValues(alpha: 0.92),
+                              color: const Color(
+                                0xFFE0F2FE,
+                              ).withValues(alpha: 0.92),
                               fontSize: 13,
                               fontWeight: FontWeight.w400,
                               height: 1.3,
@@ -403,8 +396,9 @@ class _ActiveTaskPreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return reportsAsync.when(
       data: (reports) {
-        final pendingReports =
-            reports.where((r) => r.status != "CLEANED").toList();
+        final pendingReports = reports
+            .where((r) => r.status != "CLEANED")
+            .toList();
 
         if (pendingReports.isEmpty) {
           return Container(
@@ -447,9 +441,9 @@ class _ActiveTaskPreviewCard extends StatelessWidget {
                       Text(
                         "No pending cleanup tasks currently assigned to you.",
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.mutedForeground,
-                              fontSize: 12,
-                            ),
+                          color: AppColors.mutedForeground,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -485,7 +479,10 @@ class _ActiveTaskPreviewCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: AppColors.tint(AppColors.warning, opacity: 0.15),
+                          color: AppColors.tint(
+                            AppColors.warning,
+                            opacity: 0.15,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -506,11 +503,14 @@ class _ActiveTaskPreviewCard extends StatelessWidget {
                     ],
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
-                      color: AppColors.statusColor(topReport.status)
-                          .withValues(alpha: 0.12),
+                      color: AppColors.statusColor(
+                        topReport.status,
+                      ).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -672,17 +672,17 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
-              ),
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
           subtitle,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.mutedForeground,
-                fontSize: 12,
-              ),
+            color: AppColors.mutedForeground,
+            fontSize: 12,
+          ),
         ),
       ],
     );
@@ -749,10 +749,7 @@ class _QuickActionsGrid extends StatelessWidget {
 }
 
 class _QuickActionCard extends StatelessWidget {
-  const _QuickActionCard({
-    required this.action,
-    required this.onTap,
-  });
+  const _QuickActionCard({required this.action, required this.onTap});
 
   final _WorkerAction action;
   final VoidCallback onTap;
@@ -825,9 +822,9 @@ class _QuickActionCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.mutedForeground,
-                      fontSize: 11,
-                    ),
+                  color: AppColors.mutedForeground,
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
@@ -908,10 +905,10 @@ class _WorkerTipCard extends StatelessWidget {
                 Text(
                   "Take clear cleanup photos, write brief completion notes, and update task statuses promptly to keep the community informed.",
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.mutedForeground,
-                        fontSize: 12,
-                        height: 1.35,
-                      ),
+                    color: AppColors.mutedForeground,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
