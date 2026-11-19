@@ -77,10 +77,10 @@ class _MyReportsScreenState extends ConsumerState<MyReportsScreen>
   static const List<Map<String, String>> _filterOptions = [
     {"value": "", "label": "All"},
     {"value": "PENDING", "label": "Pending"},
-    {"value": "IN_PROGRESS", "label": "In Progress"},
-    {"value": "CLEANUP_SCHEDULED", "label": "Scheduled"},
-    {"value": "CLEANED", "label": "Cleaned"},
     {"value": "VERIFIED", "label": "Verified"},
+    {"value": "CLEANUP_SCHEDULED", "label": "Scheduled"},
+    {"value": "IN_PROGRESS", "label": "In Progress"},
+    {"value": "CLEANED", "label": "Cleaned"},
     {"value": "REJECTED", "label": "Rejected"},
   ];
 

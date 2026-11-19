@@ -1,4 +1,5 @@
 import "package:flutter/material.dart";
+import "package:flutter/services.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:image_picker/image_picker.dart";
 
@@ -7,7 +8,6 @@ import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/app_components.dart";
 import "../../auth/domain/app_user.dart";
 import "../../auth/presentation/auth_controller.dart";
-import "../../reports/presentation/my_reports_screen.dart";
 import "widgets/profile_avatar.dart";
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -437,24 +437,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   addressController: _addressController,
                 ),
 
-                const SizedBox(height: AppSpacing.md),
-
-                // Account & Activity Section
-                _AccountActivityCard(
-                  onTapMyReports: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => Scaffold(
-                          appBar: AppBar(title: const Text("My Reports")),
-                          body: const SafeArea(
-                            child: MyReportsScreen(),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-
                 const SizedBox(height: AppSpacing.lg),
 
                 // Save Changes Primary Button
@@ -736,7 +718,7 @@ class _HeroProfileCard extends StatelessWidget {
 
                 const SizedBox(height: AppSpacing.sm),
 
-                // Role Pill & Address Tag Row
+                // Role Pill
                 Wrap(
                   alignment: WrapAlignment.center,
                   spacing: 6,
@@ -749,39 +731,6 @@ class _HeroProfileCard extends StatelessWidget {
                           ? Icons.engineering_outlined
                           : Icons.verified_user_outlined,
                     ),
-                    if ((user?.address ?? "").trim().isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondary,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.location_on_rounded,
-                              size: 12,
-                              color: AppColors.mutedForeground,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              user!.address!.trim(),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.secondaryForeground,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
                   ],
                 ),
               ],
@@ -845,58 +794,54 @@ class _PersonalInfoCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "Personal Information",
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                      color: AppColors.foreground,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      "Personal Information",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                        color: AppColors.foreground,
+                      ),
                     ),
-                  ),
-                  Text(
-                    "Update your personal and contact details",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.mutedForeground,
+                    Text(
+                      "Update your personal and contact details",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.mutedForeground,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
 
           const SizedBox(height: AppSpacing.md),
 
-          // First Name & Last Name in responsive row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: firstNameController,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: "First Name",
-                    prefixIcon: Icon(Icons.badge_outlined, size: 19),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: TextField(
-                  controller: lastNameController,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: "Last Name",
-                    prefixIcon: Icon(Icons.badge_outlined, size: 19),
-                  ),
-                ),
-              ),
-            ],
+          // First Name
+          TextField(
+            controller: firstNameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: "First Name",
+              prefixIcon: Icon(Icons.badge_outlined, size: 19),
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.sm),
+
+          // Last Name
+          TextField(
+            controller: lastNameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: "Last Name",
+              prefixIcon: Icon(Icons.badge_outlined, size: 19),
+            ),
           ),
 
           const SizedBox(height: AppSpacing.sm),
@@ -905,10 +850,15 @@ class _PersonalInfoCard extends StatelessWidget {
           TextField(
             controller: phoneController,
             keyboardType: TextInputType.phone,
+            maxLength: 11,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+            ],
             decoration: const InputDecoration(
               labelText: "Phone Number",
-              hintText: "e.g. +63 912 345 6789",
+              hintText: "e.g. 09123456789",
               prefixIcon: Icon(Icons.phone_outlined, size: 19),
+              counterText: "",
             ),
           ),
 
@@ -924,152 +874,6 @@ class _PersonalInfoCard extends StatelessWidget {
               labelText: "Address / Location",
               hintText: "e.g. Barangay, Street, City",
               prefixIcon: Icon(Icons.location_on_outlined, size: 19),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Account & Activity Card
-// -----------------------------------------------------------------------------
-class _AccountActivityCard extends StatelessWidget {
-  const _AccountActivityCard({
-    required this.onTapMyReports,
-  });
-
-  final VoidCallback onTapMyReports;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section Title
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AppColors.tint(AppColors.primary, opacity: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.space_dashboard_outlined,
-                  size: 17,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "Activity & History",
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                      color: AppColors.foreground,
-                    ),
-                  ),
-                  Text(
-                    "View your community activity and submissions",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.mutedForeground,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: AppSpacing.sm),
-
-          // My Reports Tile
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTapMyReports,
-              borderRadius: BorderRadius.circular(14),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: AppColors.tint(AppColors.primary, opacity: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.assignment_turned_in_rounded,
-                        color: AppColors.primary,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            "My Reports",
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.foreground,
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            "Track status of your submitted waste reports",
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: AppColors.mutedForeground,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 18,
-                        color: AppColors.mutedForeground,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
         ],

@@ -4,7 +4,6 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
 import "../../../core/ui/shimmer_loading.dart";
-import "../../auth/presentation/auth_controller.dart";
 import "../../dashboard/data/dashboard_service.dart";
 import "../../schedules/presentation/schedules_screen.dart";
 import "my_reports_screen.dart";
@@ -19,18 +18,12 @@ class CitizenHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authControllerProvider).user;
-    final firstName = (user?.firstName ?? "").trim();
-    final greetingName = firstName.isNotEmpty ? firstName : "Citizen";
-
     return ListView(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
       ),
       children: [
-        _WelcomeHeader(name: greetingName),
-        const SizedBox(height: AppSpacing.md),
         const RepaintBoundary(child: _DashboardStatsSection()),
         const SizedBox(height: AppSpacing.lg),
         _HeroReportBanner(
@@ -106,49 +99,6 @@ class CitizenHomeScreen extends ConsumerWidget {
   }
 }
 
-class _WelcomeHeader extends StatelessWidget {
-  const _WelcomeHeader({required this.name});
-
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    "Welcome back, $name",
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.foreground,
-                          letterSpacing: -0.5,
-                        ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text("👋", style: TextStyle(fontSize: 20)),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                "Let's keep your neighborhood clean & green today.",
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.mutedForeground,
-                      fontSize: 13,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _HeroReportBanner extends StatelessWidget {
   const _HeroReportBanner({required this.onTap});
 
@@ -208,19 +158,23 @@ class _HeroReportBanner extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Text(
-                          "Report an Incident",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.3,
+                        const Flexible(
+                          child: Text(
+                            "Report an Incident",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                              horizontal: 5, vertical: 2),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(6),
@@ -245,10 +199,13 @@ class _HeroReportBanner extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: AppSpacing.xs),
               Container(
                 width: 36,
                 height: 36,
@@ -582,12 +539,16 @@ class _TipCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      "Community Tip",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.foreground,
+                    Flexible(
+                      child: Text(
+                        "Community Tip",
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.foreground,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 6),
