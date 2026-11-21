@@ -529,82 +529,16 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
           child: Column(
             children: [
               const PendingReportsBanner(cleanupPhotos: true),
-              // ── Filter Segment Bar & Quick Stats ──
-              Container(
-                color: AppColors.card,
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.xs,
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        _FilterChip(
-                          label: "All",
-                          count: totalCount,
-                          isSelected: _activeFilter == "all",
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _activeFilter = "all");
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _FilterChip(
-                          label: "Active",
-                          count: activeCount,
-                          dotColor: AppColors.orange,
-                          isSelected: _activeFilter == "active",
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _activeFilter = "active");
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _FilterChip(
-                          label: "Cleaned",
-                          count: cleanedCount,
-                          dotColor: AppColors.success,
-                          isSelected: _activeFilter == "cleaned",
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _activeFilter = "cleaned");
-                          },
-                        ),
-                      ],
-                    ),
-                    if (totalCount > 0) ...[
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(999),
-                              child: LinearProgressIndicator(
-                                value: completionRate,
-                                minHeight: 4,
-                                backgroundColor:
-                                    AppColors.muted.withValues(alpha: 0.8),
-                                color: AppColors.success,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            "$cleanedCount of $totalCount completed (${(completionRate * 100).toInt()}%)",
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.mutedForeground,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
+              // ── Redesigned Compact Filter Bar & Progress ──
+              _FilterSegmentBar(
+                activeFilter: _activeFilter,
+                totalCount: totalCount,
+                activeCount: activeCount,
+                cleanedCount: cleanedCount,
+                completionRate: completionRate,
+                onFilterChanged: (filter) {
+                  setState(() => _activeFilter = filter);
+                },
               ),
               const Divider(height: 1, color: AppColors.border),
 
@@ -614,7 +548,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
-                          const SizedBox(height: 80),
+                          const SizedBox(height: 60),
                           AppEmptyState(
                             icon: _activeFilter == "cleaned"
                                 ? Icons.task_alt_rounded
@@ -663,6 +597,7 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
                               _uploadingTaskIds.contains(task.id);
 
                           return _WorkerTaskCard(
+                            key: ValueKey(task.id),
                             task: task,
                             reportImages: reportImages,
                             cleanupImages: cleanupImages,
@@ -691,11 +626,190 @@ class _WorkerTasksScreenState extends ConsumerState<WorkerTasksScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENHANCED TASK CARD
+// COMPACT & CONSISTENT FILTER SEGMENT BAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _FilterSegmentBar extends StatelessWidget {
+  const _FilterSegmentBar({
+    required this.activeFilter,
+    required this.totalCount,
+    required this.activeCount,
+    required this.cleanedCount,
+    required this.completionRate,
+    required this.onFilterChanged,
+  });
+
+  final String activeFilter;
+  final int totalCount;
+  final int activeCount;
+  final int cleanedCount;
+  final double completionRate;
+  final ValueChanged<String> onFilterChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.card,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: AppColors.secondary,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.6),
+              ),
+            ),
+            child: Row(
+              children: [
+                _buildSegment(
+                  id: "all",
+                  label: "All",
+                  count: totalCount,
+                  isSelected: activeFilter == "all",
+                ),
+                _buildSegment(
+                  id: "active",
+                  label: "Active",
+                  count: activeCount,
+                  isSelected: activeFilter == "active",
+                  badgeColor: activeCount > 0 ? AppColors.orange : null,
+                ),
+                _buildSegment(
+                  id: "cleaned",
+                  label: "Cleaned",
+                  count: cleanedCount,
+                  isSelected: activeFilter == "cleaned",
+                  badgeColor: cleanedCount > 0 ? AppColors.success : null,
+                ),
+              ],
+            ),
+          ),
+          if (totalCount > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: completionRate,
+                      minHeight: 3,
+                      backgroundColor: AppColors.muted,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "$cleanedCount of $totalCount completed (${(completionRate * 100).toInt()}%)",
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegment({
+    required String id,
+    required String label,
+    required int count,
+    required bool isSelected,
+    Color? badgeColor,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onFilterChanged(id);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.card : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            border: isSelected
+                ? Border.all(color: AppColors.border.withValues(alpha: 0.8))
+                : null,
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? AppColors.foreground
+                      : AppColors.mutedForeground,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: badgeColor != null
+                      ? badgeColor.withValues(alpha: 0.14)
+                      : (isSelected
+                          ? AppColors.secondary
+                          : AppColors.card.withValues(alpha: 0.8)),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: badgeColor ??
+                        (isSelected
+                            ? AppColors.foreground
+                            : AppColors.mutedForeground),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REDESIGNED & COMPACT WORKER TASK CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _WorkerTaskCard extends StatelessWidget {
   const _WorkerTaskCard({
+    super.key,
     required this.task,
     required this.reportImages,
     required this.cleanupImages,
@@ -762,7 +876,7 @@ class _WorkerTaskCard extends StatelessWidget {
       case "CLEANED":
         return Icons.check_circle_rounded;
       case "IN_PROGRESS":
-        return Icons.run_circle_outlined;
+        return Icons.autorenew_rounded;
       case "VERIFIED":
       case "CLEANUP_SCHEDULED":
         return Icons.schedule_rounded;
@@ -789,57 +903,78 @@ class _WorkerTaskCard extends StatelessWidget {
         wasteCategoryLabels[task.category] ?? task.category;
     final statusLabel = statusLabels[status] ?? status;
 
+    final hasValidComment = task.displayDescription.trim().isNotEmpty &&
+        task.displayDescription.trim().toLowerCase() != "none";
+
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm + 4),
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCleaned
-              ? AppColors.success.withValues(alpha: 0.3)
+              ? AppColors.success.withValues(alpha: 0.25)
               : isInProgress
-                  ? AppColors.orange.withValues(alpha: 0.3)
+                  ? AppColors.warning.withValues(alpha: 0.3)
                   : AppColors.border,
-          width: isCleaned || isInProgress ? 1.5 : 1,
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header Bar ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Top Header: Title & Single Status Badge ──
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Category Pill
+                Expanded(
+                  child: Text(
+                    task.displayTitle,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                      color: AppColors.foreground,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Status Pill (The single definitive status indicator)
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                   decoration: BoxDecoration(
-                    color: AppColors.tint(categoryColor, opacity: 0.12),
-                    borderRadius: BorderRadius.circular(16),
+                    color: AppColors.tint(statusColor, opacity: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        _getCategoryIcon(task.category),
-                        size: 14,
-                        color: categoryColor,
+                        _getStatusIcon(status),
+                        size: 12,
+                        color: statusColor,
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 4),
                       Text(
-                        categoryLabel,
+                        statusLabel,
                         style: TextStyle(
-                          color: categoryColor,
+                          color: statusColor,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
@@ -847,431 +982,220 @@ class _WorkerTaskCard extends StatelessWidget {
                     ],
                   ),
                 ),
-
-                Row(
-                  children: [
-                    if ((task.severity ?? "").isNotEmpty) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        margin: const EdgeInsets.only(right: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.warning.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          WasteSeverity.fromString(task.severity).label,
-                          style: TextStyle(
-                            color: AppColors.warning,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-
-                    // Status Pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.tint(statusColor, opacity: 0.14),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: statusColor.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _getStatusIcon(status),
-                            size: 13,
-                            color: statusColor,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            statusLabel,
-                            style: TextStyle(
-                              color: statusColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
-          ),
 
-          // ── Workflow Step Progress Indicator ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _WorkflowStepTracker(status: status),
-          ),
+            const SizedBox(height: 6),
 
-          const SizedBox(height: 10),
-
-          // ── Title & Description ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // ── Metadata Tags: Category, Severity/Priority, Date ──
+            Row(
               children: [
-                Text(
-                  task.displayTitle,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                    color: AppColors.foreground,
+                // Category Pill
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary,
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Citizen Comment: ${task.displayDescription}",
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.mutedForeground,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Report Photos (Before Evidence) ──
-          if (reportImages.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.photo_library_outlined,
-                    size: 14,
-                    color: AppColors.mutedForeground,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    "Reported Waste Photos (${reportImages.length})",
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.mutedForeground,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 88,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                scrollDirection: Axis.horizontal,
-                itemCount: reportImages.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, idx) {
-                  final img = reportImages[idx];
-                  return GestureDetector(
-                    onTap: () => onOpenViewer(reportImages, idx, "Report Photo"),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            width: 88,
-                            height: 88,
-                            decoration: BoxDecoration(
-                              color: AppColors.muted,
-                              border: Border.all(color: AppColors.border),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Image.network(
-                              img.imageUrl,
-                              width: 88,
-                              height: 88,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Center(
-                                child: Icon(
-                                  Icons.broken_image_rounded,
-                                  color: AppColors.mutedForeground,
-                                  size: 28,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 6,
-                          right: 6,
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Icon(
-                              Icons.zoom_in_rounded,
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-
-          // ── Location & Time Micro Card ──
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.muted.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                children: [
-                  if ((task.address ?? "").isNotEmpty) ...[
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.location_on_rounded,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            task.address!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.foreground,
-                              height: 1.3,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-                  Row(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.access_time_rounded,
-                        size: 14,
-                        color: AppColors.mutedForeground,
+                      Icon(
+                        _getCategoryIcon(task.category),
+                        size: 11,
+                        color: categoryColor,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 3),
                       Text(
-                        dateFormat.format(task.createdAt),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.mutedForeground,
+                        categoryLabel,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: categoryColor,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          ),
-
-          // ── Required Action Alert: Missing Cleanup Photos ──
-          if (hasNoCleanupPhotos) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB), // Amber 50
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFFDE68A), // Amber 200
-                    width: 1.2,
+                ),
+                if ((task.severity ?? "").isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      WasteSeverity.fromString(task.severity).label,
+                      style: const TextStyle(
+                        color: AppColors.warning,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
+                ],
+                const Spacer(),
+                Text(
+                  dateFormat.format(task.createdAt),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // ── Compact Task Stepper (Assigned → In Progress → Cleaned) ──
+            _CompactTaskStepper(status: status),
+
+            const SizedBox(height: 10),
+
+            // ── Citizen Comment (Rendered only if non-empty / meaningful) ──
+            if (hasValidComment) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFEF3C7),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.warning_amber_rounded,
-                        color: Color(0xFFD97706),
-                        size: 18,
+                    const Padding(
+                      padding: EdgeInsets.only(top: 1),
+                      child: Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 12,
+                        color: AppColors.mutedForeground,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Cleanup Proof Required",
-                            style: TextStyle(
-                              color: Color(0xFF92400E),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            "Attach 1 to 5 photos showing the cleaned location to unlock task completion.",
-                            style: TextStyle(
-                              color: Color(0xFFB45309),
-                              fontSize: 12,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        task.displayDescription,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                          color: AppColors.mutedForeground,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
 
-          // ── Success State: Cleanup Photos Attached ──
-          if (hasCleanupPhotos) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4), // Emerald 50
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFBBF7D0), // Emerald 200
-                    width: 1.2,
-                  ),
+            // ── Location ──
+            if ((task.address ?? "").isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 13,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        task.address!,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.foreground,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+            ],
+
+            // ── Reported Photos Gallery (Clean & Compact) ──
+            if (reportImages.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFDCFCE7),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.verified_rounded,
-                            color: Color(0xFF16A34A),
-                            size: 16,
+                        const Icon(
+                          Icons.photo_outlined,
+                          size: 12,
+                          color: AppColors.mutedForeground,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "Reported Photos (${reportImages.length})",
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.mutedForeground,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "Cleanup Proof Attached ($cleanupCount/$_maxCleanupPhotos)",
-                            style: const TextStyle(
-                              color: Color(0xFF166534),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        if (cleanupCount < _maxCleanupPhotos)
-                          TextButton.icon(
-                            onPressed: onUploadPhotos,
-                            icon: const Icon(
-                              Icons.add_a_photo_outlined,
-                              size: 14,
-                            ),
-                            label: const Text(
-                              "Add More",
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            style: TextButton.styleFrom(
-                              foregroundColor: const Color(0xFF16A34A),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     SizedBox(
-                      height: 64,
+                      height: 56,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        itemCount: cleanupCount,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemCount: reportImages.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 6),
                         itemBuilder: (context, idx) {
-                          final img = cleanupImages[idx];
+                          final img = reportImages[idx];
                           return GestureDetector(
                             onTap: () => onOpenViewer(
-                              cleanupImages,
+                              reportImages,
                               idx,
-                              "Cleanup Proof",
+                              "Report Photo",
                             ),
-                            child: Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.network(
-                                    img.imageUrl,
-                                    width: 64,
-                                    height: 64,
-                                    fit: BoxFit.cover,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 56,
+                                height: 56,
+                                color: AppColors.muted,
+                                child: Image.network(
+                                  img.imageUrl,
+                                  width: 56,
+                                  height: 56,
+                                  fit: BoxFit.cover,
+                                  loadingBuilder: (_, child, progress) =>
+                                      progress == null
+                                          ? child
+                                          : const Center(
+                                              child: SizedBox(
+                                                width: 14,
+                                                height: 14,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                ),
+                                              ),
+                                            ),
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Icon(
+                                      Icons.broken_image_outlined,
+                                      size: 18,
+                                      color: AppColors.mutedForeground,
+                                    ),
                                   ),
                                 ),
-                                Positioned(
-                                  bottom: 4,
-                                  right: 4,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.6),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Icon(
-                                      Icons.zoom_in_rounded,
-                                      color: Colors.white,
-                                      size: 12,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           );
                         },
@@ -1280,21 +1204,21 @@ class _WorkerTaskCard extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
 
-          // ── Cleaned State Summary (Cleaned Task View) ──
-          if (isCleaned) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(12),
+            // ── Cleanup Section: Cleaned State ──
+            if (isCleaned) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: AppColors.tint(AppColors.success, opacity: 0.1),
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.tint(AppColors.success, opacity: 0.08),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: AppColors.success.withValues(alpha: 0.25),
+                    color: AppColors.success.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Column(
@@ -1305,41 +1229,31 @@ class _WorkerTaskCard extends StatelessWidget {
                         const Icon(
                           Icons.task_alt_rounded,
                           color: AppColors.success,
-                          size: 18,
+                          size: 14,
                         ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            "Cleanup Completed & Verified",
-                            style: TextStyle(
-                              color: AppColors.success,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                            ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          "Cleaned & Verified",
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.success,
                           ),
                         ),
+                        const Spacer(),
                         Text(
                           dateFormat.format(task.updatedAt),
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 10,
                             color: AppColors.mutedForeground,
                           ),
                         ),
                       ],
                     ),
                     if (cleanupImages.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        "Cleanup Proof Evidence (${cleanupImages.length} photos)",
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.mutedForeground,
-                        ),
-                      ),
                       const SizedBox(height: 6),
                       SizedBox(
-                        height: 56,
+                        height: 44,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: cleanupImages.length,
@@ -1354,12 +1268,22 @@ class _WorkerTaskCard extends StatelessWidget {
                                 "Cleanup Proof",
                               ),
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(6),
                                 child: Image.network(
                                   img.imageUrl,
-                                  width: 56,
-                                  height: 56,
+                                  width: 44,
+                                  height: 44,
                                   fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 44,
+                                    height: 44,
+                                    color: AppColors.muted,
+                                    child: const Icon(
+                                      Icons.broken_image_outlined,
+                                      size: 14,
+                                      color: AppColors.mutedForeground,
+                                    ),
+                                  ),
                                 ),
                               ),
                             );
@@ -1370,233 +1294,368 @@ class _WorkerTaskCard extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
 
-          // ── Action Buttons ──
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                if (isPendingStart) ...[
-                  // Start Cleanup Work Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: FilledButton.icon(
-                      onPressed: onStartCleanup,
-                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                      label: const Text("Start Cleanup Work"),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
+            // ── Cleanup Section: In-Progress State (Proof Photos & Requirement) ──
+            if (isInProgress) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: hasNoCleanupPhotos
+                      ? const Color(0xFFFFFBEB)
+                      : const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: hasNoCleanupPhotos
+                        ? const Color(0xFFFDE68A)
+                        : const Color(0xFFBBF7D0),
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 44,
-                    child: OutlinedButton.icon(
-                      onPressed: onNavigate,
-                      icon: const Icon(Icons.near_me_rounded, size: 18),
-                      label: const Text("Navigate Route"),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: BorderSide(
-                          color: AppColors.primary.withValues(alpha: 0.3),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          hasNoCleanupPhotos
+                              ? Icons.warning_amber_rounded
+                              : Icons.verified_outlined,
+                          size: 14,
+                          color: hasNoCleanupPhotos
+                              ? const Color(0xFFD97706)
+                              : const Color(0xFF16A34A),
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ] else if (isInProgress) ...[
-                  Row(
-                    children: [
-                      // Navigate Route Button
-                      Expanded(
-                        child: SizedBox(
-                          height: 46,
-                          child: FilledButton.icon(
-                            onPressed: onNavigate,
-                            icon: const Icon(Icons.near_me_rounded, size: 18),
-                            label: const Text("Navigate"),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            hasNoCleanupPhotos
+                                ? "1+ proof photo required to mark cleaned"
+                                : "Cleanup Proof ($cleanupCount/$_maxCleanupPhotos photos)",
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: hasNoCleanupPhotos
+                                  ? const Color(0xFF92400E)
+                                  : const Color(0xFF166534),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Add Photos Button
-                      Expanded(
-                        child: SizedBox(
-                          height: 46,
-                          child: OutlinedButton.icon(
-                            onPressed: isUploading ||
-                                    cleanupCount >= _maxCleanupPhotos
-                                ? null
-                                : onUploadPhotos,
-                            icon: isUploading
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+                        if (hasNoCleanupPhotos)
+                          InkWell(
+                            onTap: onUploadPhotos,
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: isUploading
+                                  ? const SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.camera_alt_outlined,
+                                          size: 11,
+                                          color: Colors.white,
+                                        ),
+                                        SizedBox(width: 3),
+                                        Text(
+                                          "Add Photo",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  )
-                                : const Icon(
-                                    Icons.camera_alt_rounded,
-                                    size: 18,
-                                  ),
-                            label: Text(
-                              isUploading
-                                  ? "Uploading…"
-                                  : "Add Photos ($cleanupCount/$_maxCleanupPhotos)",
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              side: BorderSide(
-                                color: AppColors.primary.withValues(alpha: 0.4),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
                             ),
                           ),
+                      ],
+                    ),
+                    if (hasCleanupPhotos) ...[
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        height: 44,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: cleanupCount,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 6),
+                                itemBuilder: (context, idx) {
+                                  final img = cleanupImages[idx];
+                                  return GestureDetector(
+                                    onTap: () => onOpenViewer(
+                                      cleanupImages,
+                                      idx,
+                                      "Cleanup Proof",
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Image.network(
+                                        img.imageUrl,
+                                        width: 44,
+                                        height: 44,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            Container(
+                                          width: 44,
+                                          height: 44,
+                                          color: AppColors.muted,
+                                          child: const Icon(
+                                            Icons.broken_image_outlined,
+                                            size: 14,
+                                            color: AppColors.mutedForeground,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            if (cleanupCount < _maxCleanupPhotos) ...[
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: onUploadPhotos,
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFF16A34A)
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: isUploading
+                                      ? const Center(
+                                          child: SizedBox(
+                                            width: 12,
+                                            height: 12,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 1.5,
+                                            ),
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.add_a_photo_outlined,
+                                          size: 16,
+                                          color: Color(0xFF16A34A),
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 10),
-                  // Mark Cleaned Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: hasNoCleanupPhotos
-                        ? OutlinedButton.icon(
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    "Please upload at least 1 cleanup proof photo before completing this task.",
-                                  ),
-                                  backgroundColor: AppColors.warning,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.lock_outline_rounded,
-                              size: 18,
-                              color: AppColors.mutedForeground,
-                            ),
-                            label: const Text("Mark Cleaned (Proof Required)"),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.mutedForeground,
-                              side: BorderSide(
-                                color: AppColors.border.withValues(alpha: 0.8),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          )
-                        : FilledButton.icon(
-                            onPressed: onMarkCleaned,
-                            icon: const Icon(
-                              Icons.task_alt_rounded,
-                              size: 20,
-                            ),
-                            label: const Text("Mark Cleaned ✓"),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.success,
-                              foregroundColor: Colors.white,
-                              elevation: 2,
-                              shadowColor:
-                                  AppColors.success.withValues(alpha: 0.4),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+                  ],
+                ),
+              ),
+            ],
+
+            // ── Action Buttons ──
+            if (isPendingStart) ...[
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 38,
+                      child: OutlinedButton.icon(
+                        onPressed: onNavigate,
+                        icon: const Icon(Icons.near_me_rounded, size: 14),
+                        label: const Text("Navigate"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.3),
                           ),
-                  ),
-                ] else if (isCleaned) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    height: 44,
-                    child: OutlinedButton.icon(
-                      onPressed: onNavigate,
-                      icon: const Icon(Icons.near_me_rounded, size: 16),
-                      label: const Text("View Route History"),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.mutedForeground,
-                        side: const BorderSide(color: AppColors.border),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: EdgeInsets.zero,
+                          textStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                        textStyle: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: SizedBox(
+                      height: 38,
+                      child: FilledButton.icon(
+                        onPressed: onStartCleanup,
+                        icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                        label: const Text("Start Cleanup"),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: EdgeInsets.zero,
+                          textStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-        ],
+              ),
+            ] else if (isInProgress) ...[
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 38,
+                      child: OutlinedButton.icon(
+                        onPressed: onNavigate,
+                        icon: const Icon(Icons.near_me_rounded, size: 14),
+                        label: const Text("Navigate"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: EdgeInsets.zero,
+                          textStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: SizedBox(
+                      height: 38,
+                      child: hasNoCleanupPhotos
+                          ? OutlinedButton.icon(
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text(
+                                      "Please upload at least 1 cleanup proof photo before completing this task.",
+                                    ),
+                                    backgroundColor: AppColors.warning,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.lock_outline_rounded,
+                                size: 14,
+                                color: AppColors.mutedForeground,
+                              ),
+                              label: const Text("Mark Cleaned"),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.mutedForeground,
+                                side: const BorderSide(color: AppColors.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: EdgeInsets.zero,
+                                textStyle: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          : FilledButton.icon(
+                              onPressed: onMarkCleaned,
+                              icon: const Icon(Icons.task_alt_rounded, size: 16),
+                              label: const Text("Mark Cleaned ✓"),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.success,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: EdgeInsets.zero,
+                                textStyle: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (isCleaned) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 34,
+                child: OutlinedButton.icon(
+                  onPressed: onNavigate,
+                  icon: const Icon(Icons.near_me_outlined, size: 14),
+                  label: const Text("View Route History"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.mutedForeground,
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: EdgeInsets.zero,
+                    textStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WORKFLOW STEP TRACKER (Assigned -> In Progress -> Cleaned)
+// COMPACT WORKFLOW STEP TRACKER (Assigned -> In Progress -> Cleaned)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _WorkflowStepTracker extends StatelessWidget {
-  const _WorkflowStepTracker({required this.status});
+class _CompactTaskStepper extends StatelessWidget {
+  const _CompactTaskStepper({required this.status});
 
   final String status;
 
@@ -1609,41 +1668,34 @@ class _WorkflowStepTracker extends StatelessWidget {
       currentStep = 2;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.muted.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          _buildStepItem(0, "Assigned", currentStep >= 0, currentStep == 0),
-          _buildStepDivider(currentStep >= 1),
-          _buildStepItem(1, "In Progress", currentStep >= 1, currentStep == 1),
-          _buildStepDivider(currentStep >= 2),
-          _buildStepItem(2, "Cleaned", currentStep >= 2, currentStep == 2),
-        ],
-      ),
+    return Row(
+      children: [
+        _buildStep(0, "Assigned", currentStep >= 0, currentStep == 0),
+        _buildConnector(currentStep >= 1),
+        _buildStep(1, "In Progress", currentStep >= 1, currentStep == 1),
+        _buildConnector(currentStep >= 2),
+        _buildStep(2, "Cleaned", currentStep >= 2, currentStep == 2),
+      ],
     );
   }
 
-  Widget _buildStepItem(
-    int step,
-    String label,
-    bool isCompletedOrActive,
+  Widget _buildStep(
+    int stepIndex,
+    String title,
+    bool isReached,
     bool isCurrent,
   ) {
-    Color itemColor;
+    Color stepColor;
     if (isCurrent) {
-      itemColor = step == 2
+      stepColor = stepIndex == 2
           ? AppColors.success
-          : step == 1
+          : stepIndex == 1
               ? AppColors.orange
               : AppColors.primary;
-    } else if (isCompletedOrActive) {
-      itemColor = AppColors.success;
+    } else if (isReached) {
+      stepColor = AppColors.success;
     } else {
-      itemColor = AppColors.mutedForeground.withValues(alpha: 0.6);
+      stepColor = AppColors.mutedForeground.withValues(alpha: 0.4);
     }
 
     return Row(
@@ -1653,131 +1705,53 @@ class _WorkflowStepTracker extends StatelessWidget {
           width: 14,
           height: 14,
           decoration: BoxDecoration(
-            color: isCurrent || isCompletedOrActive
-                ? itemColor
-                : Colors.transparent,
             shape: BoxShape.circle,
-            border: Border.all(color: itemColor, width: 1.5),
+            color: isReached ? stepColor : Colors.transparent,
+            border: Border.all(
+              color: stepColor,
+              width: 1.5,
+            ),
           ),
-          child: isCompletedOrActive && !isCurrent
+          child: isReached && !isCurrent
               ? const Icon(Icons.check, size: 9, color: Colors.white)
-              : null,
+              : (isCurrent
+                  ? Center(
+                      child: Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : null),
         ),
         const SizedBox(width: 4),
         Text(
-          label,
+          title,
           style: TextStyle(
             fontSize: 10,
-            fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-            color: itemColor,
+            fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+            color: isCurrent
+                ? stepColor
+                : (isReached
+                    ? AppColors.foreground
+                    : AppColors.mutedForeground),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStepDivider(bool isActive) {
+  Widget _buildConnector(bool isActive) {
     return Expanded(
       child: Container(
         height: 1.5,
         margin: const EdgeInsets.symmetric(horizontal: 6),
-        color: isActive
-            ? AppColors.success
-            : AppColors.mutedForeground.withValues(alpha: 0.2),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FILTER CHIP
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.count,
-    required this.isSelected,
-    required this.onTap,
-    this.dotColor,
-  });
-
-  final String label;
-  final int count;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final Color? dotColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : AppColors.muted,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSelected
-                  ? AppColors.primary
-                  : AppColors.border.withValues(alpha: 0.6),
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (dotColor != null && !isSelected) ...[
-                Container(
-                  width: 6,
-                  height: 6,
-                  margin: const EdgeInsets.only(right: 6),
-                  decoration: BoxDecoration(
-                    color: dotColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : AppColors.foreground,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 5),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.white.withValues(alpha: 0.22)
-                      : AppColors.card,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  count.toString(),
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.mutedForeground,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.success : AppColors.border,
+          borderRadius: BorderRadius.circular(1),
         ),
       ),
     );
@@ -1795,60 +1769,66 @@ class _TasksSkeletonLoader extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.all(AppSpacing.md),
-      itemCount: 3,
+      itemCount: 4,
       itemBuilder: (_, __) {
         return Container(
-          margin: const EdgeInsets.only(bottom: AppSpacing.md),
-          padding: const EdgeInsets.all(AppSpacing.md),
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm + 4),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: AppColors.card,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.border),
           ),
-          child: Column(
+          child: const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  ShimmerBox(width: 90, height: 26, borderRadius: 14),
-                  ShimmerBox(width: 80, height: 26, borderRadius: 14),
+                children: [
+                  ShimmerBox(width: 130, height: 18, borderRadius: 6),
+                  ShimmerBox(width: 70, height: 20, borderRadius: 8),
                 ],
               ),
-              const SizedBox(height: 14),
-              const ShimmerBox(width: double.infinity, height: 24, borderRadius: 10),
-              const SizedBox(height: 14),
-              const ShimmerBox(width: 180, height: 18, borderRadius: 6),
-              const SizedBox(height: 8),
-              const ShimmerBox(width: double.infinity, height: 14, borderRadius: 6),
-              const SizedBox(height: 6),
-              const ShimmerBox(width: 220, height: 14, borderRadius: 6),
-              const SizedBox(height: 14),
+              SizedBox(height: 8),
               Row(
-                children: const [
-                  ShimmerBox(width: 88, height: 88, borderRadius: 14),
-                  SizedBox(width: 8),
-                  ShimmerBox(width: 88, height: 88, borderRadius: 14),
+                children: [
+                  ShimmerBox(width: 75, height: 16, borderRadius: 6),
+                  SizedBox(width: 6),
+                  ShimmerBox(width: 50, height: 16, borderRadius: 6),
+                  Spacer(),
+                  ShimmerBox(width: 90, height: 14, borderRadius: 4),
                 ],
               ),
-              const SizedBox(height: 14),
-              const ShimmerBox(width: double.infinity, height: 44, borderRadius: 12),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
+              ShimmerBox(width: double.infinity, height: 14, borderRadius: 4),
+              SizedBox(height: 12),
+              ShimmerBox(width: 180, height: 14, borderRadius: 4),
+              SizedBox(height: 12),
               Row(
-                children: const [
+                children: [
+                  ShimmerBox(width: 56, height: 56, borderRadius: 8),
+                  SizedBox(width: 6),
+                  ShimmerBox(width: 56, height: 56, borderRadius: 8),
+                ],
+              ),
+              SizedBox(height: 12),
+              Row(
+                children: [
                   Expanded(
+                    flex: 2,
                     child: ShimmerBox(
                       width: double.infinity,
-                      height: 46,
-                      borderRadius: 14,
+                      height: 38,
+                      borderRadius: 10,
                     ),
                   ),
                   SizedBox(width: 8),
                   Expanded(
+                    flex: 3,
                     child: ShimmerBox(
                       width: double.infinity,
-                      height: 46,
-                      borderRadius: 14,
+                      height: 38,
+                      borderRadius: 10,
                     ),
                   ),
                 ],

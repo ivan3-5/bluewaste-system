@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/network/api_exception.dart';
+import '../../reports/domain/report_models.dart';
 import '../domain/schedule_models.dart';
 
 final scheduleServiceProvider = Provider<ScheduleService>((ref) {
@@ -9,7 +10,11 @@ final scheduleServiceProvider = Provider<ScheduleService>((ref) {
   return ScheduleService(dio);
 });
 
-typedef ScheduleDetails = ({CleanupSchedule schedule, int uncleanedReports});
+typedef ScheduleDetails = ({
+  CleanupSchedule schedule,
+  int uncleanedReports,
+  List<ReportRecord> reports,
+});
 
 class ScheduleService {
   final Dio _dio;
@@ -50,9 +55,15 @@ class ScheduleService {
     try {
       final response = await _dio.get<Map<String, dynamic>>('/schedules/$id');
       final data = response.data!;
-      final reports = data['reports'];
-      final uncleanedReports = reports is List
-          ? reports
+      final rawReports = data['reports'];
+      final List<ReportRecord> reportsList = rawReports is List
+          ? rawReports
+              .whereType<Map<String, dynamic>>()
+              .map(ReportRecord.fromJson)
+              .toList()
+          : const [];
+      final uncleanedReports = rawReports is List
+          ? rawReports
                 .where(
                   (report) =>
                       report is Map &&
@@ -64,6 +75,7 @@ class ScheduleService {
       return (
         schedule: CleanupSchedule.fromJson(data),
         uncleanedReports: uncleanedReports,
+        reports: reportsList,
       );
     } catch (e) {
       throw _handleError(e);
