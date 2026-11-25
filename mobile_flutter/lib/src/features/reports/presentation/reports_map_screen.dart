@@ -32,6 +32,14 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
   static const double _defaultZoom = 13;
   static const double _markerWidth = 34;
   static const double _markerHeight = 44;
+  static const double _areaMarkerWidth = 38;
+  static const double _areaMarkerHeight = 48;
+  static final _reportPinAlignment = Marker.computePixelAlignment(
+    width: _markerWidth,
+    height: _markerHeight,
+    left: _WasteReportMarkerPainter.pinCenter.dx,
+    top: _WasteReportMarkerPainter.pinCenter.dy,
+  );
 
   final MapController _mapController = MapController();
 
@@ -398,19 +406,16 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
         onTap: () => _showRadiusGroupDetails(group, members),
         child: RepaintBoundary(
           child: SizedBox(
-            width: 38,
-            height: 48,
+            width: _areaMarkerWidth,
+            height: _areaMarkerHeight,
             child: Stack(
+              alignment: Alignment.topCenter,
               clipBehavior: Clip.none,
               children: [
-                Positioned(
-                  left: 2,
-                  bottom: 4,
-                  child: CustomPaint(
-                    size: const Size(_markerWidth, _markerHeight),
-                    painter: _WasteReportMarkerPainter(
-                      _pinColor(primaryReport.status),
-                    ),
+                CustomPaint(
+                  size: const Size(_markerWidth, _markerHeight),
+                  painter: _WasteReportMarkerPainter(
+                    _pinColor(primaryReport.status),
                   ),
                 ),
                 Positioned(
@@ -1251,16 +1256,21 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
       final offsetX = centerCounts[centerKey]! > 1
           ? (isAllCleaned ? 22.0 : -22.0)
           : 0.0;
+      final hasBadge = members.length > 1;
+      final markerWidth = hasBadge ? _areaMarkerWidth : _markerWidth;
+      final markerHeight = hasBadge ? _areaMarkerHeight : _markerHeight;
       markers.add(
         Marker(
           point: LatLng(group.latitude, group.longitude),
-          width: members.length > 1 ? 38 : _markerWidth,
-          height: members.length > 1 ? 48 : _markerHeight,
-          alignment: Alignment.bottomCenter,
-          child: Transform.translate(
-            offset: Offset(offsetX, 0),
-            child: _buildAreaMarker(group, members),
+          width: markerWidth,
+          height: markerHeight,
+          alignment: Marker.computePixelAlignment(
+            width: markerWidth,
+            height: markerHeight,
+            left: markerWidth / 2 - offsetX,
+            top: _WasteReportMarkerPainter.pinCenter.dy,
           ),
+          child: _buildAreaMarker(group, members),
         ),
       );
     }
@@ -1274,7 +1284,7 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
           point: LatLng(report.latitude, report.longitude),
           width: _markerWidth,
           height: _markerHeight,
-          alignment: Alignment.bottomCenter,
+          alignment: _reportPinAlignment,
           child: _buildReportMarker(report),
         ),
       );
@@ -1412,6 +1422,8 @@ class _ReportsMapScreenState extends ConsumerState<ReportsMapScreen>
 class _WasteReportMarkerPainter extends CustomPainter {
   const _WasteReportMarkerPainter(this.color);
 
+  static const pinCenter = Offset(17, 17);
+
   final Color color;
 
   @override
@@ -1447,14 +1459,14 @@ class _WasteReportMarkerPainter extends CustomPainter {
         ..isAntiAlias = true,
     );
     canvas.drawCircle(
-      const Offset(17, 17),
+      pinCenter,
       6.5,
       Paint()
         ..color = Colors.white
         ..isAntiAlias = true,
     );
     canvas.drawCircle(
-      const Offset(17, 17),
+      pinCenter,
       3.5,
       Paint()
         ..color = color
