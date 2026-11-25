@@ -6,8 +6,10 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../../core/theme/app_colors.dart";
 import "../../../core/theme/app_spacing.dart";
+import "../data/philippine_address_service.dart";
 import "auth_controller.dart";
 import "email_verification_screen.dart";
+import "widgets/address_dropdown_field.dart";
 import "widgets/auth_components.dart";
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -38,10 +40,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordFocusNode = FocusNode();
   final _confirmPasswordFocusNode = FocusNode();
 
+  final _addressService = const PhilippineAddressService();
+
+  String? _selectedProvince;
+  String? _selectedCity;
+  String? _selectedBarangay;
+  String? _selectedPurok;
+  final _customPurokController = TextEditingController();
+  final _customPurokFocusNode = FocusNode();
+  bool _isCustomPurok = false;
+
+  List<String> _provinceOptions = [];
+  List<String> _cityOptions = [];
+  List<String> _barangayOptions = [];
+  List<String> _purokOptions = [];
+
+  bool _isLoadingProvinces = false;
+  bool _isLoadingCities = false;
+  bool _isLoadingBarangays = false;
+  bool _isLoadingPuroks = false;
+
   String? _firstNameError;
   String? _lastNameError;
   String? _emailError;
   String? _phoneError;
+  String? _provinceError;
+  String? _cityError;
+  String? _barangayError;
+  String? _purokError;
   String? _addressError;
   String? _passwordError;
   String? _confirmPasswordError;
@@ -52,12 +78,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscureConfirmPassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    _loadProvinces();
+  }
+
+  @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _customPurokController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
 
@@ -66,9 +99,169 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _emailFocusNode.dispose();
     _phoneFocusNode.dispose();
     _addressFocusNode.dispose();
+    _customPurokFocusNode.dispose();
     _passwordFocusNode.dispose();
     _confirmPasswordFocusNode.dispose();
     super.dispose();
+  }
+
+  /// Automatically combines all selected address components into one formatted address string.
+  String get _formattedAddress {
+    final effectivePurok = _isCustomPurok
+        ? _customPurokController.text.trim()
+        : (_selectedPurok ?? "");
+    return PhilippineAddressService.formatAddress(
+      province: _selectedProvince,
+      city: _selectedCity,
+      barangay: _selectedBarangay,
+      purok: effectivePurok,
+    );
+  }
+
+  void _syncCombinedAddress() {
+    final combined = _formattedAddress;
+    _addressController.text = combined;
+    _onAddressChanged(combined);
+  }
+
+  Future<void> _loadProvinces() async {
+    setState(() => _isLoadingProvinces = true);
+    try {
+      final provinces = await _addressService.getProvinces();
+      if (!mounted) return;
+      setState(() {
+        _provinceOptions = provinces;
+        _isLoadingProvinces = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingProvinces = false);
+    }
+  }
+
+  Future<void> _onProvinceChanged(String? province) async {
+    if (_generalError != null) setState(() => _generalError = null);
+    setState(() {
+      _selectedProvince = province;
+      _selectedCity = null;
+      _selectedBarangay = null;
+      _selectedPurok = null;
+      _isCustomPurok = false;
+      _customPurokController.clear();
+      _cityOptions = [];
+      _barangayOptions = [];
+      _purokOptions = [];
+      _provinceError = null;
+      _cityError = null;
+      _barangayError = null;
+      _purokError = null;
+      _addressError = null;
+    });
+    _syncCombinedAddress();
+    if (province == null) return;
+    setState(() => _isLoadingCities = true);
+    try {
+      final cities = await _addressService.getCities(province);
+      if (!mounted) return;
+      setState(() {
+        _cityOptions = cities;
+        _isLoadingCities = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingCities = false);
+    }
+  }
+
+  Future<void> _onCityChanged(String? city) async {
+    if (_generalError != null) setState(() => _generalError = null);
+    setState(() {
+      _selectedCity = city;
+      _selectedBarangay = null;
+      _selectedPurok = null;
+      _isCustomPurok = false;
+      _customPurokController.clear();
+      _barangayOptions = [];
+      _purokOptions = [];
+      _cityError = null;
+      _barangayError = null;
+      _purokError = null;
+      _addressError = null;
+    });
+    _syncCombinedAddress();
+    if (city == null || _selectedProvince == null) return;
+    setState(() => _isLoadingBarangays = true);
+    try {
+      final barangays =
+          await _addressService.getBarangays(_selectedProvince!, city);
+      if (!mounted) return;
+      setState(() {
+        _barangayOptions = barangays;
+        _isLoadingBarangays = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingBarangays = false);
+    }
+  }
+
+  Future<void> _onBarangayChanged(String? barangay) async {
+    if (_generalError != null) setState(() => _generalError = null);
+    setState(() {
+      _selectedBarangay = barangay;
+      _selectedPurok = null;
+      _isCustomPurok = false;
+      _customPurokController.clear();
+      _purokOptions = [];
+      _barangayError = null;
+      _purokError = null;
+      _addressError = null;
+    });
+    _syncCombinedAddress();
+    if (barangay == null ||
+        _selectedProvince == null ||
+        _selectedCity == null) {
+      return;
+    }
+    setState(() => _isLoadingPuroks = true);
+    try {
+      final puroks = await _addressService.getPuroks(
+        _selectedProvince!,
+        _selectedCity!,
+        barangay,
+      );
+      if (!mounted) return;
+      setState(() {
+        _purokOptions = puroks;
+        _isLoadingPuroks = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingPuroks = false);
+    }
+  }
+
+  void _onPurokChanged(String? purok) {
+    if (_generalError != null) setState(() => _generalError = null);
+    setState(() {
+      _selectedPurok = purok;
+      _purokError = null;
+      _addressError = null;
+      if (purok == PhilippineAddressService.otherOption) {
+        _isCustomPurok = true;
+      } else {
+        _isCustomPurok = false;
+        _customPurokController.clear();
+      }
+    });
+    _syncCombinedAddress();
+    if (_isCustomPurok) {
+      _customPurokFocusNode.requestFocus();
+    }
+  }
+
+  void _onCustomPurokChanged(String val) {
+    if (_generalError != null) setState(() => _generalError = null);
+    if (_purokError != null && val.trim().isNotEmpty) {
+      setState(() => _purokError = null);
+    }
+    _syncCombinedAddress();
   }
 
   static final _emailRegex = RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$");
@@ -294,7 +487,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final lastName = _lastNameController.text.trim();
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
-    final address = _addressController.text.trim();
+    final address = _formattedAddress;
+    _addressController.text = address;
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
@@ -302,7 +496,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final lastNameError = _validateLastName(lastName);
     final emailError = _validateEmail(email);
     final phoneError = _validatePhone(phone);
-    final addressError = _validateAddress(address);
+
+    final provinceError = (_selectedProvince == null ||
+            _selectedProvince!.trim().isEmpty)
+        ? "Province is required."
+        : null;
+    final cityError =
+        (_selectedCity == null || _selectedCity!.trim().isEmpty)
+            ? "City / Municipality is required."
+            : null;
+    final barangayError = (_selectedBarangay == null ||
+            _selectedBarangay!.trim().isEmpty)
+        ? "Barangay is required."
+        : null;
+    final purokError = _isCustomPurok
+        ? (_customPurokController.text.trim().isEmpty
+            ? "Please specify your Purok / Sitio."
+            : null)
+        : ((_selectedPurok == null || _selectedPurok!.trim().isEmpty)
+            ? "Purok / Sitio is required."
+            : null);
+
+    final addressError = provinceError ??
+        cityError ??
+        barangayError ??
+        purokError ??
+        _validateAddress(address);
     final passwordError = _validatePassword(password);
     final confirmPasswordError =
         _validateConfirmPassword(confirmPassword, password);
@@ -311,6 +530,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         lastNameError != null ||
         emailError != null ||
         phoneError != null ||
+        provinceError != null ||
+        cityError != null ||
+        barangayError != null ||
+        purokError != null ||
         addressError != null ||
         passwordError != null ||
         confirmPasswordError != null;
@@ -321,6 +544,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         _lastNameError = lastNameError;
         _emailError = emailError;
         _phoneError = phoneError;
+        _provinceError = provinceError;
+        _cityError = cityError;
+        _barangayError = barangayError;
+        _purokError = purokError;
         _addressError = addressError;
         _passwordError = passwordError;
         _confirmPasswordError = confirmPasswordError;
@@ -336,8 +563,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         _emailFocusNode.requestFocus();
       } else if (phoneError != null) {
         _phoneFocusNode.requestFocus();
-      } else if (addressError != null) {
-        _addressFocusNode.requestFocus();
+      } else if (purokError != null && _isCustomPurok) {
+        _customPurokFocusNode.requestFocus();
       } else if (passwordError != null) {
         _passwordFocusNode.requestFocus();
       } else if (confirmPasswordError != null) {
@@ -352,6 +579,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _lastNameError = null;
       _emailError = null;
       _phoneError = null;
+      _provinceError = null;
+      _cityError = null;
+      _barangayError = null;
+      _purokError = null;
       _addressError = null;
       _passwordError = null;
       _confirmPasswordError = null;
@@ -609,49 +840,39 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     const SizedBox(height: AppSpacing.md),
                                   ],
 
-                                  // First Name & Last Name (Side by Side)
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: PremiumTextField(
-                                          controller: _firstNameController,
-                                          focusNode: _firstNameFocusNode,
-                                          labelText: "First Name",
-                                          hintText: "First name",
-                                          prefixIcon: Icons.person_rounded,
-                                          textCapitalization:
-                                              TextCapitalization.words,
-                                          textInputAction:
-                                              TextInputAction.next,
-                                          errorText: _firstNameError,
-                                          onChanged: _onFirstNameChanged,
-                                          onSubmitted: (_) {
-                                            _lastNameFocusNode.requestFocus();
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: AppSpacing.sm),
-                                      Expanded(
-                                        child: PremiumTextField(
-                                          controller: _lastNameController,
-                                          focusNode: _lastNameFocusNode,
-                                          labelText: "Last Name",
-                                          hintText: "Last name",
-                                          prefixIcon: Icons.badge_rounded,
-                                          textCapitalization:
-                                              TextCapitalization.words,
-                                          textInputAction:
-                                              TextInputAction.next,
-                                          errorText: _lastNameError,
-                                          onChanged: _onLastNameChanged,
-                                          onSubmitted: (_) {
-                                            _emailFocusNode.requestFocus();
-                                          },
-                                        ),
-                                      ),
-                                    ],
+                                  // First Name
+                                  PremiumTextField(
+                                    controller: _firstNameController,
+                                    focusNode: _firstNameFocusNode,
+                                    labelText: "First Name",
+                                    hintText: "Enter your first name",
+                                    prefixIcon: Icons.person_rounded,
+                                    textCapitalization:
+                                        TextCapitalization.words,
+                                    textInputAction: TextInputAction.next,
+                                    errorText: _firstNameError,
+                                    onChanged: _onFirstNameChanged,
+                                    onSubmitted: (_) {
+                                      _lastNameFocusNode.requestFocus();
+                                    },
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+
+                                  // Last Name
+                                  PremiumTextField(
+                                    controller: _lastNameController,
+                                    focusNode: _lastNameFocusNode,
+                                    labelText: "Last Name",
+                                    hintText: "Enter your last name",
+                                    prefixIcon: Icons.badge_rounded,
+                                    textCapitalization:
+                                        TextCapitalization.words,
+                                    textInputAction: TextInputAction.next,
+                                    errorText: _lastNameError,
+                                    onChanged: _onLastNameChanged,
+                                    onSubmitted: (_) {
+                                      _emailFocusNode.requestFocus();
+                                    },
                                   ),
                                   const SizedBox(height: AppSpacing.md),
 
@@ -696,24 +917,83 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   ),
                                   const SizedBox(height: AppSpacing.md),
 
-                                  // Address
-                                  PremiumTextField(
-                                    controller: _addressController,
-                                    focusNode: _addressFocusNode,
-                                    labelText: "Residential Address",
-                                    hintText: "Street, Barangay, City",
-                                    prefixIcon: Icons.location_on_rounded,
-                                    textCapitalization:
-                                        TextCapitalization.sentences,
-                                    keyboardType:
-                                        TextInputType.streetAddress,
-                                    textInputAction: TextInputAction.next,
-                                    errorText: _addressError,
-                                    onChanged: _onAddressChanged,
-                                    onSubmitted: (_) {
-                                      _passwordFocusNode.requestFocus();
-                                    },
+                                  // Cascading Address Dropdowns: Province, City/Municipality, Barangay, Purok/Sitio
+                                  AddressDropdownField(
+                                    labelText: "Province",
+                                    hintText: "Select Province",
+                                    prefixIcon: Icons.map_rounded,
+                                    value: _selectedProvince,
+                                    items: _provinceOptions,
+                                    isLoading: _isLoadingProvinces,
+                                    onChanged: _onProvinceChanged,
+                                    errorText: _provinceError,
                                   ),
+                                  const SizedBox(height: AppSpacing.md),
+
+                                  AddressDropdownField(
+                                    labelText: "City / Municipality",
+                                    hintText: _selectedProvince == null
+                                        ? "Select province first"
+                                        : "Select City / Municipality",
+                                    prefixIcon: Icons.location_city_rounded,
+                                    value: _selectedCity,
+                                    items: _cityOptions,
+                                    isLoading: _isLoadingCities,
+                                    enabled: _selectedProvince != null,
+                                    onChanged: _onCityChanged,
+                                    errorText: _cityError,
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+
+                                  AddressDropdownField(
+                                    labelText: "Barangay",
+                                    hintText: _selectedCity == null
+                                        ? "Select city first"
+                                        : "Select Barangay",
+                                    prefixIcon: Icons.holiday_village_rounded,
+                                    value: _selectedBarangay,
+                                    items: _barangayOptions,
+                                    isLoading: _isLoadingBarangays,
+                                    enabled: _selectedCity != null,
+                                    onChanged: _onBarangayChanged,
+                                    errorText: _barangayError,
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+
+                                  AddressDropdownField(
+                                    labelText: "Purok / Sitio",
+                                    hintText: _selectedBarangay == null
+                                        ? "Select barangay first"
+                                        : "Select Purok / Sitio",
+                                    prefixIcon: Icons.signpost_rounded,
+                                    value: _selectedPurok,
+                                    items: _purokOptions,
+                                    isLoading: _isLoadingPuroks,
+                                    enabled: _selectedBarangay != null,
+                                    onChanged: _onPurokChanged,
+                                    errorText: _purokError,
+                                  ),
+
+                                  if (_isCustomPurok) ...[
+                                    const SizedBox(height: AppSpacing.md),
+                                    PremiumTextField(
+                                      controller: _customPurokController,
+                                      focusNode: _customPurokFocusNode,
+                                      labelText: "Specify Purok / Sitio",
+                                      hintText:
+                                          "e.g. Purok 5A, Sitio Riverside",
+                                      prefixIcon:
+                                          Icons.edit_location_alt_rounded,
+                                      textCapitalization:
+                                          TextCapitalization.words,
+                                      textInputAction: TextInputAction.next,
+                                      errorText: _purokError,
+                                      onChanged: _onCustomPurokChanged,
+                                      onSubmitted: (_) {
+                                        _passwordFocusNode.requestFocus();
+                                      },
+                                    ),
+                                  ],
                                   const SizedBox(height: AppSpacing.md),
 
                                   // Password Field
@@ -853,9 +1133,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   const SizedBox(height: AppSpacing.xl),
 
                                   // Already have an account row
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
+                                  Wrap(
+                                    alignment: WrapAlignment.center,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
                                     children: [
                                       Text(
                                         "Already have an account?",
