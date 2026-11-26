@@ -159,25 +159,25 @@ export class ScheduleService {
 
       const schedule = existing
         ? await tx.cleanupSchedule.update({
-            where: { id: existing.id },
-            data: {
-              equipment,
-              workers: { create: newWorkerIds.map((workerId) => ({ workerId })) },
-            },
-          })
+          where: { id: existing.id },
+          data: {
+            equipment,
+            workers: { create: newWorkerIds.map((workerId) => ({ workerId })) },
+          },
+        })
         : await tx.cleanupSchedule.create({
-            data: {
-              title: data.title,
-              description: data.description,
-              barangay: data.barangay,
-              latitude: data.latitude,
-              longitude: data.longitude,
-              scheduledAt,
-              createdById: adminId,
-              equipment,
-              workers: { create: workerIds.map((workerId) => ({ workerId })) },
-            },
-          });
+          data: {
+            title: data.title,
+            description: data.description,
+            barangay: data.barangay,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            scheduledAt,
+            createdById: adminId,
+            equipment,
+            workers: { create: workerIds.map((workerId) => ({ workerId })) },
+          },
+        });
 
       if (newReportIds.length > 0) {
         const status = existing?.status === CleanupScheduleStatus.ONGOING
@@ -327,7 +327,7 @@ export class ScheduleService {
         }
         if (addedReportIds.length > 0) {
           if (existing.status === "COMPLETED" || existing.status === "CANCELLED" ||
-              nextStatus === "COMPLETED" || nextStatus === "CANCELLED") {
+            nextStatus === "COMPLETED" || nextStatus === "CANCELLED") {
             throw new Error("New reports can only be added to an upcoming or ongoing cleanup schedule.");
           }
           const reports = await tx.report.findMany({
@@ -430,8 +430,8 @@ export class ScheduleService {
         throw new Error("Insufficient permissions.");
       }
       if (isWorker && status !== existing.status &&
-          !(existing.status === "UPCOMING" && status === "ONGOING") &&
-          !(existing.status === "ONGOING" && status === "COMPLETED")) {
+        !(existing.status === "UPCOMING" && status === "ONGOING") &&
+        !(existing.status === "ONGOING" && status === "COMPLETED")) {
         throw new Error("This schedule status has changed. Refresh and try again.");
       }
       if (status === existing.status && notes === undefined) {
@@ -515,7 +515,7 @@ export class ScheduleService {
           title: "Cleanup Schedule Updated",
           message: `"${schedule.title}" status changed to ${statusLabels[status] || status}.`,
           type: "CLEANUP_SCHEDULE",
-        }).catch(() => {}),
+        }).catch(() => { }),
       ),
     );
 
@@ -623,7 +623,7 @@ export class ScheduleService {
               title: "Cleanup Schedule Completed",
               message: `"${schedule.title}" has been automatically marked as Completed because all associated waste reports are cleaned.`,
               type: "CLEANUP_SCHEDULE",
-            }).catch(() => {}),
+            }).catch(() => { }),
           ),
         );
 
@@ -714,7 +714,7 @@ export class ScheduleService {
               title: "Cleanup Schedule Completed",
               message: `"${schedule.title}" has been automatically marked as Completed because all associated waste reports are cleaned.`,
               type: "CLEANUP_SCHEDULE",
-            }).catch(() => {}),
+            }).catch(() => { }),
           ),
         );
       }
@@ -932,10 +932,10 @@ export class ScheduleService {
       reporterId: r.reporterId,
       reporter: r.reporter
         ? {
-            id: r.reporter.id,
-            name: `${r.reporter.firstName} ${r.reporter.lastName}`,
-            email: r.reporter.email,
-          }
+          id: r.reporter.id,
+          name: `${r.reporter.firstName} ${r.reporter.lastName}`,
+          email: r.reporter.email,
+        }
         : null,
       isAnonymous: r.isAnonymous,
       photoUrls: r.images
@@ -971,9 +971,9 @@ export class ScheduleService {
         verifiedAt: schedule.verifiedAt ? schedule.verifiedAt.toISOString() : null,
         verifiedBy: schedule.verifiedBy
           ? {
-              id: schedule.verifiedBy.id,
-              name: `${schedule.verifiedBy.firstName} ${schedule.verifiedBy.lastName}`,
-            }
+            id: schedule.verifiedBy.id,
+            name: `${schedule.verifiedBy.firstName} ${schedule.verifiedBy.lastName}`,
+          }
           : null,
         notes: finalNotes,
       },

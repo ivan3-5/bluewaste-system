@@ -629,13 +629,13 @@ export class ReportCrudService {
 
     const validWorkers = workerIds.length > 0
       ? await prisma.user.findMany({
-          where: {
-            id: { in: workerIds },
-            role: Role.FIELD_WORKER,
-            isActive: true,
-          },
-          select: { id: true, firstName: true, lastName: true },
-        })
+        where: {
+          id: { in: workerIds },
+          role: Role.FIELD_WORKER,
+          isActive: true,
+        },
+        select: { id: true, firstName: true, lastName: true },
+      })
       : [];
 
     const validWorkerIds = validWorkers.map((w) => w.id);
