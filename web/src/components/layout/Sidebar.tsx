@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
@@ -41,7 +41,6 @@ const citizenLinks = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, logout, isAdmin } = useAuth();
   const { isCollapsed, toggleSidebar } = useSidebar();
 
@@ -188,10 +187,7 @@ export function Sidebar() {
             </div>
           )}
           <button
-            onClick={() => {
-              logout();
-              router.push("/");
-            }}
+            onClick={logout}
             className={cn(
               "text-gray-400 dark:text-slate-400 transition-colors hover:text-red-500 dark:hover:text-red-400",
               isCollapsed && "mx-auto",

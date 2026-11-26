@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/providers/AuthProvider";
+import { accountHome } from "@/lib/account-home";
+import { hasIdleNotice } from "@/lib/web-session";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -35,9 +37,11 @@ const features = [
 ];
 
 export default function LoginPage() {
-  const { login, verifyEmail, resendVerification } = useAuth();
+  const { user, isLoading, login, verifyEmail, resendVerification } = useAuth();
   const router = useRouter();
+  const role = user?.role;
   const [error, setError] = useState("");
+  const [idleNotice, setIdleNotice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState("");
@@ -54,22 +58,16 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  useEffect(() => {
+    if (!isLoading) setIdleNotice(hasIdleNotice());
+    if (role) router.replace(accountHome(role));
+  }, [isLoading, role, router]);
+
   const onSubmit = async (data: LoginForm) => {
     try {
       setLoading(true);
       setError("");
       await login(data.email, data.password);
-      const savedUser = localStorage.getItem("bluewaste_user");
-      if (savedUser) {
-        const user = JSON.parse(savedUser);
-        if (user.role === "LGU_ADMIN") {
-          router.push("/dashboard");
-        } else if (user.role === "FIELD_WORKER") {
-          router.push("/field-worker");
-        } else {
-          router.push("/citizen/report");
-        }
-      }
     } catch (err: any) {
       const apiError = err.response?.data?.error;
       if (apiError?.code === "EMAIL_NOT_VERIFIED") {
@@ -95,7 +93,6 @@ export default function LoginPage() {
     setVerificationError("");
     try {
       await verifyEmail(verificationEmail, verificationCode);
-      router.push("/citizen/report");
     } catch (err: any) {
       setVerificationError(err.response?.data?.message || err.response?.data?.error?.message || "That code could not be verified.");
     } finally {
@@ -224,6 +221,12 @@ export default function LoginPage() {
                   tracking.
                 </p>
               </div>
+
+              {idleNotice && (
+                <p role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                  Signed out after 15 minutes of inactivity.
+                </p>
+              )}
 
               <form
                 onSubmit={handleSubmit(onSubmit)}

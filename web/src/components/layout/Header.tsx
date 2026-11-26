@@ -6,7 +6,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const ADMIN_PAGE_TITLES: Record<string, string> = {
@@ -30,7 +30,6 @@ function getAdminPageTitle(pathname: string): string {
 
 export function Header() {
   const { user, logout, isAdmin } = useAuth();
-  const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -132,7 +131,6 @@ export function Header() {
                   onClick={() => {
                     setProfileMenuOpen(false);
                     logout();
-                    router.push("/");
                   }}
                   className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                 >
@@ -208,7 +206,6 @@ export function Header() {
             onClick={() => {
               setMobileMenuOpen(false);
               logout();
-              router.push("/");
             }}
             className="flex items-center w-full px-3 py-2 text-sm text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40"
           >

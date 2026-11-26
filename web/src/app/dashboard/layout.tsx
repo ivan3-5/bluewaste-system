@@ -46,7 +46,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push("/login");
+      router.replace("/login");
     }
     if (!isLoading && user && user.role !== "LGU_ADMIN") {
       if (user.role === "FIELD_WORKER") {

@@ -5,9 +5,19 @@ import {
   useContext,
   useEffect,
   useState,
+  useRef,
   useCallback,
 } from "react";
-import api, { AUTH_KEYS, setUnauthorizedHandler } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { authApi, endWebSession, getCurrentWebSession } from "@/lib/api";
+import { useWebSessionActivity } from "@/hooks/useWebSessionActivity";
+import {
+  startWebSession,
+  subscribeToWebSession,
+  updateWebSession,
+  WebSession,
+  WebSessionResponse,
+} from "@/lib/web-session";
 import { useDemoMode } from "@/hooks/useDemoMode";
 import { User } from "@/types";
 
@@ -40,79 +50,64 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   useDemoMode();
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const activeSessionId = useRef<string>();
+  const [session, setSession] = useState<WebSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const user = session?.user ?? null;
+  const token = session?.token ?? null;
+
+  useWebSessionActivity(session?.sessionId, session?.idleUntil);
 
   useEffect(() => {
-    setUnauthorizedHandler(() => {
-      setUser(null);
-      setToken(null);
-    });
-
-    const savedToken = localStorage.getItem(AUTH_KEYS.TOKEN);
-    const savedUser = localStorage.getItem(AUTH_KEYS.USER);
-
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
-        localStorage.removeItem(AUTH_KEYS.USER);
+    function syncSession(next: WebSession | null) {
+      if (activeSessionId.current && activeSessionId.current !== next?.sessionId) {
+        queryClient.clear();
       }
+      activeSessionId.current = next?.sessionId;
+      setSession(next);
     }
+
+    const unsubscribe = subscribeToWebSession(syncSession);
+    // Web credentials from before server-side idle enforcement need a new sign-in.
+    for (const key of ["bluewaste_user", "bluewaste_token", "bluewaste_refresh_token"]) {
+      localStorage.removeItem(key);
+    }
+    syncSession(getCurrentWebSession());
     setIsLoading(false);
+    return unsubscribe;
+  }, [queryClient]);
+
+  const startSession = useCallback(async (path: string, credentials: Record<string, string>) => {
+    const { data } = await authApi.post<WebSessionResponse>(path, credentials);
+    startWebSession(data);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    try {
-      const { data } = await api.post("/auth/login", { email, password });
-      setUser(data.user);
-      setToken(data.token);
-      localStorage.setItem(AUTH_KEYS.TOKEN, data.token);
-      if (data.refreshToken) {
-        localStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
-      }
-      localStorage.setItem(AUTH_KEYS.USER, JSON.stringify(data.user));
-    } catch (error) {
-      throw error;
-    }
-  }, []);
+  const login = useCallback((email: string, password: string) =>
+    startSession("/auth/web/login", { email, password }), [startSession]);
 
   const register = useCallback(async (registerData: RegisterData) => {
-    await api.post("/auth/register", registerData);
+    await authApi.post("/auth/register", registerData);
   }, []);
 
   const verifyEmail = useCallback(async (email: string, code: string) => {
-    const { data } = await api.post("/auth/verify-email", { email, code });
-    setUser(data.user);
-    setToken(data.token);
-    localStorage.setItem(AUTH_KEYS.TOKEN, data.token);
-    if (data.refreshToken) localStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, data.refreshToken);
-    localStorage.setItem(AUTH_KEYS.USER, JSON.stringify(data.user));
-  }, []);
+    await startSession("/auth/web/verify-email", { email, code });
+  }, [startSession]);
 
   const resendVerification = useCallback(async (email: string) => {
-    await api.post("/auth/resend-verification", { email });
+    await authApi.post("/auth/resend-verification", { email });
   }, []);
 
   const logout = useCallback(() => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem(AUTH_KEYS.TOKEN);
-    localStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
-    localStorage.removeItem(AUTH_KEYS.USER);
-    api.post("/auth/logout").catch(() => {});
+    const current = getCurrentWebSession();
+    if (current) endWebSession(current);
   }, []);
 
   const updateUser = useCallback((updatedUser: Partial<User>) => {
-    setUser((prev) => {
-      if (!prev) return null;
-      const newUser = { ...prev, ...updatedUser };
-      localStorage.setItem(AUTH_KEYS.USER, JSON.stringify(newUser));
-      return newUser;
-    });
-  }, []);
+    const current = getCurrentWebSession();
+    if (current?.sessionId !== session?.sessionId || !current) return;
+    updateWebSession(current.sessionId, { user: { ...current.user, ...updatedUser } });
+  }, [session?.sessionId]);
 
   const isAdmin = user?.role === "LGU_ADMIN" || user?.role === "FIELD_WORKER";
   const isLguAdmin = user?.role === "LGU_ADMIN";

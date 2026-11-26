@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useState } from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { Button } from "@/components/ui/button";
+import { accountHome } from "@/lib/account-home";
+import { useAuth } from "@/providers/AuthProvider";
 import {
   MapPin,
   BarChart3,
@@ -109,6 +111,9 @@ const trustBadges = [
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, isLoading } = useAuth();
+  const portalHref = user ? accountHome(user.role) : null;
+  const portalLabel = user?.role === "CITIZEN" ? "Return to Citizen Portal" : "Return to Dashboard";
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -150,23 +155,31 @@ export default function HomePage() {
             </nav>
 
             <div className="hidden md:flex items-center space-x-3">
-              <Link href="/login">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 h-9"
-                >
-                  Login
+              {!isLoading && (portalHref ? (
+                <Button asChild size="sm">
+                  <Link href={portalHref}>{portalLabel}</Link>
                 </Button>
-              </Link>
-              <Link href="/register">
-                <Button
-                  size="sm"
-                  className="h-9 shadow-sm shadow-primary/15 hover:shadow-md hover:shadow-primary/20 transition-shadow duration-200"
-                >
-                  Get Started
-                </Button>
-              </Link>
+              ) : (
+                <>
+                  <Link href="/login">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 h-9"
+                    >
+                      Login
+                    </Button>
+                  </Link>
+                  <Link href="/register">
+                    <Button
+                      size="sm"
+                      className="h-9 shadow-sm shadow-primary/15 hover:shadow-md hover:shadow-primary/20 transition-shadow duration-200"
+                    >
+                      Get Started
+                    </Button>
+                  </Link>
+                </>
+              ))}
             </div>
 
             <button
@@ -210,20 +223,28 @@ export default function HomePage() {
               </a>
             </nav>
             <div className="mt-4 flex flex-col sm:flex-row gap-2">
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full border-gray-200 text-gray-700 hover:bg-gray-50"
-                >
-                  Login
+              {!isLoading && (portalHref ? (
+                <Button asChild size="sm">
+                  <Link href={portalHref} onClick={() => setMobileMenuOpen(false)}>{portalLabel}</Link>
                 </Button>
-              </Link>
-              <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
-                <Button size="sm" className="w-full">
-                  Get Started
-                </Button>
-              </Link>
+              ) : (
+                <>
+                  <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-gray-200 text-gray-700 hover:bg-gray-50"
+                    >
+                      Login
+                    </Button>
+                  </Link>
+                  <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
+                    <Button size="sm" className="w-full">
+                      Get Started
+                    </Button>
+                  </Link>
+                </>
+              ))}
             </div>
           </div>
         </div>
@@ -256,7 +277,7 @@ export default function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-                <Link href="/register">
+                <Link href={portalHref ?? "/register"}>
                   <Button
                     size="lg"
                     className="h-12 px-8 text-base font-semibold gap-2 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 transition-all duration-200"
@@ -399,24 +420,25 @@ export default function HomePage() {
             tracking cleanups across the city — completely free.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/register">
+            <Link href={portalHref ?? "/register"}>
               <Button
                 size="lg"
                 className="h-12 px-8 text-base font-semibold gap-2 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-200"
               >
-                Get Started Free
+                {portalHref ? portalLabel : "Get Started Free"}
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </Link>
-            <Link href="/login">
+            {!portalHref && (
               <Button
+                asChild
                 size="lg"
                 variant="outline"
                 className="h-12 px-8 text-base font-semibold border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300"
               >
-                Sign In
+                <Link href="/login">Sign In</Link>
               </Button>
-            </Link>
+            )}
           </div>
         </div>
       </section>
@@ -456,7 +478,7 @@ export default function HomePage() {
               <ul className="space-y-3 text-sm text-gray-500">
                 <li>
                   <Link
-                    href="/register"
+                    href={portalHref ?? "/register"}
                     className="hover:text-primary transition-colors"
                   >
                     Report Waste
@@ -488,20 +510,19 @@ export default function HomePage() {
               <ul className="space-y-3 text-sm text-gray-500">
                 <li>
                   <Link
-                    href="/login"
+                    href={portalHref ?? "/login"}
                     className="hover:text-primary transition-colors"
                   >
-                    Citizen Login
+                    {portalHref ? portalLabel : "Citizen Login"}
                   </Link>
                 </li>
-                <li>
-                  <Link
-                    href="/register"
-                    className="hover:text-primary transition-colors"
-                  >
-                    Create Account
-                  </Link>
-                </li>
+                {!portalHref && (
+                  <li>
+                    <Link href="/register" className="hover:text-primary transition-colors">
+                      Create Account
+                    </Link>
+                  </li>
+                )}
                 <li>
                   <Link
                     href="#"

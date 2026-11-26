@@ -116,6 +116,8 @@ model User {
   // Cleanup schedule worker assignments
   scheduleAssignments CleanupScheduleWorker[] @relation("AssignedSchedules")
 
+  webSessions WebSession[]
+
   @@index([role])
   @@index([role, isActive])
   @@index([email])
@@ -134,6 +136,17 @@ model EmailVerification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([expiresAt])
+}
+
+model WebSession {
+  id        String   @id @default(uuid())
+  userId    String
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId])
 }
 
 model Report {
