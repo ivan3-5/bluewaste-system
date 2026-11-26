@@ -882,7 +882,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: Image.file(
-                                  File(_images[index].path),
+                                  File(image.path),
+                                  semanticLabel: isSpam
+                                      ? "Photo ${index + 1}, flagged as spam"
+                                      : "Photo ${index + 1}",
                                   width:
                                       MediaQuery.of(context).size.width * 0.75,
                                   height: 220,
@@ -913,42 +916,42 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                                 ),
                               ),
                             ),
-                            Positioned(
-                              bottom: 8,
-                              left: 8,
-                              right: 8,
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                color: Colors.black.withValues(alpha: 0.8),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      isSpam
-                                          ? "Warning: spam detected. We suggest removing this photo."
-                                          : error ??
-                                                (result == null
-                                                    ? "Analyzing…"
-                                                    : result.severity.summary(
-                                                        result.hasWaste,
-                                                      )),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
+                            if (!isSpam || error != null)
+                              Positioned(
+                                bottom: 8,
+                                left: 8,
+                                right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  color: Colors.black.withValues(alpha: 0.8),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        error ??
+                                            (result == null
+                                                ? "Analyzing…"
+                                                : result.severity.summary(
+                                                    result.hasWaste,
+                                                  )),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                        ),
                                       ),
-                                    ),
-                                    if (error != null)
-                                      TextButton(
-                                        onPressed: _isSubmitting
-                                            ? null
-                                            : () => _runDetection(image),
-                                        child: const Text("Retry analysis"),
-                                      ),
-                                  ],
+                                      if (error != null)
+                                        TextButton(
+                                          onPressed: _isSubmitting
+                                              ? null
+                                              : () => _runDetection(image),
+                                          child: const Text("Retry analysis"),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
                             Positioned(
                               top: 10,
                               right: 10,
@@ -977,6 +980,16 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   },
                 ),
               ),
+              if (_isSpamFlagged) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Semantics(
+                  liveRegion: true,
+                  child: const Text(
+                    "Warning: Keeping a spam photo will flag this report as spam. We suggest removing it.",
+                    style: TextStyle(color: AppColors.destructive),
+                  ),
+                ),
+              ],
               if (_detectionError case final error?) ...[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
@@ -1221,14 +1234,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               const SizedBox(height: AppSpacing.xs),
               Text(
                 missingRequirements.isEmpty
-                    ? _isSpamFlagged
-                          ? "⚠️ Submitting as spam-flagged report."
-                          : "Ready to submit. Please review details before sending."
+                    ? "Ready to submit. Please review details before sending."
                     : "Complete required fields: ${missingRequirements.join(", ")}",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: _isSpamFlagged
-                      ? AppColors.destructive
-                      : AppColors.mutedForeground,
+                  color: AppColors.mutedForeground,
                 ),
               ),
             ],

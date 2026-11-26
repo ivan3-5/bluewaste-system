@@ -216,8 +216,10 @@ export default function SubmitReportPage() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [photos, setPhotos] = useState<File[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const imageFile = photos[0] ?? null;
-  const imagePreview = usePhotoUrl(imageFile);
+  const previewPhoto = selectedPhoto ?? imageFile;
+  const imagePreview = usePhotoUrl(previewPhoto);
   const [savedReportId, setSavedReportId] = useState<string | null>(null);
   const [uploadedCount, setUploadedCount] = useState(0);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
@@ -368,6 +370,7 @@ export default function SubmitReportPage() {
   };
 
   const removePhoto = (index: number) => {
+    if (photos[index] === selectedPhoto) setSelectedPhoto(null);
     setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
     setFileError("");
   };
@@ -622,6 +625,7 @@ export default function SubmitReportPage() {
                 setIsSubmittedSuccess(false);
                 setCountdownSeconds(3);
                 setPhotos([]);
+                setSelectedPhoto(null);
                 setSavedReportId(null);
                 setUploadedCount(0);
                 resetPrimaryAnalysis();
@@ -787,11 +791,12 @@ export default function SubmitReportPage() {
                     </div>
                   )}
                 </div>
-                {imagePreview && (
+                {imagePreview && previewPhoto && (
                   <DetectionImageOverlay
+                    key={imagePreview}
                     imageSrc={imagePreview}
                     alt="Selected waste"
-                    detections={imageFile ? photoAnalysis.get(imageFile)?.result?.detections || [] : []}
+                    detections={photoAnalysis.get(previewPhoto)?.result?.detections ?? []}
                     imageClassName="w-full h-auto max-h-80 object-contain bg-gray-50"
                   />
                 )}
@@ -799,6 +804,8 @@ export default function SubmitReportPage() {
                   <p className="text-xs text-gray-600">Every photo is analyzed. Remove any spam photos before submitting.</p>
                   <ReportPhotoThumbnails
                     files={photos}
+                    onSelect={setSelectedPhoto}
+                    selectedFile={previewPhoto}
                     showPrimary
                     analysis={photos.map((photo) => {
                       const entry = photoAnalysis.get(photo);
@@ -809,7 +816,7 @@ export default function SubmitReportPage() {
                     onRetry={isSubmitting ? undefined : (index) => retryPhoto(photos[index])}
                     onRemove={isSubmitting ? undefined : removePhoto}
                   />
-                  {hasSpamPhotos && <p role="alert" className="text-xs text-red-700">Keeping a spam photo will flag this report as spam. We suggest removing it.</p>}
+                  {hasSpamPhotos && <p role="alert" className="text-xs text-red-700">Warning: Keeping a spam photo will flag this report as spam. We suggest removing it.</p>}
                   {fileError && <p role="alert" className="text-xs text-red-700">{fileError}</p>}
                 </div>
               </div>
