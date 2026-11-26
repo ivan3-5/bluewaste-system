@@ -8,6 +8,7 @@ import { useCreateReport, useUploadReportImages } from "@/hooks/useReports";
 import { dbSeverityToAiLabel, formatWasteAnalysis, severityFromWasteCount, type DbSeverity } from "@/lib/severity";
 import { useReportingZones, isPointInAnyZone } from "@/hooks/useReportingZones";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { analyzePendingPhotos } from "@/lib/report-photo-analysis";
 import { MAX_REPORT_PHOTOS, REPORT_PHOTO_ACCEPT, selectReportPhotos } from "@/lib/report-photos";
 import { ReportPhotoThumbnails, usePhotoUrl } from "@/components/reports/ReportPhotoThumbnails";
 import { DetectionBox } from "@/lib/waste-classification";
@@ -141,6 +142,7 @@ async function requestAnalyzeWaste(
       const payload = {
         label,
         is_waste: isWaste,
+        has_waste: isWaste,
         severity: isWaste ? null : null,
         message: isWaste ? "Coastal waste detected." : "Area is clean.",
         // compatibility fields used by the client
@@ -219,7 +221,7 @@ export default function SubmitReportPage() {
   const [photos, setPhotos] = useState<File[]>([]);
   const imageFile = photos[0] ?? null;
   const imagePreview = usePhotoUrl(imageFile);
-  const analysisRequest = useRef(0);
+  const [photoAnalysis, setPhotoAnalysis] = useState<Map<File, { result?: AnalyzeWasteResult; error?: string }>>(new Map());
   const [savedReportId, setSavedReportId] = useState<string | null>(null);
   const [uploadedCount, setUploadedCount] = useState(0);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
@@ -236,11 +238,20 @@ export default function SubmitReportPage() {
   const [locationError, setLocationError] = useState("");
   const [locationStatus, setLocationStatus] = useState("");
 
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] =
-    useState<AnalyzeWasteResult | null>(null);
-  const [analysisError, setAnalysisError] = useState("");
-  const [decisionMessage, setDecisionMessage] = useState("");
+  const isAnalyzing = photos.some((photo) => !photoAnalysis.has(photo));
+  const analysisReady = photos.length > 0 && photos.every((photo) => !!photoAnalysis.get(photo)?.result);
+  // Use the strongest single view; summing different angles would count waste twice.
+  const analysisResult = photos.reduce<AnalyzeWasteResult | null>((best, photo) => {
+    const result = photoAnalysis.get(photo)?.result;
+    return result && (!best || result.wasteCount > best.wasteCount) ? result : best;
+  }, null);
+  const analysisError = photos.map((photo) => photoAnalysis.get(photo)?.error).filter(Boolean).join(" ");
+  const decisionMessage = photos.some((photo) => photoAnalysis.get(photo)?.result?.decision.retakeRecommended)
+    ? "Please retake unclear photos for a better analysis." : "";
+  const hasSpamPhotos = photos.some((photo) => {
+    const result = photoAnalysis.get(photo)?.result;
+    return result && (!result.has_waste || result.severity === "SPAM");
+  });
 
   const [fileError, setFileError] = useState("");
   const [submitError, setSubmitError] = useState("");
@@ -276,6 +287,7 @@ export default function SubmitReportPage() {
   const canSubmit = useMemo(
     () =>
       !!imageFile &&
+      analysisReady &&
       !!location &&
       locationConfirmed &&
       selectedCategory !== "" &&
@@ -284,6 +296,7 @@ export default function SubmitReportPage() {
       !outsideZone,
     [
       imageFile,
+      analysisReady,
       location,
       locationConfirmed,
       selectedCategory,
@@ -293,25 +306,24 @@ export default function SubmitReportPage() {
     ],
   );
 
-  // Auto-run analysis when a new image is selected and user is authenticated.
-  // Small delay gives the browser time to create the preview and for
-  // `requestCurrentLocation()` to start fetching coordinates.
+  // Run sequentially to respect provider limits. Cleanup discards removed photos
+  // and stale responses when the selection or authenticated session changes.
   useEffect(() => {
-    if (!imageFile) return;
-    if (!token) return;
-    if (analysisResult) return; // already analyzed
-    if (isAnalyzing || analysisError || savedReportId) return;
-
-    const timer = setTimeout(() => {
-      // Fire and forget — handleAnalyzeWaste manages its own state and errors
-      handleAnalyzeWaste();
-    }, 300);
-
-    return () => clearTimeout(timer);
-    // Intentionally exclude handleAnalyzeWaste from deps to avoid re-creating
-    // the timeout when the function identity changes; rely on state deps above.
+    if (!token || savedReportId) return;
+    let cancelled = false;
+    void analyzePendingPhotos(
+      photos, photoAnalysis, analyzeWasteImage,
+      (photo, entry) => setPhotoAnalysis((current) => new Map(current).set(photo, entry)),
+      () => cancelled,
+    );
+    return () => { cancelled = true; };
+    // Results are cached by File identity; selection changes restart only pending work.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFile, token, analysisResult, isAnalyzing, analysisError, savedReportId]);
+  }, [photos, token, savedReportId]);
+
+  useEffect(() => {
+    setSelectedCategory(analysisReady && analysisResult ? mapAnalysisToBucket(analysisResult) : "");
+  }, [analysisReady, analysisResult]);
 
   const requestCurrentLocation = () => {
     setIsLocating(true);
@@ -352,11 +364,7 @@ export default function SubmitReportPage() {
   };
 
   const resetPrimaryAnalysis = () => {
-    analysisRequest.current++;
-    setIsAnalyzing(false);
-    setAnalysisError("");
-    setDecisionMessage("");
-    setAnalysisResult(null);
+    setPhotoAnalysis(new Map());
     setSelectedCategory("");
   };
 
@@ -380,7 +388,6 @@ export default function SubmitReportPage() {
   const removePhoto = (index: number) => {
     setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
     setFileError("");
-    if (index === 0) resetPrimaryAnalysis();
   };
 
   const openCameraPicker = () => {
@@ -389,7 +396,7 @@ export default function SubmitReportPage() {
     cameraInputRef.current.click();
   };
 
-  const analyzeWasteImage = async (): Promise<AnalyzeWasteResult> => {
+  const analyzeWasteImage = async (imageFile: File): Promise<AnalyzeWasteResult> => {
     if (!imageFile) {
       throw new Error("Select an image first.");
     }
@@ -452,34 +459,6 @@ export default function SubmitReportPage() {
     };
   };
 
-  const handleAnalyzeWaste = async () => {
-    const request = ++analysisRequest.current;
-    setIsAnalyzing(true);
-    setAnalysisError("");
-    setDecisionMessage("");
-
-    try {
-      const result = await analyzeWasteImage();
-      if (request !== analysisRequest.current) return;
-
-      setAnalysisResult(result);
-      setSelectedCategory(mapAnalysisToBucket(result));
-      if (result.decision.retakeRecommended) {
-        setDecisionMessage(
-          "Please retake the photo for a clearer analysis.",
-        );
-      }
-    } catch (error) {
-      if (request !== analysisRequest.current) return;
-      setAnalysisResult(null);
-      setAnalysisError(
-        error instanceof Error ? error.message : "Failed to analyze image.",
-      );
-    } finally {
-      if (request === analysisRequest.current) setIsAnalyzing(false);
-    }
-  };
-
   const finishPhotoUpload = async (reportId: string) => {
     await uploadImages.mutateAsync({
       reportId,
@@ -518,6 +497,10 @@ export default function SubmitReportPage() {
       setSubmitError("Please add a photo before submitting.");
       return;
     }
+    if (!analysisReady) {
+      setSubmitError("Wait for every photo to be analyzed. Retry or remove failed photos.");
+      return;
+    }
     if (!location) {
       setSubmitError("Location is required.");
       return;
@@ -542,9 +525,7 @@ export default function SubmitReportPage() {
       return;
     }
 
-    // Allow submitting reports marked as `no_waste` — backend will auto-mark
-    // them as spam after images are uploaded (auto analysis). We no longer
-    // block submission for `no_waste` so spam detection runs server-side.
+    // Retained spam photos are flagged for review by the backend.
 
     const trimmedDescription = description.trim();
     if (trimmedDescription.length > 0 && trimmedDescription.length < 10) {
@@ -556,7 +537,7 @@ export default function SubmitReportPage() {
 
     setIsSubmitting(true);
     setSubmitError("");
-    setDecisionMessage("");
+
 
     try {
       const categoryBucketLabel = WASTE_BUCKET_LABELS[selectedCategory];
@@ -572,6 +553,8 @@ export default function SubmitReportPage() {
         latitude: location.lat,
         longitude: location.lng,
         isAnonymous: isAnonymous,
+        isSpamFlagged: hasSpamPhotos,
+        spamReason: hasSpamPhotos ? "One or more attached photos were flagged as spam during image analysis." : undefined,
         // Analysis data from the client-side YOLO /analyze pipeline
         severity: severityToSave,
         analysisStatus: analysisResult?.status ?? null,
@@ -662,7 +645,7 @@ export default function SubmitReportPage() {
                 setLocationConfirmed(false);
                 setDescription("");
                 setSelectedCategory("");
-                setAnalysisResult(null);
+
               }}
             >
               Submit Another Report
@@ -825,17 +808,28 @@ export default function SubmitReportPage() {
                   <DetectionImageOverlay
                     imageSrc={imagePreview}
                     alt="Selected waste"
-                    detections={analysisResult?.detections || []}
+                    detections={imageFile ? photoAnalysis.get(imageFile)?.result?.detections || [] : []}
                     imageClassName="w-full h-auto max-h-80 object-contain bg-gray-50"
                   />
                 )}
                 <div className="space-y-2 border-t p-3">
-                  <p className="text-xs text-gray-600">The first photo is used for waste analysis.</p>
+                  <p className="text-xs text-gray-600">Every photo is analyzed. Remove any spam photos before submitting.</p>
                   <ReportPhotoThumbnails
                     files={photos}
                     showPrimary
+                    analysis={photos.map((photo) => {
+                      const entry = photoAnalysis.get(photo);
+                      return !entry ? { status: "pending" as const }
+                        : entry.error ? { status: "error" as const, message: entry.error }
+                        : { status: entry.result && (!entry.result.has_waste || entry.result.severity === "SPAM") ? "spam" as const : "complete" as const };
+                    })}
+                    onRetry={isSubmitting ? undefined : (index) => {
+                      setPhotoAnalysis((current) => { const next = new Map(current); next.delete(photos[index]); return next; });
+                      setPhotos((current) => [...current]);
+                    }}
                     onRemove={isSubmitting ? undefined : removePhoto}
                   />
+                  {hasSpamPhotos && <p role="alert" className="text-xs text-red-700">Keeping a spam photo will flag this report as spam. We suggest removing it.</p>}
                   {fileError && <p role="alert" className="text-xs text-red-700">{fileError}</p>}
                 </div>
               </div>
@@ -848,7 +842,7 @@ export default function SubmitReportPage() {
                     Waste Analysis
                   </span>
                   <span className="ml-auto text-[11px] text-gray-400">
-                    Optional — helps auto-fill waste type
+                    All photos must finish analysis
                   </span>
                 </div>
                 <div className="space-y-3 p-4">

@@ -6,6 +6,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getApiErrorMessage } from "@/lib/apiError";
+import { analyzePendingPhotos } from "@/lib/report-photo-analysis";
 import { MAX_REPORT_PHOTOS, REPORT_PHOTO_ACCEPT, selectReportPhotos } from "@/lib/report-photos";
 import { AnalysisSummary } from "@/components/AnalysisSummary";
 import { ReportPhotoThumbnails, usePhotoUrl } from "@/components/reports/ReportPhotoThumbnails";
@@ -33,6 +34,14 @@ interface GeminiAnalysisResult {
   hasWaste: boolean;
   wasteCount: number;
   reportId: string;
+  cached?: boolean;
+}
+
+interface PhotoResult {
+  hasWaste: boolean;
+  wasteCount: number;
+  model: string;
+  categories: string[];
   cached?: boolean;
 }
 
@@ -64,6 +73,9 @@ export default function ReportWastePage() {
   const [outsideZone, setOutsideZone] = useState(false);
 
   const [photos, setPhotos] = useState<File[]>([]);
+  const [photoAnalysis, setPhotoAnalysis] = useState<Map<File, { result?: PhotoResult; error?: string }>>(new Map());
+  const analysisReady = photos.length > 0 && photos.every((photo) => !!photoAnalysis.get(photo)?.result);
+  const photosPending = photos.some((photo) => !photoAnalysis.has(photo));
   const imageFile = photos[0] ?? null;
   const previewUrl = usePhotoUrl(imageFile);
   const [savedReport, setSavedReport] = useState<GeminiAnalysisResult | null>(null);
@@ -124,6 +136,27 @@ export default function ReportWastePage() {
     setPhotos((current) => [...current, ...selection.photos].slice(0, MAX_REPORT_PHOTOS));
   };
 
+  useEffect(() => {
+    if (!token || savedReport) return;
+    let cancelled = false;
+    void analyzePendingPhotos(photos, photoAnalysis, async (photo): Promise<PhotoResult> => {
+      const formData = new FormData();
+      formData.append("image", photo);
+      formData.append("latitude", String(latitude ?? 0));
+      formData.append("longitude", String(longitude ?? 0));
+      if (user?.id) formData.append("citizenId", user.id);
+      const response = await fetch("/api/ai/analyze-report", {
+        method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || data.error || "Failed to analyze image");
+      return data;
+    }, (photo, entry) => setPhotoAnalysis((current) => new Map(current).set(photo, entry)), () => cancelled);
+    return () => { cancelled = true; };
+    // Cache results by file; retry and selection changes only process missing results.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photos, token, savedReport]);
+
   const finishPhotoUpload = async (report: GeminiAnalysisResult) => {
     await uploadImages.mutateAsync({
       reportId: report.reportId,
@@ -140,6 +173,7 @@ export default function ReportWastePage() {
     setSavedReport(null);
     setUploadedCount(0);
     setPhotos([]);
+    setPhotoAnalysis(new Map());
     setError("");
     setDescription("");
   };
@@ -214,27 +248,12 @@ export default function ReportWastePage() {
     setResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append("image", imageFile);
-      formData.append("latitude", String(latitude));
-      formData.append("longitude", String(longitude));
-      if (description.trim().length > 0) {
-        formData.append("description", description.trim());
+      if (!analysisReady) {
+        throw new Error("Wait for all photos to be checked. Retry or remove failed photos.");
       }
-      if (user?.id) {
-        formData.append("citizenId", user.id);
-      }
-
-      const response = await fetch("/api/ai/analyze-report", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || "Failed to analyze image");
-      }
+      const analyses = photos.map((photo) => photoAnalysis.get(photo)!.result!);
+      const data = analyses.reduce((best, current) => current.wasteCount > best.wasteCount ? current : best);
+      const hasSpamPhotos = analyses.some((analysis) => !analysis.hasWaste);
 
       const rawCategoryLabel = data.categories?.[0] ? (CATEGORY_LABELS[data.categories[0]] ?? data.categories[0]) : (data.hasWaste ? "With Waste" : "No Waste");
       const reportTitle = (rawCategoryLabel === "With Waste" || rawCategoryLabel === "No Waste")
@@ -253,6 +272,8 @@ export default function ReportWastePage() {
         longitude: longitude,
         address: address.trim().length > 0 ? address.trim() : undefined,
         isAnonymous: isAnonymous,
+        isSpamFlagged: hasSpamPhotos,
+        spamReason: hasSpamPhotos ? "One or more attached photos were flagged as spam during image analysis." : undefined,
         severity,
         analysisStatus: data.hasWaste ? "DIRTY" : "CLEAN",
         analysisWasteCount: detectedWasteCount,
@@ -285,7 +306,7 @@ export default function ReportWastePage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Waste Analysis</h1>
             <p className="text-sm text-gray-600">
-              Attach up to five photos. The first photo is used for waste analysis.
+              Attach up to five photos. Every photo is analyzed before submission.
             </p>
           </div>
           <Link href="/my-reports">
@@ -435,6 +456,16 @@ JPG, PNG or WEBP · 4 MB each
             <ReportPhotoThumbnails
               files={photos}
               showPrimary
+              analysis={photos.map((photo) => {
+                const entry = photoAnalysis.get(photo);
+                return !entry ? { status: "pending" as const }
+                  : entry.error ? { status: "error" as const, message: entry.error }
+                  : { status: entry.result?.hasWaste ? "complete" as const : "spam" as const };
+              })}
+              onRetry={isAnalyzing || savedReport ? undefined : (index) => {
+                setPhotoAnalysis((current) => { const next = new Map(current); next.delete(photos[index]); return next; });
+                setPhotos((current) => [...current]);
+              }}
               onRemove={isAnalyzing || savedReport ? undefined : (index) => {
                 setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
                 setError("");
@@ -446,6 +477,9 @@ JPG, PNG or WEBP · 4 MB each
               </p>
             )}
 
+            {photos.some((photo) => photoAnalysis.get(photo)?.result?.hasWaste === false) && <p role="alert" className="text-sm text-red-700">Keeping a spam photo will flag this report as spam. We suggest removing it.</p>}
+            {photosPending && <p role="status" className="text-sm text-gray-600">Analyzing all photos…</p>}
+
             {/* Error */}
             {error && (
               <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>
@@ -456,21 +490,21 @@ JPG, PNG or WEBP · 4 MB each
               id="analyze-submit-btn"
               onClick={handleAnalyzeAndSubmit}
               disabled={
-                isAnalyzing || !!result || (!savedReport && (!imageFile || !zonesLoaded || outsideZone || latitude === null))
+                isAnalyzing || !!result || (!savedReport && (!analysisReady || !imageFile || !zonesLoaded || outsideZone || latitude === null))
               }
               className="w-full"
             >
               {isAnalyzing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {savedReport ? "Uploading photos…" : "Analyzing image…"}
+                  {savedReport ? "Uploading photos…" : "Submitting report…"}
                 </>
               ) : savedReport && !result ? (
                 "Retry Photo Upload"
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Analyze &amp; Submit Report
+                  Submit Report
                 </>
               )}
             </Button>
