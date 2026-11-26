@@ -16,6 +16,7 @@ const ADMIN_PAGE_TITLES: Record<string, string> = {
   "/dashboard/schedules": "Cleanup Schedules",
   "/dashboard/map": "Waste Map",
   "/dashboard/users": "User Management",
+  "/dashboard/activity-logs": "Activity Logs",
   "/dashboard/notifications": "Notifications",
   "/dashboard/profile": "Profile Settings",
 };
@@ -166,11 +167,18 @@ export function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               />
               {isLGUAdmin && (
-                <MobileLink
-                  href="/dashboard/analytics"
-                  label="Analytics"
-                  onClick={() => setMobileMenuOpen(false)}
-                />
+                <>
+                  <MobileLink
+                    href="/dashboard/analytics"
+                    label="Analytics"
+                    onClick={() => setMobileMenuOpen(false)}
+                  />
+                  <MobileLink
+                    href="/dashboard/activity-logs"
+                    label="Activity Logs"
+                    onClick={() => setMobileMenuOpen(false)}
+                  />
+                </>
               )}
               <MobileLink
                 href="/dashboard/notifications"

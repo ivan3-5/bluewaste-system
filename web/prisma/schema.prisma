@@ -73,6 +73,15 @@ enum Severity {
   SPAM
 }
 
+enum ActivityCategory {
+  AUTH
+  USER
+  REPORT
+  SCHEDULE
+  ZONE
+  SYSTEM
+}
+
 // ==================== MODELS ====================
 
 model User {
@@ -101,6 +110,7 @@ model User {
   createdSchedules     CleanupSchedule[]       @relation("ScheduleCreator")
   verifiedSchedules    CleanupSchedule[]       @relation("ScheduleVerifier")
   scheduleAssignments  CleanupScheduleWorker[] @relation("AssignedSchedules")
+  activityLogs         ActivityLog[]
 
   webSessions WebSession[]
 
@@ -244,6 +254,30 @@ model Notification {
   @@index([userId, isRead])
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+model ActivityLog {
+  id          String           @id @default(uuid())
+  userId      String?
+  userName    String
+  userRole    String
+  action      String
+  category    ActivityCategory
+  description String
+  entityType  String?
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([userRole])
+  @@index([category])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([category, createdAt(sort: Desc)])
 }
 
 model ReportingZone {

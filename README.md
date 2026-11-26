@@ -235,3 +235,7 @@ npm run db:studio
 
 - `vercel.json` rewrites `/api/*` to the backend serverless function while Next.js handles frontend routes directly.
 - In production, set environment variables in your hosting provider (Vercel, Render, etc.).
+
+## Feature Documentation
+
+- **Activity Log**: See [docs/ACTIVITY_LOG.md](docs/ACTIVITY_LOG.md) for the database schema, tracked events, RBAC-restricted API endpoints, and admin dashboard UI.

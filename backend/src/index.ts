@@ -19,6 +19,7 @@ import uploadRoutes from "./routes/upload.routes";
 import reportingZoneRoutes from "./routes/reportingZone.routes";
 import analyticsRoutes from "./routes/analytics.routes";
 import scheduleRoutes from "./routes/schedule.routes";
+import activityLogRoutes from "./routes/activity-log.routes";
 
 const app = express();
 
@@ -145,6 +146,7 @@ app.use("/api/v1/upload", uploadRoutes);
 app.use("/api/v1/reporting-zones", reportingZoneRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/schedules", scheduleRoutes);
+app.use("/api/v1/activity-logs", activityLogRoutes);
 
 // ---------------------------------------------------------------------------
 // Backward-compatible aliases (/api/*) — kept so existing clients don't break.
@@ -163,6 +165,7 @@ app.use("/api/upload", deprecationMiddleware, uploadRoutes);
 app.use("/api/reporting-zones", deprecationMiddleware, reportingZoneRoutes);
 app.use("/api/analytics", deprecationMiddleware, analyticsRoutes);
 app.use("/api/schedules", deprecationMiddleware, scheduleRoutes);
+app.use("/api/activity-logs", deprecationMiddleware, activityLogRoutes);
 
 // Error handler
 app.use(errorHandler);

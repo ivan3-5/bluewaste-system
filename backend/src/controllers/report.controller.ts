@@ -3,6 +3,7 @@ import { ReportCrudService } from "../services/report-crud.service";
 import { ReportGeoService } from "../services/report-geo.service";
 import { ReportSpamService } from "../services/report-spam.service";
 import { REPORT_PHOTO_LIMIT_MESSAGE, ReportImageService } from "../services/report-image.service";
+import { ActivityLogService, formatActorName } from "../services/activity-log.service";
 import { AuthRequest } from "../middleware/auth";
 import { handleControllerError, QueryFilters, sendError } from "../utils/http";
 
@@ -38,6 +39,26 @@ export class ReportController {
             ? req.body.yoloConfidence
             : undefined,
       });
+      await ActivityLogService.log({
+        userId: report.isAnonymous ? null : req.user?.id ?? null,
+        userName: report.isAnonymous
+          ? "Anonymous Citizen"
+          : req.user
+            ? formatActorName(req.user)
+            : "Anonymous Citizen",
+        userRole: req.user?.role ?? "ANONYMOUS",
+        action: "REPORT_SUBMITTED",
+        category: "REPORT",
+        description: `Submitted waste report "${report.title}"`,
+        entityType: "Report",
+        entityId: report.id,
+        metadata: {
+          category: report.category,
+          severity: report.severity,
+          isSpam: report.isSpam,
+          isAnonymous: report.isAnonymous,
+        },
+      });
       res.status(201).json(report);
     } catch (error) {
       handleControllerError(res, error, "Failed to create report", "REPORT_CREATE_FAILED");
@@ -62,6 +83,29 @@ export class ReportController {
         req.user!.id,
         notes,
       );
+      const action =
+        status === "VERIFIED"
+          ? "REPORT_VERIFIED"
+          : status === "REJECTED"
+            ? "REPORT_REJECTED"
+            : "REPORT_STATUS_UPDATED";
+      const description =
+        status === "VERIFIED"
+          ? `Verified waste report "${report.title}"`
+          : status === "REJECTED"
+            ? `Rejected waste report "${report.title}"`
+            : `Updated waste report "${report.title}" status to ${status}`;
+      await ActivityLogService.log({
+        userId: req.user?.id,
+        userName: formatActorName(req.user),
+        userRole: req.user?.role,
+        action,
+        category: "REPORT",
+        description,
+        entityType: "Report",
+        entityId: report.id,
+        metadata: { newStatus: status, notes: notes ?? undefined },
+      });
       res.json(report);
     } catch (error) {
       handleControllerError(
@@ -91,6 +135,22 @@ export class ReportController {
         workerIds !== undefined ? workerIds : assignedToId,
         req.user!.id,
       );
+      const assignedIds = Array.isArray(workerIds)
+        ? workerIds
+        : assignedToId
+          ? [assignedToId]
+          : [];
+      await ActivityLogService.log({
+        userId: req.user?.id,
+        userName: formatActorName(req.user),
+        userRole: req.user?.role,
+        action: "REPORT_ASSIGNED",
+        category: "REPORT",
+        description: `Assigned ${assignedIds.length} field worker(s) to report "${report?.title ?? req.params.id}"`,
+        entityType: "Report",
+        entityId: req.params.id,
+        metadata: { workerIds: assignedIds },
+      });
       res.json(report);
     } catch (error) {
       handleControllerError(res, error, "Failed to assign worker", "REPORT_ASSIGN_FAILED");
@@ -215,6 +275,16 @@ export class ReportController {
   static async restoreSpam(req: AuthRequest, res: Response) {
     try {
       const report = await ReportSpamService.restoreSpam(req.params.id);
+      await ActivityLogService.log({
+        userId: req.user?.id,
+        userName: formatActorName(req.user),
+        userRole: req.user?.role,
+        action: "SPAM_REPORT_RESTORED",
+        category: "REPORT",
+        description: `Restored spam report "${report.title}"`,
+        entityType: "Report",
+        entityId: report.id,
+      });
       res.json(report);
     } catch (error) {
       handleControllerError(
@@ -228,7 +298,17 @@ export class ReportController {
 
   static async delete(req: AuthRequest, res: Response) {
     try {
-      await ReportCrudService.softDelete(req.params.id);
+      const deleted = await ReportCrudService.softDelete(req.params.id);
+      await ActivityLogService.log({
+        userId: req.user?.id,
+        userName: formatActorName(req.user),
+        userRole: req.user?.role,
+        action: "REPORT_DELETED",
+        category: "REPORT",
+        description: `Deleted waste report "${deleted.title}"`,
+        entityType: "Report",
+        entityId: req.params.id,
+      });
       res.json({ message: "Report deleted successfully" });
     } catch (error) {
       handleControllerError(res, error, "Failed to delete report", "REPORT_DELETE_FAILED");

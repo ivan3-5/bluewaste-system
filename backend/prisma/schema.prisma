@@ -72,6 +72,15 @@ enum Severity {
   SPAM
 }
 
+enum ActivityCategory {
+  AUTH
+  USER
+  REPORT
+  SCHEDULE
+  ZONE
+  SYSTEM
+}
+
 // ==================== MODELS ====================
 
 model User {
@@ -103,8 +112,7 @@ model User {
   // Notifications for the user
   notifications   Notification[]
   // Activity logs
-  // Activity logs
-  // (ActivityLog model removed)
+  activityLogs    ActivityLog[]
   // AI-assisted waste detections
   // (WasteReport model removed)
   // Reporting zones created by admin
@@ -269,7 +277,29 @@ model Notification {
   @@index([createdAt])
 }
 
-// ActivityLog and WasteReport models removed via migration.
+model ActivityLog {
+  id          String           @id @default(uuid())
+  userId      String?
+  userName    String
+  userRole    String
+  action      String
+  category    ActivityCategory
+  description String
+  entityType  String?
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([userRole])
+  @@index([category])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([category, createdAt(sort: Desc)])
+}
 
 model ReportingZone {
   id          String   @id @default(uuid())
@@ -383,4 +413,4 @@ model WasteIncident {
   @@index([latitude, longitude])
   @@index([createdAt])
   @@index([category, isResolved])
-}
+}

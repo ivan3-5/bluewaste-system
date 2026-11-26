@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { ScheduleService } from "../services/schedule.service";
+import { ActivityLogService, formatActorName } from "../services/activity-log.service";
 import { AuthRequest } from "../middleware/auth";
 import { handleControllerError, QueryFilters } from "../utils/http";
 
@@ -7,6 +8,21 @@ export class ScheduleController {
   static async create(req: AuthRequest, res: Response) {
     try {
       const schedule = await ScheduleService.create(req.body, req.user!.id);
+      await ActivityLogService.log({
+        userId: req.user?.id,
+        userName: formatActorName(req.user),
+        userRole: req.user?.role,
+        action: "SCHEDULE_CREATED",
+        category: "SCHEDULE",
+        description: `Created cleanup schedule "${schedule.title}" (${schedule.barangay})`,
+        entityType: "CleanupSchedule",
+        entityId: schedule.id,
+        metadata: {
+          barangay: schedule.barangay,
+          scheduledAt: schedule.scheduledAt,
+          workerCount: schedule.workers?.length ?? 0,
+        },
+      });
       res.status(201).json(schedule);
     } catch (error) {
       handleControllerError(
@@ -34,6 +50,17 @@ export class ScheduleController {
         req.body,
         req.user!.id,
       );
+      await ActivityLogService.log({
+        userId: req.user?.id,
+        userName: formatActorName(req.user),
+        userRole: req.user?.role,
+        action: "SCHEDULE_UPDATED",
+        category: "SCHEDULE",
+        description: `Updated cleanup schedule "${schedule.title}"`,
+        entityType: "CleanupSchedule",
+        entityId: schedule.id,
+        metadata: { updatedFields: Object.keys(req.body || {}) },
+      });
       res.json(schedule);
     } catch (error) {
       handleControllerError(
@@ -55,6 +82,17 @@ export class ScheduleController {
         notes,
         req.user!.role === "FIELD_WORKER",
       );
+      await ActivityLogService.log({
+        userId: req.user?.id,
+        userName: formatActorName(req.user),
+        userRole: req.user?.role,
+        action: "SCHEDULE_STATUS_UPDATED",
+        category: "SCHEDULE",
+        description: `Updated cleanup schedule "${schedule.title}" status to ${status}`,
+        entityType: "CleanupSchedule",
+        entityId: schedule.id,
+        metadata: { status, notes: notes ?? undefined },
+      });
       res.json(schedule);
     } catch (error) {
       handleControllerError(
@@ -69,6 +107,16 @@ export class ScheduleController {
   static async delete(req: AuthRequest, res: Response) {
     try {
       await ScheduleService.delete(req.params.id);
+      await ActivityLogService.log({
+        userId: req.user?.id,
+        userName: formatActorName(req.user),
+        userRole: req.user?.role,
+        action: "SCHEDULE_DELETED",
+        category: "SCHEDULE",
+        description: `Deleted cleanup schedule (${req.params.id})`,
+        entityType: "CleanupSchedule",
+        entityId: req.params.id,
+      });
       res.json({ message: "Schedule deleted successfully" });
     } catch (error) {
       handleControllerError(

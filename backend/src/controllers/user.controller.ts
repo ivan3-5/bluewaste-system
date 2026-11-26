@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import { UserService } from "../services/user.service";
+import { ActivityLogService, formatActorName } from "../services/activity-log.service";
 import { handleControllerError, QueryFilters } from "../utils/http";
 import type { UserReportHistoryQuery, UserScheduleHistoryQuery } from "../validators/user.validator";
 
@@ -53,6 +54,17 @@ export class UserController {
   static async createUser(req: AuthRequest, res: Response) {
     try {
       const user = await UserService.createUser(req.body);
+      await ActivityLogService.log({
+        userId: req.user?.id,
+        userName: formatActorName(req.user),
+        userRole: req.user?.role,
+        action: "USER_CREATED",
+        category: "USER",
+        description: `Created ${user.role.toLowerCase().replace("_", " ")} account for ${formatActorName(user)}`,
+        entityType: "User",
+        entityId: user.id,
+        metadata: { targetEmail: user.email, targetRole: user.role },
+      });
       res.status(201).json(user);
     } catch (error) {
       handleControllerError(res, error, "Failed to create user", "USER_CREATE_FAILED");
@@ -63,6 +75,31 @@ export class UserController {
     try {
       const { id } = req.params;
       const user = await UserService.updateUser(id, req.body, req.user?.id);
+      const isActivationChange = typeof req.body?.isActive === "boolean";
+      const action = isActivationChange
+        ? req.body.isActive
+          ? "USER_ACTIVATED"
+          : "USER_DEACTIVATED"
+        : "USER_UPDATED";
+      const description = isActivationChange
+        ? `${req.body.isActive ? "Activated" : "Deactivated"} account for ${formatActorName(user)}`
+        : `Updated user account for ${formatActorName(user)}`;
+
+      await ActivityLogService.log({
+        userId: req.user?.id,
+        userName: formatActorName(req.user),
+        userRole: req.user?.role,
+        action,
+        category: "USER",
+        description,
+        entityType: "User",
+        entityId: user.id,
+        metadata: {
+          targetEmail: user.email,
+          targetRole: user.role,
+          updatedFields: Object.keys(req.body || {}),
+        },
+      });
       res.json(user);
     } catch (error) {
       handleControllerError(res, error, "Failed to update user", "USER_UPDATE_FAILED");
@@ -74,6 +111,18 @@ export class UserController {
       const { id } = req.params;
       const requestingUserId = req.user?.id;
       const result = await UserService.deleteUser(id, requestingUserId);
+      if (!result.alreadyDeactivated) {
+        await ActivityLogService.log({
+          userId: req.user?.id,
+          userName: formatActorName(req.user),
+          userRole: req.user?.role,
+          action: "USER_DEACTIVATED",
+          category: "USER",
+          description: `Deactivated user account (${id})`,
+          entityType: "User",
+          entityId: id,
+        });
+      }
       res.json(result);
     } catch (error) {
       handleControllerError(res, error, "Failed to delete user", "USER_DELETE_FAILED");

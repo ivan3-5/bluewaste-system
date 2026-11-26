@@ -17,6 +17,7 @@ import {
   Menu,
   Users,
   Calendar,
+  History,
 } from "lucide-react";
 
 const adminLinks = [
@@ -30,6 +31,7 @@ const adminLinks = [
   { href: "/dashboard/schedules", label: "Cleanup Schedules", icon: Calendar },
   { href: "/dashboard/map", label: "Waste Map", icon: Map },
   { href: "/dashboard/users", label: "User Management", icon: Users },
+  { href: "/dashboard/activity-logs", label: "Activity Logs", icon: History },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
 ];
 

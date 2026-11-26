@@ -9,8 +9,9 @@ import {
   revokeWebSession,
   webSessionTiming,
 } from "../services/web-session.service";
-import { generateToken, verifyRefreshToken } from "../utils/jwt";
+import { generateToken, verifyRefreshToken, verifyToken } from "../utils/jwt";
 import { sendError } from "../utils/http";
+import { ActivityLogService, formatActorName } from "../services/activity-log.service";
 
 /** Cookie name for the long-lived refresh token */
 const REFRESH_COOKIE = "refresh_token";
@@ -52,6 +53,17 @@ export class AuthController {
   static async register(req: Request, res: Response) {
     try {
       const result = await AuthService.register(req.body);
+      await ActivityLogService.log({
+        userId: result.user.id,
+        userName: formatActorName(result.user),
+        userRole: result.user.role,
+        action: "USER_REGISTERED",
+        category: "AUTH",
+        description: `${formatActorName(result.user)} registered a new account`,
+        entityType: "User",
+        entityId: result.user.id,
+        metadata: { email: result.user.email },
+      });
       res.status(201).json(result);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Registration failed";
@@ -71,6 +83,17 @@ export class AuthController {
   static async verifyEmail(req: Request, res: Response, web = false) {
     try {
       const result = await AuthService.verifyEmail(req.body.email, req.body.code, web);
+      await ActivityLogService.log({
+        userId: result.user.id,
+        userName: formatActorName(result.user),
+        userRole: result.user.role,
+        action: "USER_EMAIL_VERIFIED",
+        category: "AUTH",
+        description: `${formatActorName(result.user)} verified their email address`,
+        entityType: "User",
+        entityId: result.user.id,
+        metadata: { channel: web ? "web" : "mobile" },
+      });
       res.cookie(web ? WEB_REFRESH_COOKIE : REFRESH_COOKIE, result.refreshToken, web ? webCookieOptions : refreshCookieOptions);
       res.set("Cache-Control", "no-store").json(result);
     } catch (error: unknown) {
@@ -110,14 +133,25 @@ export class AuthController {
     try {
       const { email, password } = req.body;
       const result = await AuthService.login(email, password, web);
+      await ActivityLogService.log({
+        userId: result.user.id,
+        userName: formatActorName(result.user),
+        userRole: result.user.role,
+        action: "USER_LOGIN",
+        category: "AUTH",
+        description: `${formatActorName(result.user)} logged in${web ? " to the web portal" : ""}`,
+        entityType: "User",
+        entityId: result.user.id,
+        metadata: { channel: web ? "web" : "mobile" },
+      });
       res.cookie(web ? WEB_REFRESH_COOKIE : REFRESH_COOKIE, result.refreshToken, web ? webCookieOptions : refreshCookieOptions);
       res.set("Cache-Control", "no-store").json(result);
     } catch (error: unknown) {
       console.error("Login Error Details:", error);
       const message = error instanceof Error ? error.message : "An unexpected error occurred during login";
       if (message === "Invalid email or password") {
-        return res.status(401).json({ 
-          error: { code: "UNAUTHORIZED", message } 
+        return res.status(401).json({
+          error: { code: "UNAUTHORIZED", message }
         });
       }
       if (error instanceof EmailVerificationError) {
@@ -126,11 +160,11 @@ export class AuthController {
           message: error.message,
         });
       }
-      res.status(500).json({ 
-        error: { 
-          code: "INTERNAL_SERVER_ERROR", 
-          message 
-        } 
+      res.status(500).json({
+        error: {
+          code: "INTERNAL_SERVER_ERROR",
+          message
+        }
       });
     }
   }
@@ -161,12 +195,45 @@ export class AuthController {
    * Clears the refresh_token cookie and acknowledges logout.
    */
   static async logout(req: Request, res: Response) {
+    let actorId: string | undefined;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        actorId = verifyToken(authHeader.split(" ")[1]).userId;
+      } catch {
+        // Ignore invalid/expired token during logout
+      }
+    }
+    if (!actorId) {
+      const refreshToken = req.cookies?.[REFRESH_COOKIE] || req.body?.refreshToken;
+      if (typeof refreshToken === "string") {
+        try {
+          actorId = verifyRefreshToken(refreshToken).userId;
+        } catch {
+          // Ignore invalid/expired refresh token during logout
+        }
+      }
+    }
+
     res.clearCookie(REFRESH_COOKIE, {
       httpOnly: true,
       secure: env.NODE_ENV === "production",
       sameSite: (env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax",
       path: "/",
     });
+
+    if (actorId) {
+      await ActivityLogService.log({
+        userId: actorId,
+        action: "USER_LOGOUT",
+        category: "AUTH",
+        description: "User logged out",
+        entityType: "User",
+        entityId: actorId,
+        metadata: { channel: "mobile" },
+      });
+    }
+
     res.json({ message: "Logged out successfully" });
   }
 
@@ -211,6 +278,17 @@ export class AuthController {
       if (claims) await revokeWebSession(claims);
       const cookie = req.cookies?.[WEB_REFRESH_COOKIE];
       if (!cookie || cookie === claims?.grant) res.clearCookie(WEB_REFRESH_COOKIE, webCookieOptions);
+      if (claims?.userId) {
+        await ActivityLogService.log({
+          userId: claims.userId,
+          action: "USER_LOGOUT",
+          category: "AUTH",
+          description: "User logged out of the web portal",
+          entityType: "User",
+          entityId: claims.userId,
+          metadata: { channel: "web" },
+        });
+      }
       res.status(204).end();
     } catch {
       return sendError(res, 500, "Unable to end web session.");
@@ -230,6 +308,17 @@ export class AuthController {
   static async updateProfile(req: AuthRequest, res: Response) {
     try {
       const user = await AuthService.updateProfile(req.user!.id, req.body);
+      await ActivityLogService.log({
+        userId: user.id,
+        userName: formatActorName(user),
+        userRole: user.role,
+        action: "PROFILE_UPDATED",
+        category: "USER",
+        description: `${formatActorName(user)} updated their profile`,
+        entityType: "User",
+        entityId: user.id,
+        metadata: { updatedFields: Object.keys(req.body || {}) },
+      });
       res.json(user);
     } catch {
       res.status(500).json({ error: "Profile update failed" });
