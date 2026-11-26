@@ -313,7 +313,7 @@ class DetectService {
             baseUrl: AppEnv.analysisApiBaseUrl,
             connectTimeout: const Duration(seconds: 15),
             sendTimeout: const Duration(seconds: 60),
-            receiveTimeout: const Duration(seconds: 130),
+            receiveTimeout: const Duration(seconds: 190),
           ),
         );
 
@@ -350,6 +350,11 @@ class DetectService {
       return DetectResult.fromJson(data);
     } on DioException catch (error) {
       final apiError = ApiException.fromDioError(error);
+      if (error.type == DioExceptionType.receiveTimeout) {
+        throw DetectServerException(
+          "Photo analysis timed out while waiting for the service. Try this photo again.",
+        );
+      }
       if (apiError.isTimeoutOrNetworkError) {
         throw DetectServerUnreachableException(
           "Could not reach the analysis service. Check your connection.",

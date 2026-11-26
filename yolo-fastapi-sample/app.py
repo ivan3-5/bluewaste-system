@@ -18,6 +18,7 @@ Or via named call API:
   POST /call/detect   →  { "data": ["data:image/jpeg;base64,..."] }
 """
 
+import logging
 import os
 import cv2
 import base64
@@ -26,12 +27,16 @@ import gradio as gr
 import spaces
 from PIL import Image, ImageOps
 from threading import Lock
+from time import perf_counter
 from typing import Optional, Any
 
 # ── Model paths ───────────────────────────────────────────────────────────────
 MODEL_NAME = "yolov8n.pt"
 CUSTOM_MODEL_PATH = os.getenv("CUSTOM_MODEL_PATH", "weights/best.pt")
 DETECT_MODEL_PATH = os.getenv("DETECT_MODEL_PATH", "weights/best.pt")
+GPU_DURATION_SECONDS = int(os.getenv("YOLO_GPU_DURATION_SECONDS", "25"))
+QUEUE_MAX_SIZE = int(os.getenv("YOLO_QUEUE_MAX_SIZE", "10"))
+logger = logging.getLogger(__name__)
 
 # ── Analysis thresholds ───────────────────────────────────────────────────────
 ANALYZE_YOLO_MIN_CONF      = float(os.getenv("ANALYZE_YOLO_MIN_CONF", "0.15"))
@@ -193,7 +198,7 @@ def _enhance_low_light(frame: np.ndarray) -> np.ndarray:
 # ZeroGPU inference functions
 # ═════════════════════════════════════════════════════════════════════════════
 
-@spaces.GPU
+@spaces.GPU(duration=GPU_DURATION_SECONDS)
 def _analyze_gpu(image: Image.Image) -> dict:
     """
     Layer 1: yolov8n spam filter.
@@ -256,7 +261,7 @@ def _analyze_gpu(image: Image.Image) -> dict:
     }
 
 
-@spaces.GPU
+@spaces.GPU(duration=GPU_DURATION_SECONDS)
 def _predict_gpu(image: Image.Image, include_annotated: bool = False) -> dict:
     """COCO-based waste detection with optional annotated image."""
     frame = _pil_to_bgr(image)
@@ -304,7 +309,7 @@ def _predict_gpu(image: Image.Image, include_annotated: bool = False) -> dict:
     }
 
 
-@spaces.GPU
+@spaces.GPU(duration=GPU_DURATION_SECONDS)
 def _detect_gpu(image: Image.Image) -> dict:
     """Simplified waste detection (best.pt). Returns has_waste + waste_count."""
     frame = _pil_to_bgr(image)
@@ -328,7 +333,20 @@ def _detect_gpu(image: Image.Image) -> dict:
 def analyze_fn(image: Optional[Image.Image]) -> dict:
     if image is None:
         return {"error": "No image provided."}
-    return _analyze_gpu(image)
+    started = perf_counter()
+    try:
+        result = _analyze_gpu(image)
+    except Exception as error:
+        message = str(error).lower()
+        if "quota" in message:
+            logger.warning("YOLO analysis rejected by ZeroGPU quota")
+            return {"error": "GPU quota exceeded."}
+        if any(text in message for text in ("timed out", "timeout", "time limit")):
+            logger.warning("YOLO analysis timed out after %.2fs", perf_counter() - started)
+            return {"error": "GPU analysis timed out."}
+        raise
+    logger.info("YOLO analysis finished in %.2fs", perf_counter() - started)
+    return result
 
 
 def predict_fn(image: Optional[Image.Image]) -> dict:
@@ -367,21 +385,21 @@ with gr.Blocks(title="BlueWaste YOLO Analyzer", theme=gr.themes.Soft()) as demo:
                 img1  = gr.Image(type="pil", label="Upload Waste Image")
                 out1  = gr.JSON(label="Analysis Result")
             btn1 = gr.Button("Analyze", variant="primary", size="lg")
-            btn1.click(fn=analyze_fn, inputs=img1, outputs=out1, api_name="analyze")
+            btn1.click(fn=analyze_fn, inputs=img1, outputs=out1, api_name="analyze", concurrency_id="yolo", concurrency_limit=1)
 
         with gr.Tab("📦 Predict (COCO)"):
             with gr.Row():
                 img2  = gr.Image(type="pil", label="Upload Image")
                 out2  = gr.JSON(label="Detection Result")
             btn2 = gr.Button("Predict", variant="secondary")
-            btn2.click(fn=predict_fn, inputs=img2, outputs=out2, api_name="predict")
+            btn2.click(fn=predict_fn, inputs=img2, outputs=out2, api_name="predict", concurrency_id="yolo", concurrency_limit=1)
 
         with gr.Tab("🗑️ Detect (simplified)"):
             with gr.Row():
                 img3  = gr.Image(type="pil", label="Upload Image")
                 out3  = gr.JSON(label="Detection Result")
             btn3 = gr.Button("Detect", variant="secondary")
-            btn3.click(fn=detect_fn, inputs=img3, outputs=out3, api_name="detect")
+            btn3.click(fn=detect_fn, inputs=img3, outputs=out3, api_name="detect", concurrency_id="yolo", concurrency_limit=1)
 
     gr.Markdown("""
     ---
@@ -395,4 +413,4 @@ with gr.Blocks(title="BlueWaste YOLO Analyzer", theme=gr.themes.Soft()) as demo:
     ```
     """)
 
-demo.launch()
+demo.queue(max_size=QUEUE_MAX_SIZE).launch()

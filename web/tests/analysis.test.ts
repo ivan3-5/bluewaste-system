@@ -80,6 +80,57 @@ describe("web image analysis", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("https://example.hf.space/gradio_api/call/analyze/event-1");
   });
 
+  it("uses server-side Space credentials and resolves on a split terminal event", async () => {
+    vi.stubEnv("HF_TOKEN", "test-space-token");
+    const encoder = new TextEncoder();
+    const cancel = vi.fn();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode("event: heartbeat\r\ndata: null\r\n\r\nevent: com"));
+        controller.enqueue(encoder.encode(`plete\r\ndata: ${JSON.stringify([yoloPayload])}\r\n\r\n`));
+      },
+      cancel,
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
+      .mockResolvedValueOnce(new Response(stream));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect((await POST(request())).status).toBe(200);
+    for (const [, options] of fetchMock.mock.calls) {
+      expect(options.headers.Authorization).toBe("Bearer test-space-token");
+    }
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("retries an explicit queue rejection before a job is accepted", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ detail: "Queue is full!" }, { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
+      .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([yoloPayload])}\n\n`));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect((await POST(request())).status).toBe(200);
+    expect(fetchMock.mock.calls.map(([, options]) => options.method ?? "GET")).toEqual(["POST", "POST", "GET"]);
+  });
+
+  it.each([
+    ["event: error\ndata: GPU quota exceeded.\n\n", 429, /GPU quota/],
+    ['event: complete\ndata: [{"error":"GPU quota exceeded."}]\n\n', 429, /GPU quota/],
+    ["event: error\ndata: timed out waiting for a GPU\n\n", 504, /timed out/],
+    ["event: error\ndata: null\n\n", 503, /could not analyze/],
+  ] as const)("keeps per-photo provider failures actionable without submitting twice", async (events, status, message) => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
+      .mockResolvedValueOnce(new Response(events));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(request());
+    expect(response.status).toBe(status);
+    expect((await response.json()).message).toMatch(message);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("uses only Gemini when enabled", async () => {
     vi.stubEnv("USE_GEMINI", "true");
     vi.stubEnv("GEMINI_API_KEY", "test-key");

@@ -16,6 +16,7 @@ if (cloudName && apiKey && apiSecret) {
 export async function uploadToCloudinary(
   buffer: Buffer,
   folder = "bluewaste/reports",
+  timeout?: number,
 ) {
   return new Promise<{ secureUrl: string; publicId: string }>(
     (resolve, reject) => {
@@ -23,6 +24,7 @@ export async function uploadToCloudinary(
         {
           folder,
           resource_type: "image",
+          timeout,
         },
         (error, result) => {
           if (error || !result) {
