@@ -6,7 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/providers/AuthProvider";
 import { accountHome } from "@/lib/account-home";
-import { hasIdleNotice } from "@/lib/web-session";
+import { consumeIdleNotice } from "@/lib/web-session";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -59,9 +59,20 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
-    if (!isLoading) setIdleNotice(hasIdleNotice());
+    if (isLoading) return;
+    if (consumeIdleNotice()) setIdleNotice(true);
+
+    function clearRestoredNotice(event: PageTransitionEvent) {
+      if (event.persisted) setIdleNotice(false);
+    }
+
+    window.addEventListener("pageshow", clearRestoredNotice);
+    return () => window.removeEventListener("pageshow", clearRestoredNotice);
+  }, [isLoading]);
+
+  useEffect(() => {
     if (role) router.replace(accountHome(role));
-  }, [isLoading, role, router]);
+  }, [role, router]);
 
   const onSubmit = async (data: LoginForm) => {
     try {

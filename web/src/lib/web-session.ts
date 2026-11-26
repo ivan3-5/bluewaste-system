@@ -93,10 +93,17 @@ export function clearWebSession(sessionId: string, idle: boolean) {
   return true;
 }
 
-export function hasIdleNotice() {
+export function consumeIdleNotice() {
   if (typeof window === "undefined") return false;
   const id = localStorage.getItem(SESSION_KEY);
-  return id !== null && localStorage.getItem(sessionEndKey(id)) === "idle";
+  if (id === null) return false;
+
+  const endKey = sessionEndKey(id);
+  if (localStorage.getItem(endKey) !== "idle") return false;
+
+  // Keep the session marked as ended for other tabs and in-flight writes.
+  localStorage.setItem(endKey, "idle-notice-shown");
+  return true;
 }
 
 export function subscribeToWebSession(listener: SessionListener) {
