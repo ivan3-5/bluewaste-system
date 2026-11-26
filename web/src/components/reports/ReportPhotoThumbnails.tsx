@@ -19,12 +19,14 @@ export function usePhotoUrl(file: File | null) {
 
 export type PhotoAnalysisStatus = { status: "pending" | "complete" | "spam" | "error"; message?: string };
 
-function PhotoThumbnail({ file, label, onRemove, primary, analysis, onRetry }: {
+function PhotoThumbnail({ file, label, onRemove, onSelect, selected, primary, analysis, onRetry }: {
   analysis?: PhotoAnalysisStatus;
   onRetry?: () => void;
   file: File;
   label: string;
   onRemove?: () => void;
+  onSelect?: () => void;
+  selected: boolean;
   primary: boolean;
 }) {
   const url = usePhotoUrl(file);
@@ -34,6 +36,15 @@ function PhotoThumbnail({ file, label, onRemove, primary, analysis, onRetry }: {
         {url && <Image src={url} alt={label} fill unoptimized sizes="120px" className="object-cover" />}
         {primary && (
           <span className="absolute bottom-1 left-1 rounded bg-slate-900/85 px-1.5 py-0.5 text-[10px] font-semibold text-white">Primary</span>
+        )}
+        {onSelect && (
+          <button
+            type="button"
+            onClick={onSelect}
+            aria-label={`Preview ${label.toLowerCase()}${analysis?.status === "spam" ? " (spam)" : ""}`}
+            aria-pressed={selected}
+            className={`absolute inset-0 cursor-pointer rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-blue-600 ${selected ? "ring-2 ring-inset ring-blue-600" : ""}`}
+          />
         )}
         {onRemove && (
           <button
@@ -46,21 +57,22 @@ function PhotoThumbnail({ file, label, onRemove, primary, analysis, onRetry }: {
           </button>
         )}
       </div>
-      {analysis && <div className="mt-1 text-xs" aria-live="polite">
-        {analysis.status === "pending" && <p>Analyzing…</p>}
-        {analysis.status === "complete" && <p className="text-green-700">Waste detected</p>}
-        {analysis.status === "spam" && <p className="text-red-700" role="alert">Warning: spam detected. We suggest removing this photo.</p>}
-        {analysis.status === "error" && <><p className="text-red-700">{analysis.message}</p>{onRetry && <button type="button" onClick={onRetry} className="underline">Retry analysis</button>}</>}
-      </div>}
+      <div className="mt-1 text-xs empty:hidden" aria-live="polite">
+        {analysis?.status === "pending" && <p>Analyzing…</p>}
+        {analysis?.status === "complete" && <p className="text-green-700">Waste detected</p>}
+        {analysis?.status === "error" && <><p className="text-red-700">{analysis.message}</p>{onRetry && <button type="button" onClick={onRetry} className="underline">Retry analysis</button>}</>}
+      </div>
     </div>
   );
 }
 
-export function ReportPhotoThumbnails({ files, onRemove, showPrimary = false, analysis, onRetry }: {
+export function ReportPhotoThumbnails({ files, onRemove, onSelect, selectedFile, showPrimary = false, analysis, onRetry }: {
   analysis?: PhotoAnalysisStatus[];
   onRetry?: (index: number) => void;
   files: File[];
   onRemove?: (index: number) => void;
+  onSelect?: (file: File) => void;
+  selectedFile?: File | null;
   showPrimary?: boolean;
 }) {
   if (!files.length) return null;
@@ -72,6 +84,8 @@ export function ReportPhotoThumbnails({ files, onRemove, showPrimary = false, an
           file={file}
           label={`Photo ${index + 1}`}
           onRemove={onRemove && (() => onRemove(index))}
+          onSelect={onSelect && (() => onSelect(file))}
+          selected={file === selectedFile}
           primary={showPrimary && index === 0}
           analysis={analysis?.[index]}
           onRetry={onRetry && (() => onRetry(index))}

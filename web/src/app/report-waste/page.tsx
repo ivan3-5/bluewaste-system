@@ -74,12 +74,14 @@ export default function ReportWastePage() {
   const [outsideZone, setOutsideZone] = useState(false);
 
   const [photos, setPhotos] = useState<File[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [savedReport, setSavedReport] = useState<ReportAnalysisResult | null>(null);
   const { photoAnalysis, retryPhoto, clearPhotoAnalysis } = useReportPhotoAnalysis(photos, !!token && !savedReport, analyzePhoto);
   const analysisReady = photos.length > 0 && photos.every((photo) => !!photoAnalysis.get(photo)?.result);
   const photosPending = photos.some((photo) => !photoAnalysis.has(photo));
   const imageFile = photos[0] ?? null;
-  const previewUrl = usePhotoUrl(imageFile);
+  const previewPhoto = selectedPhoto ?? imageFile;
+  const previewUrl = usePhotoUrl(previewPhoto);
   const [uploadedCount, setUploadedCount] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ReportAnalysisResult | null>(null);
@@ -183,6 +185,7 @@ export default function ReportWastePage() {
     setSavedReport(null);
     setUploadedCount(0);
     setPhotos([]);
+    setSelectedPhoto(null);
     clearPhotoAnalysis();
     setError("");
     setDescription("");
@@ -460,6 +463,8 @@ JPG, PNG or WEBP · 4 MB each
 
             <ReportPhotoThumbnails
               files={photos}
+              onSelect={setSelectedPhoto}
+              selectedFile={previewPhoto}
               showPrimary
               analysis={photos.map((photo) => {
                 const entry = photoAnalysis.get(photo);
@@ -469,6 +474,7 @@ JPG, PNG or WEBP · 4 MB each
               })}
               onRetry={isAnalyzing || savedReport ? undefined : (index) => retryPhoto(photos[index])}
               onRemove={isAnalyzing || savedReport ? undefined : (index) => {
+                if (photos[index] === selectedPhoto) setSelectedPhoto(null);
                 setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
                 setError("");
               }}
@@ -479,7 +485,7 @@ JPG, PNG or WEBP · 4 MB each
               </p>
             )}
 
-            {photos.some((photo) => photoAnalysis.get(photo)?.result?.hasWaste === false) && <p role="alert" className="text-sm text-red-700">Keeping a spam photo will flag this report as spam. We suggest removing it.</p>}
+            {photos.some((photo) => photoAnalysis.get(photo)?.result?.hasWaste === false) && <p role="alert" className="text-sm text-red-700">Warning: Keeping a spam photo will flag this report as spam. We suggest removing it.</p>}
             {photosPending && <p role="status" className="text-sm text-gray-600">Analyzing all photos…</p>}
 
             {/* Error */}
