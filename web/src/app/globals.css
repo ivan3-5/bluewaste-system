@@ -53,6 +53,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -76,39 +77,29 @@
 
 /* Auth split-panel: corner vignette overlay */
 .auth-panel-vignette {
-  background: radial-gradient(
-    ellipse 110% 110% at 50% 50%,
-    transparent 50%,
-    rgba(29, 78, 216, 0.65) 100%
-  );
+  background: radial-gradient(ellipse 110% 110% at 50% 50%,
+      transparent 50%,
+      rgba(29, 78, 216, 0.65) 100%);
 }
 
 /* Auth pages: eco ambient gradient */
 .auth-eco-gradient {
   background:
-    radial-gradient(
-      circle at 15% 20%,
+    radial-gradient(circle at 15% 20%,
       rgba(59, 130, 246, 0.1),
-      transparent 38%
-    ),
-    radial-gradient(
-      circle at 86% 30%,
+      transparent 38%),
+    radial-gradient(circle at 86% 30%,
       rgba(14, 165, 233, 0.09),
-      transparent 40%
-    ),
-    linear-gradient(
-      180deg,
+      transparent 40%),
+    linear-gradient(180deg,
       rgba(243, 249, 255, 0.66) 0%,
-      rgba(255, 255, 255, 0.98) 62%
-    );
+      rgba(255, 255, 255, 0.98) 62%);
 }
 
 /* Auth pages: subtle texture layer */
 .auth-eco-noise {
-  background-image: radial-gradient(
-    rgba(30, 41, 59, 0.08) 0.6px,
-    transparent 0.6px
-  );
+  background-image: radial-gradient(rgba(30, 41, 59, 0.08) 0.6px,
+      transparent 0.6px);
   background-size: 8px 8px;
 }
 
@@ -130,47 +121,37 @@
 
 /* Hero section: edge vignette */
 .hero-vignette {
-  background: radial-gradient(
-    ellipse 100% 100% at 50% 50%,
-    transparent 55%,
-    rgba(255, 255, 255, 0.9) 100%
-  );
+  background: radial-gradient(ellipse 100% 100% at 50% 50%,
+      transparent 55%,
+      rgba(255, 255, 255, 0.9) 100%);
 }
 
 /* Hero section: blue tint radial */
 .hero-tint {
-  background: radial-gradient(
-    ellipse 80% 70% at 50% 50%,
-    rgba(219, 234, 254, 0.55) 0%,
-    transparent 100%
-  );
+  background: radial-gradient(ellipse 80% 70% at 50% 50%,
+      rgba(219, 234, 254, 0.55) 0%,
+      transparent 100%);
 }
 
 /* Hero section: ambient glows */
 .hero-glow-one {
-  background: radial-gradient(
-    circle,
-    rgba(59, 130, 246, 0.22) 0%,
-    rgba(59, 130, 246, 0.08) 38%,
-    transparent 72%
-  );
+  background: radial-gradient(circle,
+      rgba(59, 130, 246, 0.22) 0%,
+      rgba(59, 130, 246, 0.08) 38%,
+      transparent 72%);
 }
 
 .hero-glow-two {
-  background: radial-gradient(
-    circle,
-    rgba(14, 165, 233, 0.2) 0%,
-    rgba(125, 211, 252, 0.1) 42%,
-    transparent 75%
-  );
+  background: radial-gradient(circle,
+      rgba(14, 165, 233, 0.2) 0%,
+      rgba(125, 211, 252, 0.1) 42%,
+      transparent 75%);
 }
 
 /* Hero section: subtle paper-like noise texture */
 .hero-noise {
-  background-image: radial-gradient(
-    rgba(30, 41, 59, 0.08) 0.6px,
-    transparent 0.6px
-  );
+  background-image: radial-gradient(rgba(30, 41, 59, 0.08) 0.6px,
+      transparent 0.6px);
   background-size: 8px 8px;
 }
 
@@ -191,12 +172,15 @@
 .lightbox-img {
   min-width: 220px;
 }
+
 .location-picker .leaflet-container {
   cursor: crosshair !important;
 }
+
 .location-picker .leaflet-marker-icon {
   cursor: grab !important;
 }
+
 .location-picker .leaflet-marker-icon:active {
   cursor: grabbing !important;
 }
@@ -207,15 +191,19 @@
 .bg-cat-PLASTIC_WASTE {
   background-color: #3b82f6;
 }
+
 .bg-cat-ORGANIC_WASTE {
   background-color: #84cc16;
 }
+
 .bg-cat-GLASS_WASTE {
   background-color: #06b6d4;
 }
+
 .bg-cat-METAL_WASTE {
   background-color: #f97316;
 }
+
 .bg-cat-PAPER_WASTE {
   background-color: #8b5cf6;
 }
@@ -223,18 +211,23 @@
 .bg-st-PENDING {
   background-color: #f59e0b;
 }
+
 .bg-st-VERIFIED {
   background-color: #3b82f6;
 }
+
 .bg-st-CLEANUP_SCHEDULED {
   background-color: #8b5cf6;
 }
+
 .bg-st-IN_PROGRESS {
   background-color: #f97316;
 }
+
 .bg-st-CLEANED {
   background-color: #22c55e;
 }
+
 .bg-st-REJECTED {
   background-color: #ef4444;
 }
@@ -243,18 +236,23 @@
 .text-st-PENDING {
   color: #f59e0b;
 }
+
 .text-st-VERIFIED {
   color: #3b82f6;
 }
+
 .text-st-CLEANUP_SCHEDULED {
   color: #8b5cf6;
 }
+
 .text-st-IN_PROGRESS {
   color: #f97316;
 }
+
 .text-st-CLEANED {
   color: #22c55e;
 }
+
 .text-st-REJECTED {
   color: #ef4444;
 }
@@ -264,22 +262,27 @@
   background-color: #fef3c715;
   border-color: #f59e0b40;
 }
+
 .bg-tint-VERIFIED {
   background-color: #eff6ff;
   border-color: #3b82f640;
 }
+
 .bg-tint-CLEANUP_SCHEDULED {
   background-color: #f5f3ff;
   border-color: #8b5cf640;
 }
+
 .bg-tint-IN_PROGRESS {
   background-color: #fff7ed;
   border-color: #f9731640;
 }
+
 .bg-tint-CLEANED {
   background-color: #f0fdf4;
   border-color: #22c55e40;
 }
+
 .bg-tint-REJECTED {
   background-color: #fef2f2;
   border-color: #ef444440;
@@ -292,7 +295,7 @@
 }
 
 .custom-waste-marker-icon:hover .waste-marker-pin,
-.incident-marker-icon:hover > div {
+.incident-marker-icon:hover>div {
   transform: scale(1.12);
 }
 
@@ -303,6 +306,7 @@
     transform 0.15s ease,
     box-shadow 0.15s ease;
 }
+
 /* Soft ambient glow ring on every marker via ::after pseudo-element */
 .waste-marker::after {
   content: "";
@@ -314,31 +318,39 @@
   pointer-events: none;
   z-index: -1;
 }
+
 .waste-marker:hover {
   transform: scale(1.2);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
 }
+
 /* PENDING markers: faster, more intense glow pulse */
 .waste-marker--pulse::after {
   animation: waste-glow-pulse 1.8s ease-in-out infinite;
 }
+
 @keyframes waste-glow-breathe {
+
   0%,
   100% {
     transform: scale(1.1);
     opacity: 0.3;
   }
+
   50% {
     transform: scale(2.2);
     opacity: 0;
   }
 }
+
 @keyframes waste-glow-pulse {
+
   0%,
   100% {
     transform: scale(1.15);
     opacity: 0.5;
   }
+
   50% {
     transform: scale(2.6);
     opacity: 0;
@@ -360,6 +372,7 @@
   cursor: pointer;
   transition: transform 0.15s ease;
 }
+
 .waste-cluster:hover {
   transform: scale(1.06);
 }
@@ -382,6 +395,7 @@
     color 0.15s,
     background 0.15s;
 }
+
 .leaflet-recenter-btn:hover {
   background: #f0f9ff;
   color: #1d4ed8;
@@ -395,19 +409,23 @@
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
   border: none;
 }
+
 .waste-popup-wrapper .leaflet-popup-content {
   margin: 0;
   min-width: 200px;
 }
+
 .waste-popup-wrapper .leaflet-popup-tip-container {
   margin-top: -1px;
 }
+
 .waste-popup-header {
   padding: 8px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
+
 .waste-popup-cat {
   color: #fff;
   font-size: 10px;
@@ -415,10 +433,12 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
 .waste-popup-body {
   padding: 10px 12px;
   background: #fff;
 }
+
 .waste-popup-title {
   font-size: 13px;
   font-weight: 700;
@@ -426,6 +446,7 @@
   margin: 0 0 7px;
   line-height: 1.4;
 }
+
 .waste-popup-meta {
   display: flex;
   align-items: center;
@@ -433,23 +454,27 @@
   margin-bottom: 7px;
   flex-wrap: wrap;
 }
+
 .waste-popup-status {
   font-size: 10px;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 10px;
 }
+
 .waste-popup-time {
   font-size: 10px;
   color: #9ca3af;
   font-weight: 500;
 }
+
 .waste-popup-loc {
   font-size: 11px;
   color: #374151;
   margin: 4px 0 2px;
   font-weight: 600;
 }
+
 .waste-popup-addr {
   font-size: 10px;
   color: #6b7280;
@@ -465,9 +490,11 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   padding: 8px 10px;
   font-family: inherit;
-  -webkit-backdrop-filter: blur(8px); /* Safari/iOS Safari */
+  -webkit-backdrop-filter: blur(8px);
+  /* Safari/iOS Safari */
   backdrop-filter: blur(8px);
 }
+
 .waste-marker-tooltip.leaflet-tooltip::before {
   border-top-color: rgba(255, 255, 255, 0.98);
 }
@@ -477,15 +504,13 @@
   height: 0.75rem;
   width: 9rem;
   border-radius: 9999px;
-  background: linear-gradient(
-    to right,
-    #3b82f6,
-    #06b6d4,
-    #22c55e,
-    #f59e0b,
-    #f97316,
-    #ef4444
-  );
+  background: linear-gradient(to right,
+      #3b82f6,
+      #06b6d4,
+      #22c55e,
+      #f59e0b,
+      #f97316,
+      #ef4444);
 }
 
 ::-webkit-scrollbar {
@@ -583,9 +608,17 @@
 }
 
 /* ── FullCalendar Dark Mode ── */
+.dark .fc-theme-standard .fc-scrollgrid {
+  border-color: #334155 !important;
+}
+
 .dark .fc-theme-standard td,
 .dark .fc-theme-standard th {
-  border-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+.dark .fc-theme-standard th {
+  border-bottom-color: #475569 !important;
 }
 
 .dark .fc-col-header-cell {
@@ -678,4 +711,3 @@
 .dark .fc-popover-close:hover {
   color: #f8fafc !important;
 }
-

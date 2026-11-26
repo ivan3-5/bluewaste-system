@@ -112,7 +112,7 @@ export function ScheduleCalendar({
   }, [schedules]);
 
   return (
-    <div className="bg-white/85 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-gray-100 dark:border-slate-800 p-6 md:p-8 transition-all hover:shadow-[0_16px_40px_rgb(0,0,0,0.06)]">
+    <div className="bg-white/85 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-gray-200 dark:border-slate-700 p-6 md:p-8 transition-all hover:shadow-[0_16px_40px_rgb(0,0,0,0.06)]">
       {/* ── Calendar Operational Top Banner ─────── */}
       <div className="mb-6 pb-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4">
         {/* Left: Branding & Context */}
@@ -144,10 +144,16 @@ export function ScheduleCalendar({
         [&_.fc]:font-sans
         
         /* Grid and Borders */
-        [&_.fc-theme-standard_.fc-scrollgrid]:!border-gray-100
-        [&_.fc-theme-standard_td]:!border-gray-100
-        [&_.fc-theme-standard_th]:!border-gray-100
-        [&_.fc-theme-standard_th]:!border-b-gray-200
+        [&_.fc]:![--fc-border-color:#d1d5db]
+        dark:[&_.fc]:![--fc-border-color:#334155]
+        [&_.fc-theme-standard_.fc-scrollgrid]:!border-gray-300
+        dark:[&_.fc-theme-standard_.fc-scrollgrid]:!border-slate-700
+        [&_.fc-theme-standard_td]:!border-gray-300/80
+        dark:[&_.fc-theme-standard_td]:!border-slate-700
+        [&_.fc-theme-standard_th]:!border-gray-300/80
+        dark:[&_.fc-theme-standard_th]:!border-slate-700
+        [&_.fc-theme-standard_th]:!border-b-gray-300
+        dark:[&_.fc-theme-standard_th]:!border-b-slate-600
         
         /* Header Cells */
         [&_.fc-col-header-cell]:!py-3.5 [&_.fc-col-header-cell]:!bg-gray-50/60
@@ -238,7 +244,7 @@ export function ScheduleCalendar({
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             if (arg.date < today) {
-              return "!bg-gray-50/40 !opacity-60 cursor-not-allowed";
+              return "!bg-gray-50/40 dark:!bg-slate-800/40 [&_.fc-daygrid-day-frame]:opacity-60 cursor-not-allowed";
             }
             return "cursor-pointer group/cell";
           }}
