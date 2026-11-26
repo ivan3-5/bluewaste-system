@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -12,6 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Mail,
   Lock,
   Eye,
@@ -19,6 +26,11 @@ import {
   Phone,
   User,
   MapPin,
+  Map,
+  Building2,
+  Home,
+  Signpost,
+  Pencil,
   BarChart3,
   CheckCircle2,
   Timer,
@@ -33,6 +45,15 @@ import {
 } from "@/components/ui/dialog";
 
 import { limitPhoneDigits, phoneError, phonePattern } from "@/lib/phone";
+import {
+  getProvinces,
+  getCities,
+  getBarangays,
+  getPuroks,
+  formatAddress,
+  OTHER_PUROK_OPTION,
+} from "@/lib/philippine-address";
+import { cn } from "@/lib/utils";
 
 const registerSchema = z
   .object({
@@ -42,12 +63,28 @@ const registerSchema = z
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
     phone: z.string().regex(phonePattern, phoneError).optional(),
-    address: z.string().min(1, "Address is required"),
+    province: z.string().min(1, "Province is required"),
+    city: z.string().min(1, "City / Municipality is required"),
+    barangay: z.string().min(1, "Barangay is required"),
+    purok: z.string().min(1, "Purok / Sitio is required"),
+    customPurok: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
-  });
+  })
+  .refine(
+    (data) => {
+      if (data.purok === OTHER_PUROK_OPTION) {
+        return Boolean(data.customPurok && data.customPurok.trim().length > 0);
+      }
+      return true;
+    },
+    {
+      message: "Please specify your Purok / Sitio",
+      path: ["customPurok"],
+    }
+  );
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
@@ -85,10 +122,75 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
+    clearErrors,
     formState: { errors },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      phone: "",
+      province: "",
+      city: "",
+      barangay: "",
+      purok: "",
+      customPurok: "",
+    },
   });
+
+  const selectedProvince = watch("province");
+  const selectedCity = watch("city");
+  const selectedBarangay = watch("barangay");
+  const selectedPurok = watch("purok");
+
+  const provinces = useMemo(() => getProvinces(), []);
+  const cities = useMemo(() => getCities(selectedProvince), [selectedProvince]);
+  const barangays = useMemo(
+    () => getBarangays(selectedProvince, selectedCity),
+    [selectedProvince, selectedCity]
+  );
+  const puroks = useMemo(
+    () => getPuroks(selectedProvince, selectedCity, selectedBarangay),
+    [selectedProvince, selectedCity, selectedBarangay]
+  );
+  const isCustomPurok = selectedPurok === OTHER_PUROK_OPTION;
+
+  const handleProvinceChange = (provinceValue: string) => {
+    setValue("province", provinceValue, { shouldValidate: true });
+    setValue("city", "");
+    setValue("barangay", "");
+    setValue("purok", "");
+    setValue("customPurok", "");
+    clearErrors(["city", "barangay", "purok", "customPurok"]);
+  };
+
+  const handleCityChange = (cityValue: string) => {
+    setValue("city", cityValue, { shouldValidate: true });
+    setValue("barangay", "");
+    setValue("purok", "");
+    setValue("customPurok", "");
+    clearErrors(["barangay", "purok", "customPurok"]);
+  };
+
+  const handleBarangayChange = (barangayValue: string) => {
+    setValue("barangay", barangayValue, { shouldValidate: true });
+    setValue("purok", "");
+    setValue("customPurok", "");
+    clearErrors(["purok", "customPurok"]);
+  };
+
+  const handlePurokChange = (purokValue: string) => {
+    setValue("purok", purokValue, { shouldValidate: true });
+    if (purokValue !== OTHER_PUROK_OPTION) {
+      setValue("customPurok", "");
+      clearErrors(["customPurok"]);
+    }
+  };
 
   const phoneField = register("phone");
   const verificationCode = verificationDigits.join("");
@@ -112,13 +214,22 @@ export default function RegisterPage() {
     try {
       setLoading(true);
       setError("");
+      const effectivePurok =
+        data.purok === OTHER_PUROK_OPTION ? data.customPurok?.trim() : data.purok;
+      const formattedAddress = formatAddress({
+        province: data.province,
+        city: data.city,
+        barangay: data.barangay,
+        purok: effectivePurok,
+      });
+
       await registerUser({
         email: data.email,
         password: data.password,
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
-        address: data.address,
+        address: formattedAddress,
       });
       setVerificationDigits(Array(6).fill(""));
       setVerificationError("");
@@ -427,32 +538,253 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="address"
-                    className="text-sm font-medium text-slate-700"
-                  >
-                    Address
-                  </Label>
-                  <div className="relative">
-                    <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      id="address"
-                      type="text"
-                      autoComplete="street-address"
-                      placeholder="Your complete address"
-                      aria-invalid={Boolean(errors.address)}
-                      aria-describedby={
-                        errors.address ? "address-error" : undefined
-                      }
-                      className="h-11 rounded-xl border-slate-200 pl-10 focus-visible:border-primary focus-visible:ring-primary/30"
-                      {...register("address")}
-                    />
+                {/* Cascading Address Dropdowns: Province, City/Municipality, Barangay, Purok/Sitio */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {/* Province */}
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="province"
+                        className="text-sm font-medium text-slate-700"
+                      >
+                        Province
+                      </Label>
+                      <div className="relative">
+                        <Map className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 z-10" />
+                        <Select
+                          value={selectedProvince || undefined}
+                          onValueChange={handleProvinceChange}
+                        >
+                          <SelectTrigger
+                            id="province"
+                            aria-label="Province"
+                            aria-invalid={Boolean(errors.province)}
+                            aria-describedby={
+                              errors.province ? "province-error" : undefined
+                            }
+                            className={cn(
+                              "h-11 rounded-xl border-slate-200 pl-10 focus-visible:border-primary focus-visible:ring-primary/30",
+                              errors.province &&
+                                "border-red-500 focus-visible:ring-red-400"
+                            )}
+                          >
+                            <SelectValue placeholder="Select Province" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {provinces.map((prov) => (
+                              <SelectItem key={prov} value={prov}>
+                                {prov}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {errors.province && (
+                        <p id="province-error" className="text-xs text-red-600">
+                          {errors.province.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* City / Municipality */}
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="city"
+                        className="text-sm font-medium text-slate-700"
+                      >
+                        City / Municipality
+                      </Label>
+                      <div className="relative">
+                        <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 z-10" />
+                        <Select
+                          value={selectedCity || undefined}
+                          onValueChange={handleCityChange}
+                          disabled={!selectedProvince}
+                        >
+                          <SelectTrigger
+                            id="city"
+                            aria-label="City / Municipality"
+                            aria-invalid={Boolean(errors.city)}
+                            aria-describedby={
+                              errors.city ? "city-error" : undefined
+                            }
+                            className={cn(
+                              "h-11 rounded-xl border-slate-200 pl-10 focus-visible:border-primary focus-visible:ring-primary/30",
+                              !selectedProvince &&
+                                "bg-slate-50 text-slate-400 cursor-not-allowed",
+                              errors.city &&
+                                "border-red-500 focus-visible:ring-red-400"
+                            )}
+                          >
+                            <SelectValue
+                              placeholder={
+                                !selectedProvince
+                                  ? "Select province first"
+                                  : "Select City / Municipality"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {cities.map((c) => (
+                              <SelectItem key={c} value={c}>
+                                {c}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {errors.city && (
+                        <p id="city-error" className="text-xs text-red-600">
+                          {errors.city.message}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  {errors.address && (
-                    <p id="address-error" className="text-xs text-red-600">
-                      {errors.address.message}
-                    </p>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {/* Barangay */}
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="barangay"
+                        className="text-sm font-medium text-slate-700"
+                      >
+                        Barangay
+                      </Label>
+                      <div className="relative">
+                        <Home className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 z-10" />
+                        <Select
+                          value={selectedBarangay || undefined}
+                          onValueChange={handleBarangayChange}
+                          disabled={!selectedCity}
+                        >
+                          <SelectTrigger
+                            id="barangay"
+                            aria-label="Barangay"
+                            aria-invalid={Boolean(errors.barangay)}
+                            aria-describedby={
+                              errors.barangay ? "barangay-error" : undefined
+                            }
+                            className={cn(
+                              "h-11 rounded-xl border-slate-200 pl-10 focus-visible:border-primary focus-visible:ring-primary/30",
+                              !selectedCity &&
+                                "bg-slate-50 text-slate-400 cursor-not-allowed",
+                              errors.barangay &&
+                                "border-red-500 focus-visible:ring-red-400"
+                            )}
+                          >
+                            <SelectValue
+                              placeholder={
+                                !selectedCity
+                                  ? "Select city first"
+                                  : "Select Barangay"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {barangays.map((b) => (
+                              <SelectItem key={b} value={b}>
+                                {b}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {errors.barangay && (
+                        <p id="barangay-error" className="text-xs text-red-600">
+                          {errors.barangay.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Purok / Sitio */}
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="purok"
+                        className="text-sm font-medium text-slate-700"
+                      >
+                        Purok / Sitio
+                      </Label>
+                      <div className="relative">
+                        <Signpost className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 z-10" />
+                        <Select
+                          value={selectedPurok || undefined}
+                          onValueChange={handlePurokChange}
+                          disabled={!selectedBarangay}
+                        >
+                          <SelectTrigger
+                            id="purok"
+                            aria-label="Purok / Sitio"
+                            aria-invalid={Boolean(errors.purok)}
+                            aria-describedby={
+                              errors.purok ? "purok-error" : undefined
+                            }
+                            className={cn(
+                              "h-11 rounded-xl border-slate-200 pl-10 focus-visible:border-primary focus-visible:ring-primary/30",
+                              !selectedBarangay &&
+                                "bg-slate-50 text-slate-400 cursor-not-allowed",
+                              errors.purok &&
+                                "border-red-500 focus-visible:ring-red-400"
+                            )}
+                          >
+                            <SelectValue
+                              placeholder={
+                                !selectedBarangay
+                                  ? "Select barangay first"
+                                  : "Select Purok / Sitio"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {puroks.map((p) => (
+                              <SelectItem key={p} value={p}>
+                                {p}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {errors.purok && (
+                        <p id="purok-error" className="text-xs text-red-600">
+                          {errors.purok.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Custom Purok / Sitio if 'Other (Specify)' is chosen */}
+                  {isCustomPurok && (
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="customPurok"
+                        className="text-sm font-medium text-slate-700"
+                      >
+                        Specify Purok / Sitio
+                      </Label>
+                      <div className="relative">
+                        <Pencil className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                          id="customPurok"
+                          type="text"
+                          placeholder="e.g. Purok 5A, Sitio Riverside"
+                          aria-invalid={Boolean(errors.customPurok)}
+                          aria-describedby={
+                            errors.customPurok
+                              ? "customPurok-error"
+                              : undefined
+                          }
+                          className="h-11 rounded-xl border-slate-200 pl-10 focus-visible:border-primary focus-visible:ring-primary/30"
+                          {...register("customPurok")}
+                        />
+                      </div>
+                      {errors.customPurok && (
+                        <p
+                          id="customPurok-error"
+                          className="text-xs text-red-600"
+                        >
+                          {errors.customPurok.message}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
 
