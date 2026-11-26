@@ -16,6 +16,7 @@ import "../data/report_service.dart";
 import "../data/reporting_zones.dart";
 import "../data/offline_service.dart";
 import "../data/detect_service.dart";
+import "../data/report_photo_analysis.dart";
 import "../domain/report_models.dart";
 import "widgets/pending_reports_banner.dart";
 import "widgets/report_result_card.dart";
@@ -23,8 +24,6 @@ import "widgets/report_step_indicator.dart";
 import "location_picker_screen.dart";
 import "my_reports_screen.dart";
 import "../../notifications/presentation/notification_providers.dart";
-
-enum _NoWasteAction { retake, submitAnyway }
 
 class ReportCreateScreen extends ConsumerStatefulWidget {
   const ReportCreateScreen({super.key});
@@ -49,7 +48,10 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   // ── AI analysis state ───────────────────────────────────────────────────
   bool _isDetecting = false;
   String? _detectionError;
-  int _analysisRequest = 0;
+  final _photoAnalysis = ReportPhotoAnalysis<XFile>();
+  Map<XFile, DetectResult> get _photoResults => _photoAnalysis.results;
+  Map<XFile, String> get _photoErrors => _photoAnalysis.errors;
+  Set<XFile> get _pendingPhotos => _photoAnalysis.pending;
   int _locationRequest = 0;
   DetectResult? _detectResult; // full pipeline result (set after detect runs)
   // Submission result card state
@@ -63,13 +65,13 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   bool get _hasLocation => _latitude != null && _longitude != null;
 
   /// Detection must have run successfully before submission is allowed.
-  bool get _detectionReady => _detectResult != null;
-  bool get _isSpamFlagged => _detectResult?.isSpam == true;
+  bool get _detectionReady => _photoAnalysis.ready(_images);
+  bool get _isSpamFlagged => _photoAnalysis.hasSpam(_images);
   // ── helpers ───────────────────────────────────────────────────────────────
 
-  /// Resets all detection state to pristine (call when image is removed).
+  /// Reset the cache when starting a new report.
   void _resetDetection() {
-    _analysisRequest++;
+    _photoAnalysis.clear();
     _isDetecting = false;
     _detectionError = null;
     _detectResult = null;
@@ -92,12 +94,15 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
   // ── Detection ─────────────────────────────────────────────────────────────
 
   Future<void> _runDetection(XFile pickedFile) async {
-    if (!mounted || _images.isEmpty || _images.first != pickedFile) return;
-    final request = ++_analysisRequest;
+    if (!mounted ||
+        !_images.contains(pickedFile) ||
+        _pendingPhotos.contains(pickedFile)) {
+      return;
+    }
     setState(() {
-      _isDetecting = true;
-      _detectionError = null;
-      _detectResult = null;
+      _pendingPhotos.add(pickedFile);
+      _photoErrors.remove(pickedFile);
+      _refreshDetection();
     });
 
     DetectResult? result;
@@ -123,68 +128,37 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       errorMessage = "Photo analysis failed unexpectedly. Please try again.";
     }
 
-    if (!mounted || request != _analysisRequest) return;
-
-    if (errorMessage != null || result?.severity == WasteSeverity.unknown || result == null) {
-      setState(() {
-        _isDetecting = false;
-        _detectionError = errorMessage ?? "Could not analyze this photo.";
-      });
-      return;
-    }
-
-    final detectedResult = result;
-    final detectedCategory = detectedResult.hasWaste
-        ? "with_waste"
-        : "no_waste";
+    if (!mounted || !_images.contains(pickedFile)) return;
     setState(() {
-      _isDetecting = false;
-      _detectResult = detectedResult;
-      _category = detectedCategory;
+      _pendingPhotos.remove(pickedFile);
+      if (errorMessage != null ||
+          result == null ||
+          result.severity == WasteSeverity.unknown) {
+        _photoErrors[pickedFile] =
+            errorMessage ?? "Could not analyze this photo.";
+      } else {
+        _photoResults[pickedFile] = result;
+      }
+      _refreshDetection();
     });
-
-    if (!detectedResult.hasWaste || detectedResult.isSpam) {
-      await _showNoWasteDialog();
-    }
   }
 
-  /// Dialog shown when the model returns has_waste: false.
-  Future<void> _showNoWasteDialog() async {
-    if (!mounted) return;
-    final action = await showDialog<_NoWasteAction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text("No Waste Detected"),
-        content: const Text(
-          "This photo did not meet the minimum waste severity. "
-          "If you continue, the report will be classified as No Waste and flagged as spam.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(_NoWasteAction.retake),
-            child: const Text("Retake Photo"),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(_NoWasteAction.submitAnyway),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.destructive,
-            ),
-            child: const Text("Continue Anyway"),
-          ),
-        ],
-      ),
-    );
+  void _refreshDetection() {
+    _isDetecting = _images.any(_pendingPhotos.contains);
+    _detectionError = _images.any(_photoErrors.containsKey)
+        ? "Some photos could not be analyzed. Retry or remove them."
+        : null;
+    _detectResult = _photoAnalysis.strongest(_images);
+    _category = _detectResult?.hasWaste == true ? "with_waste" : "no_waste";
+  }
 
-    if (!mounted) return;
-
-    if (action == _NoWasteAction.retake || action == null) {
-      setState(() {
-        _images.removeAt(0);
-        _resetDetection();
-      });
-      if (_images.isNotEmpty) await _runDetection(_images.first);
-    }
+  void _removePhoto(XFile image) {
+    if (_isSubmitting) return;
+    setState(() {
+      _images.remove(image);
+      _photoAnalysis.remove(image);
+      _refreshDetection();
+    });
   }
 
   Future<void> _pickFromCamera() async {
@@ -194,7 +168,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       source: ImageSource.camera,
       imageQuality: 75,
     );
-    if (!mounted || picked == null || _images.length >= 5 || _isSubmitting) return;
+    if (!mounted || picked == null || _images.length >= 5 || _isSubmitting) {
+      return;
+    }
 
     setState(() {
       _images.add(picked);
@@ -203,9 +179,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       }
     });
 
-    if (_images.length == 1) {
-      await _runDetection(picked);
-    }
+    await _runDetection(picked);
   }
 
   Future<void> _pickFromGallery() async {
@@ -215,7 +189,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       source: ImageSource.gallery,
       imageQuality: 75,
     );
-    if (!mounted || picked == null || _images.length >= 5 || _isSubmitting) return;
+    if (!mounted || picked == null || _images.length >= 5 || _isSubmitting) {
+      return;
+    }
 
     setState(() {
       _images.add(picked);
@@ -224,9 +200,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       }
     });
 
-    if (_images.length == 1) {
-      await _runDetection(picked);
-    }
+    await _runDetection(picked);
   }
 
   Future<void> _getCurrentLocation() async {
@@ -282,7 +256,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       final point = LatLng(position.latitude, position.longitude);
       if (!isInsideReportingZones(point, zones)) {
         if (!_hasLocation) setState(() => _isOutsideZone = true);
-        _showMessage('Your current location is outside the reporting zones. Use "Mark on Map" to choose a spot inside a zone.');
+        _showMessage(
+          'Your current location is outside the reporting zones. Use "Mark on Map" to choose a spot inside a zone.',
+        );
         return;
       }
       setState(() {
@@ -292,7 +268,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       });
     } catch (error) {
       if (!mounted || request != _locationRequest) return;
-      _showMessage(error is ApiException ? error.message : 'Could not get your current location. Use "Mark on Map" to choose it.');
+      _showMessage(
+        error is ApiException
+            ? error.message
+            : 'Could not get your current location. Use "Mark on Map" to choose it.',
+      );
     }
   }
 
@@ -355,7 +335,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
       final result = _detectResult!;
       final effectiveCategory = _category;
-      final effectiveIsSpam = result.isSpam;
+      final effectiveIsSpam = _isSpamFlagged;
       final categoryLabel =
           wasteCategoryLabels[effectiveCategory] ??
           (effectiveCategory == "with_waste" ? "With Waste" : "No Waste");
@@ -375,8 +355,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
           "isAnonymous": _isAnonymous,
           "isSpamFlagged": effectiveIsSpam,
           "spamReason": effectiveIsSpam
-              ? (_detectResult?.spamReason ??
-                    "No visible waste detected during photo analysis")
+              ? "One or more attached photos were flagged as spam during image analysis."
               : null,
           "severity": result.severity.dbValue,
           "analysisStatus": result.hasWaste ? "DIRTY" : "CLEAN",
@@ -655,7 +634,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  "Take up to 5 photos of the waste from different angles. The primary image will be used to automatically detect and classify the category.",
+                  "Take up to 5 photos of the waste from different angles. Every image will be checked for waste and spam.",
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.mutedForeground,
                   ),
@@ -666,7 +645,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   width: double.infinity,
                   height: 52,
                   child: FilledButton.icon(
-                    onPressed: (_isDetecting || _isSubmitting) ? null : _pickFromCamera,
+                    onPressed: (_isDetecting || _isSubmitting)
+                        ? null
+                        : _pickFromCamera,
                     icon: const Icon(Icons.photo_camera_rounded, size: 22),
                     label: const Text(
                       "Take a Photo",
@@ -682,7 +663,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton.icon(
-                    onPressed: (_isDetecting || _isSubmitting) ? null : _pickFromGallery,
+                    onPressed: (_isDetecting || _isSubmitting)
+                        ? null
+                        : _pickFromGallery,
                     icon: const Icon(Icons.photo_library_rounded, size: 22),
                     label: const Text(
                       "Choose from Gallery",
@@ -808,7 +791,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   context,
                   Icons.info_outline,
                   AppColors.primary,
-                  "The primary image will be analyzed to classify the waste.",
+                  "Every photo is analyzed. Remove spam photos before submitting.",
                 ),
               ],
             ),
@@ -869,7 +852,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                 icon: Icons.photo_camera_rounded,
                 title: "Review Photo & Analysis",
                 subtitle:
-                    "The system verifies and categorizes your captured image.",
+                    "Every photo is checked. Remove any spam photos before submitting.",
               ),
               const SizedBox(height: AppSpacing.md),
               SizedBox(
@@ -879,20 +862,36 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   itemCount: _images.length,
                   itemBuilder: (context, index) {
                     final isPrimary = index == 0;
+                    final image = _images[index];
+                    final result = _photoResults[image];
+                    final isSpam = result?.isSpam == true;
+                    final error = _photoErrors[image];
                     return RepaintBoundary(
                       child: Padding(
                         padding: const EdgeInsets.only(right: AppSpacing.sm),
                         child: Stack(
                           clipBehavior: Clip.none,
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                File(_images[index].path),
-                                width: MediaQuery.of(context).size.width * 0.75,
-                                height: 220,
-                                fit: BoxFit.cover,
-                                cacheWidth: 800,
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isSpam
+                                      ? AppColors.destructive
+                                      : AppColors.border,
+                                  width: isSpam ? 3 : 1,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.file(
+                                  File(_images[index].path),
+                                  width:
+                                      MediaQuery.of(context).size.width * 0.75,
+                                  height: 220,
+                                  fit: BoxFit.cover,
+                                  cacheWidth: 800,
+                                ),
                               ),
                             ),
                             Positioned(
@@ -918,23 +917,48 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                               ),
                             ),
                             Positioned(
+                              bottom: 8,
+                              left: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                color: Colors.black.withValues(alpha: 0.8),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isSpam
+                                          ? "Warning: spam detected. We suggest removing this photo."
+                                          : error ??
+                                                (result == null
+                                                    ? "Analyzing…"
+                                                    : result.severity.summary(
+                                                        result.hasWaste,
+                                                      )),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    if (error != null)
+                                      TextButton(
+                                        onPressed: _isSubmitting
+                                            ? null
+                                            : () => _runDetection(image),
+                                        child: const Text("Retry analysis"),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Positioned(
                               top: 10,
                               right: 10,
                               child: InkWell(
-                                onTap: _isSubmitting ? null : () async {
-                                  final wasPrimary = index == 0;
-                                  setState(() {
-                                    _images.removeAt(index);
-                                    if (wasPrimary && _images.isNotEmpty) {
-                                      _resetDetection();
-                                    } else if (_images.isEmpty) {
-                                      _resetDetection();
-                                    }
-                                  });
-                                  if (wasPrimary && _images.isNotEmpty) {
-                                    await _runDetection(_images.first);
-                                  }
-                                },
+                                onTap: _isSubmitting
+                                    ? null
+                                    : () => _removePhoto(_images[index]),
                                 child: Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: const BoxDecoration(
@@ -958,9 +982,20 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
               ),
               if (_detectionError case final error?) ...[
                 const SizedBox(height: AppSpacing.sm),
-                Text(error, style: const TextStyle(color: AppColors.destructive)),
+                Text(
+                  error,
+                  style: const TextStyle(color: AppColors.destructive),
+                ),
                 TextButton(
-                  onPressed: () => _runDetection(_images.first),
+                  onPressed: (_isDetecting || _isSubmitting)
+                      ? null
+                      : () async {
+                          for (final image in List<XFile>.of(_images)) {
+                            if (_photoErrors.containsKey(image)) {
+                              await _runDetection(image);
+                            }
+                          }
+                        },
                   child: const Text("Retry Analysis"),
                 ),
               ],
@@ -977,7 +1012,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: (_isDetecting || _isSubmitting) ? null : _pickFromCamera,
+                        onPressed: (_isDetecting || _isSubmitting)
+                            ? null
+                            : _pickFromCamera,
                         icon: const Icon(Icons.add_a_photo_outlined, size: 18),
                         label: const Text("Angle (Camera)"),
                       ),
@@ -985,7 +1022,9 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: (_isDetecting || _isSubmitting) ? null : _pickFromGallery,
+                        onPressed: (_isDetecting || _isSubmitting)
+                            ? null
+                            : _pickFromGallery,
                         icon: const Icon(
                           Icons.add_photo_alternate_outlined,
                           size: 18,
@@ -1024,7 +1063,8 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                       ),
                     )
                     .toList(growable: false),
-                onChanged: (_detectResult != null || _isDetecting || _isSubmitting)
+                onChanged:
+                    (_detectResult != null || _isDetecting || _isSubmitting)
                     ? null
                     : (value) {
                         if (value != null) {

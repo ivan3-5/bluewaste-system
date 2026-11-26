@@ -119,6 +119,8 @@ export function useCreateReport() {
       longitude: number;
       address?: string;
       isAnonymous?: boolean;
+      isSpamFlagged?: boolean;
+      spamReason?: string;
       /** Pre-computed severity from the client-side YOLO /analyze pipeline */
       severity?: "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM" | null;
       /** Pre-computed status from client-side analysis */
