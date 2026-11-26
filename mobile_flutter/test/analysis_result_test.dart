@@ -7,13 +7,43 @@ import "package:bluewaste_mobile_flutter/src/features/reports/data/detect_servic
 import "package:bluewaste_mobile_flutter/src/features/reports/presentation/widgets/report_result_card.dart";
 
 void main() {
+  test("server YOLO verdict follows severity regardless of reported count", () {
+    final spam = DetectResult.fromJson({
+      "provider": "yolo",
+      "hasWaste": true,
+      "severity": "SPAM",
+      "categories": ["others"],
+      "wasteCount": 2,
+    });
+    final graded = DetectResult.fromJson({
+      "provider": "yolo",
+      "hasWaste": false,
+      "severity": "HIGH",
+      "wasteCount": 0,
+    });
+    expect(spam.isSpam, isTrue);
+    expect(spam.categories, isEmpty);
+    expect(graded.hasWaste, isTrue);
+    expect(graded.severity, WasteSeverity.high);
+    expect(graded.wasteCount, 0);
+  });
+
+  test("server YOLO rejects unsupported grades", () {
+    for (final severity in [null, "None", "CRITICAL", "MEDIUM", "low"]) {
+      expect(
+        () => DetectResult.fromJson({"provider": "yolo", "severity": severity}),
+        throwsA(isA<DetectServerException>()),
+      );
+    }
+  });
+
   test("server results retain the selected model and categories", () {
     final result = DetectResult.fromJson({
       "hasWaste": true,
       "model": "yolo",
       "categories": ["plastic", "glass"],
       "wasteCount": 4,
-      "severity": "Low",
+      "severity": "LOW",
       "reason": "Plastic and glass detected.",
     });
     expect(result.model, "yolo");
@@ -63,7 +93,7 @@ void main() {
                 "model": "yolo",
                 "hasWaste": false,
                 "categories": <String>[],
-                "severity": "None",
+                "severity": "SPAM",
                 "wasteCount": 0,
                 "reason": "No waste detected.",
               },

@@ -47,8 +47,11 @@ A FastAPI service that analyzes waste images using a two-layer YOLOv8 pipeline.
 | 26+ | High |
 | 14–25 | Medium (`MODERATE`) |
 | 4–13 | Low |
-| 1–3 | None (`null`, `has_waste: true`) |
-| 0 | None (`SPAM`, `has_waste: false`) |
+| 0–3 | None (`SPAM`, `has_waste: false`) |
+
+The payload returns one of `SPAM`, `LOW`, `MODERATE`, or `HIGH` as
+`severity`. This grade determines `has_waste`. The raw count can include
+detections from a photo graded `SPAM`.
 
 ## Usage
 

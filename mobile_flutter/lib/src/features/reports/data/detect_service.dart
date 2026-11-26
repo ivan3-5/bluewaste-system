@@ -27,7 +27,7 @@ enum WasteSeverity {
 
   /// Parse the server string value (case-insensitive).
   static WasteSeverity fromString(String? value) {
-    switch (value?.toUpperCase()) {
+    switch (value?.trim().toUpperCase()) {
       case "CRITICAL":
       case "HIGH":
         return WasteSeverity.high;
@@ -126,7 +126,7 @@ class DetectResult {
   /// Total number of waste items detected in the photo.
   final int wasteCount;
 
-  /// Severity level, derived from [wasteCount].
+  /// Severity level assigned by the analysis provider.
   final WasteSeverity severity;
 
   /// Whether inference passed the object-presence layer.
@@ -182,16 +182,31 @@ class DetectResult {
           .toList(growable: false);
     }
 
-    final detectedWaste = json["hasWaste"] == true || json["has_waste"] == true;
+    final isYolo = json["provider"] == "yolo" || json["model"] == "yolo";
+    final yoloSeverity = switch (json["severity"]) {
+      "SPAM" => WasteSeverity.spam,
+      "LOW" => WasteSeverity.low,
+      "MODERATE" => WasteSeverity.moderate,
+      "HIGH" => WasteSeverity.high,
+      _ => WasteSeverity.unknown,
+    };
+    if (isYolo && yoloSeverity == WasteSeverity.unknown) {
+      throw DetectServerException("YOLO returned an invalid severity.");
+    }
+    final detectedWaste = isYolo
+        ? yoloSeverity != WasteSeverity.spam
+        : json["hasWaste"] == true || json["has_waste"] == true;
     final reportedCount =
         (json["wasteCount"] ?? json["waste_count"] ?? json["count"]) as num?;
     final wasteCountVal = detectedWaste
         ? (reportedCount?.toInt() ?? categoriesList.length)
-              .clamp(1, 1 << 30)
+              .clamp(isYolo ? 0 : 1, 1 << 30)
               .toInt()
         : 0;
 
-    final severity = WasteSeverity.fromWasteCount(wasteCountVal);
+    final severity = isYolo
+        ? yoloSeverity
+        : WasteSeverity.fromWasteCount(wasteCountVal);
     final hasWaste = severity != WasteSeverity.spam;
     final reasonStr = severity.summary(hasWaste);
 
@@ -202,9 +217,13 @@ class DetectResult {
       severity: severity,
       layer1Passed:
           json["layer1_passed"] != false && json["layer1Passed"] != false,
-      categories: categoriesList,
-      labels: parseLabels(json["labels"] ?? json["categories"]),
-      allLabels: parseLabels(json["all_labels"] ?? json["categories"]),
+      categories: isYolo && !hasWaste ? [] : categoriesList,
+      labels: isYolo && !hasWaste
+          ? []
+          : parseLabels(json["labels"] ?? json["categories"]),
+      allLabels: isYolo && !hasWaste
+          ? []
+          : parseLabels(json["all_labels"] ?? json["categories"]),
       spamReason:
           (json["spamReason"] ?? json["spam_reason"])?.toString() ??
           (!hasWaste ? "Photo did not meet the minimum waste severity." : null),
@@ -212,7 +231,7 @@ class DetectResult {
       reportId: json["reportId"]?.toString(),
       imageUrl: json["imageUrl"]?.toString(),
       status: json["status"]?.toString(),
-      model: json["model"]?.toString(),
+      model: isYolo ? "yolo" : json["model"]?.toString(),
     );
   }
 
@@ -342,8 +361,9 @@ class DetectService {
           data["hasWaste"] is! bool ||
           categories is! List ||
           !categories.every((category) => category is String) ||
-          WasteSeverity.fromString(data["severity"]?.toString()) ==
-              WasteSeverity.unknown ||
+          (data["provider"] == "gemini" &&
+              WasteSeverity.fromString(data["severity"]?.toString()) ==
+                  WasteSeverity.unknown) ||
           data["reason"] is! String) {
         throw DetectServerException("Analysis returned an invalid response.");
       }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { classifyYoloPayload, inferWasteCategory } from "@/lib/waste-classification";
 import { requestYoloPayload, YoloRequestError } from "@/lib/ai/yolo";
-import { dbSeverityToAiLabel, formatWasteAnalysis, severityFromWasteCount } from "@/lib/severity";
+import { dbSeverityToAiLabel, formatWasteAnalysis, parseYoloSeverity, severityFromWasteCount } from "@/lib/severity";
 import { analyzeImageWithGemini } from "@/lib/ai/gemini";
 import { validateGeminiResult } from "@/lib/ai/validator";
 
@@ -93,19 +93,6 @@ function toJsonError(status: number, message: string, details?: string) {
 
 function toNonNegativeInt(value: unknown): number | null {
   return parseNumeric(value, { min: 0, integer: true }) as number | null;
-}
-
-function normalizeDecisionStatus(value: unknown): DecisionStatus | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const normalized = value.trim().toUpperCase();
-  if (normalized === "DIRTY" || normalized === "CLEAN") {
-    return normalized;
-  }
-
-  return null;
 }
 
 function normalizeDecision(payload: unknown): AnalyzeDecision {
@@ -208,12 +195,14 @@ export async function POST(request: NextRequest) {
     }
     const yoloJson = raw as YoloApiResponse;
     const yoloData = yoloJson;
+    const yoloSeverity = providerSetting === "false" ? parseYoloSeverity(yoloData.severity) : undefined;
+    if (providerSetting === "false" && !yoloSeverity) {
+      throw new YoloRequestError("invalid-severity");
+    }
 
-    const classification = classifyYoloPayload(yoloJson);
-    // has_waste is the authoritative field from the /analyze hybrid pipeline.
-    // The /analyze endpoint returns has_waste but NOT a status field, so we
-    // must use has_waste first before falling back to the detected count.
-    const labels = Array.isArray(yoloData.labels) ? yoloData.labels : classification.labels;
+    const isYoloSpam = yoloSeverity === "SPAM";
+    const classification = classifyYoloPayload(isYoloSpam ? {} : yoloJson);
+    const labels = !isYoloSpam && Array.isArray(yoloData.labels) ? yoloData.labels : classification.labels;
     const labelNames = labels.flatMap((label: unknown) => {
       if (typeof label === "string") return [label];
       if (label && typeof label === "object" && "label" in label && typeof label.label === "string") return [label.label];
@@ -230,18 +219,11 @@ export async function POST(request: NextRequest) {
       toNonNegativeInt(yoloData.count) ??
       Math.max(classification.totalItems, labelItemTotal);
 
-    const rawHasWaste = yoloData.has_waste;
-    const hasWaste: boolean =
-      typeof rawHasWaste === "boolean"
-        ? rawHasWaste && reportedCount > 0
-        : normalizeDecisionStatus(yoloData.status) === "DIRTY" ||
-          reportedCount > 0;
-
-    // Severity is based on the total number of waste items detected.
-    const wasteCount = hasWaste ? Math.max(reportedCount, 1) : 0;
+    const hasWaste = yoloSeverity ? yoloSeverity !== "SPAM" : yoloData.has_waste === true;
+    const wasteCount = hasWaste ? reportedCount : 0;
     const rawCount = wasteCount;
     const status: DecisionStatus = hasWaste ? "DIRTY" : "CLEAN";
-    const dbSeverity = severityFromWasteCount(wasteCount);
+    const dbSeverity = yoloSeverity ?? severityFromWasteCount(wasteCount);
     const detectedObject = classification.detectedObject === "unknown"
       ? labelNames[0] ?? "unknown"
       : classification.detectedObject;
@@ -344,7 +326,7 @@ export async function POST(request: NextRequest) {
       provider: providerSetting === "true" ? "gemini" : "yolo",
       imageUrl: uploadedImageUrl,
       labels,
-      all_labels: Array.isArray(yoloData.all_labels) ? yoloData.all_labels : [],
+      all_labels: !isYoloSpam && Array.isArray(yoloData.all_labels) ? yoloData.all_labels : [],
       detections: classification.detections,
       report: savedReport,
     });

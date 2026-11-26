@@ -26,13 +26,13 @@ import {
 } from "lucide-react";
 import { useReportingZones, isPointInAnyZone } from "@/hooks/useReportingZones";
 import { useCreateReport, useUploadReportImages } from "@/hooks/useReports";
-import { dbSeverityToAiLabel, formatWasteAnalysis, severityFromWasteCount } from "@/lib/severity";
+import { dbSeverityToAiLabel, formatWasteAnalysis, isStrongerPhoto, parseYoloSeverity, severityFromWasteCount, type DbSeverity } from "@/lib/severity";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface GeminiAnalysisResult {
+interface ReportAnalysisResult {
   hasWaste: boolean;
-  wasteCount: number;
+  severity: DbSeverity | null;
   reportId: string;
   cached?: boolean;
 }
@@ -40,6 +40,7 @@ interface GeminiAnalysisResult {
 interface PhotoResult {
   hasWaste: boolean;
   wasteCount: number;
+  severity: DbSeverity | null;
   model: string;
   categories: string[];
   cached?: boolean;
@@ -73,7 +74,7 @@ export default function ReportWastePage() {
   const [outsideZone, setOutsideZone] = useState(false);
 
   const [photos, setPhotos] = useState<File[]>([]);
-  const [savedReport, setSavedReport] = useState<GeminiAnalysisResult | null>(null);
+  const [savedReport, setSavedReport] = useState<ReportAnalysisResult | null>(null);
   const { photoAnalysis, retryPhoto, clearPhotoAnalysis } = useReportPhotoAnalysis(photos, !!token && !savedReport, analyzePhoto);
   const analysisReady = photos.length > 0 && photos.every((photo) => !!photoAnalysis.get(photo)?.result);
   const photosPending = photos.some((photo) => !photoAnalysis.has(photo));
@@ -81,7 +82,7 @@ export default function ReportWastePage() {
   const previewUrl = usePhotoUrl(imageFile);
   const [uploadedCount, setUploadedCount] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [result, setResult] = useState<GeminiAnalysisResult | null>(null);
+  const [result, setResult] = useState<ReportAnalysisResult | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(4);
   const [error, setError] = useState<string>("");
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -149,10 +150,24 @@ export default function ReportWastePage() {
       const data = await response.json().catch(() => ({}));
       throw new Error(data.message || data.error || "Failed to analyze image");
     }
-    return response.json();
+    const data = await response.json();
+    if (data.provider === "yolo" || data.model === "yolo") {
+      const severity = parseYoloSeverity(data.severity);
+      if (!severity) throw new Error("YOLO returned an invalid severity. Retry this photo.");
+      const hasWaste = severity !== "SPAM";
+      return {
+        ...data,
+        model: "yolo",
+        hasWaste,
+        severity,
+        wasteCount: hasWaste ? data.wasteCount : 0,
+        categories: hasWaste ? data.categories : [],
+      };
+    }
+    return { ...data, severity: severityFromWasteCount(data.wasteCount) };
   }
 
-  const finishPhotoUpload = async (report: GeminiAnalysisResult) => {
+  const finishPhotoUpload = async (report: ReportAnalysisResult) => {
     await uploadImages.mutateAsync({
       reportId: report.reportId,
       files: photos.slice(uploadedCount),
@@ -247,18 +262,13 @@ export default function ReportWastePage() {
         throw new Error("Wait for all photos to be checked. Retry or remove failed photos.");
       }
       const analyses = photos.map((photo) => photoAnalysis.get(photo)!.result!);
-      const data = analyses.reduce((best, current) => current.wasteCount > best.wasteCount ? current : best);
+      const data = analyses.reduce((best, current) => isStrongerPhoto(current, best) ? current : best);
       const hasSpamPhotos = analyses.some((analysis) => !analysis.hasWaste);
 
       const rawCategoryLabel = data.categories?.[0] ? (CATEGORY_LABELS[data.categories[0]] ?? data.categories[0]) : (data.hasWaste ? "With Waste" : "No Waste");
       const reportTitle = (rawCategoryLabel === "With Waste" || rawCategoryLabel === "No Waste")
         ? "Waste report"
         : `Waste report - ${rawCategoryLabel}`;
-      const detectedWasteCount = data.hasWaste
-        ? Math.max(1, Number(data.wasteCount) || data.categories?.length || 1)
-        : 0;
-
-      const severity = severityFromWasteCount(detectedWasteCount);
       const createdReport = await createReport.mutateAsync({
         title: reportTitle,
         description: description.trim(),
@@ -269,17 +279,17 @@ export default function ReportWastePage() {
         isAnonymous: isAnonymous,
         isSpamFlagged: hasSpamPhotos,
         spamReason: hasSpamPhotos ? "One or more attached photos were flagged as spam during image analysis." : undefined,
-        severity,
+        severity: data.severity,
         analysisStatus: data.hasWaste ? "DIRTY" : "CLEAN",
-        analysisWasteCount: detectedWasteCount,
+        analysisWasteCount: data.wasteCount,
         aiModel: data.model,
         aiCategories: data.categories,
-        aiReason: formatWasteAnalysis(data.hasWaste, dbSeverityToAiLabel(severity)),
+        aiReason: formatWasteAnalysis(data.hasWaste, dbSeverityToAiLabel(data.severity)),
       });
 
-      const report: GeminiAnalysisResult = {
+      const report: ReportAnalysisResult = {
         hasWaste: data.hasWaste === true,
-        wasteCount: detectedWasteCount,
+        severity: data.severity,
         reportId: createdReport.id,
         cached: data.cached === true,
       };
@@ -579,7 +589,7 @@ JPG, PNG or WEBP · 4 MB each
 
               <AnalysisSummary
                 hasWaste={result.hasWaste}
-                severity={severityFromWasteCount(result.wasteCount)}
+                severity={result.severity}
               />
               <div>
                 <p className="text-xs font-semibold text-gray-500">Citizen Comment</p>

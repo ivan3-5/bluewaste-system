@@ -60,6 +60,7 @@ export function handleControllerError(
   }
 
   // 400 Bad Request mappings
+  if (message === "Invalid YOLO report severity.") return sendError(res, 400, message, "INVALID_YOLO_SEVERITY");
   if (message === "Report is marked as spam") return sendError(res, 400, message, "REPORT_SPAM");
   if (message === "One or more worker IDs are invalid") return sendError(res, 400, message, "INVALID_WORKER_IDS");
   if (message === "Cannot create schedule for a past date") return sendError(res, 400, message, "SCHEDULE_VALIDATION_FAILED");

@@ -20,13 +20,21 @@ class ReportPhotoAnalysis<Photo> {
   bool hasSpam(Iterable<Photo> photos) =>
       photos.any((photo) => results[photo]?.isSpam == true);
 
-  /// Different angles may show the same waste, so do not sum item counts.
+  static bool _isYolo(DetectResult result) =>
+      result.model == "yolo" || result.model == "yolo-tflite";
+
+  /// Different angles may show the same waste. Select a single photo.
   DetectResult? strongest(Iterable<Photo> photos) {
     DetectResult? best;
     for (final photo in photos) {
       final result = results[photo];
       if (result != null &&
-          (best == null || result.wasteCount > best.wasteCount)) {
+          (best == null ||
+              (_isYolo(result) || _isYolo(best)
+                  ? result.hasWaste &&
+                      (!best.hasWaste ||
+                          result.severity.index < best.severity.index)
+                  : result.wasteCount > best.wasteCount))) {
         best = result;
       }
     }

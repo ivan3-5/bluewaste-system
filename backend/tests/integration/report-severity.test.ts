@@ -22,6 +22,34 @@ const zone = {
 };
 
 describe("report creation", () => {
+  it.each([
+    ["HIGH", 0, "with_waste", "DIRTY", false],
+    ["SPAM", 2, "no_waste", "CLEAN", true],
+  ] as const)("stores the YOLO grade %s even when the count is %i", async (severity, count, category, analysisStatus, isSpam) => {
+    prismaMock.$transaction.mockImplementation(async (transaction) => {
+      if (typeof transaction !== "function") throw new Error("Expected an interactive transaction");
+      return transaction(prismaMock);
+    });
+    prismaMock.reportingZone.findMany.mockResolvedValue([zone] as never);
+    prismaMock.report.create.mockResolvedValue({ id: "report-1", reporterId: null } as never);
+    await ReportCrudService.create({
+      title: "Test", description: "", category: "with_waste", aiModel: "yolo",
+      latitude: 1, longitude: 2, address: "Test address",
+      severity, analysisWasteCount: count,
+    });
+    expect(prismaMock.report.create.mock.calls[0][0].data).toMatchObject({
+      category, analysisStatus, isSpam, severity, analysisWasteCount: 0,
+    });
+  });
+
+  it("rejects a new YOLO report without a canonical grade", async () => {
+    await expect(ReportCrudService.create({
+      title: "Test", description: "", category: "with_waste", aiModel: "yolo",
+      latitude: 1, longitude: 2, severity: null, analysisWasteCount: 2,
+    })).rejects.toThrow("Invalid YOLO report severity.");
+    expect(prismaMock.report.create).not.toHaveBeenCalled();
+  });
+
   it("rejects reports located outside every active zone", async () => {
     prismaMock.reportingZone.findMany.mockResolvedValue([zone] as never);
     await expect(

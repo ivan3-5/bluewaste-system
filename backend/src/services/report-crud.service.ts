@@ -3,7 +3,7 @@ import { ReportStatus, WasteCategory, Prisma, Role, NotificationType, Severity, 
 import { getPaginationParams, buildPaginatedResponse } from "../utils/pagination";
 import { NotificationService } from "./notification.service";
 import { GeoCache } from "../utils/geo-cache";
-import { formatWasteAnalysis, severityFromWasteCount } from "../utils/severity";
+import { formatWasteAnalysis, parseYoloSeverity, severityFromWasteCount } from "../utils/severity";
 import { getReportDateFilter, type ReportDateFilter } from "../utils/report-date-filter";
 import { ReportSpamService } from "./report-spam.service";
 import { ReportDedupService } from "./report-dedup.service";
@@ -86,6 +86,10 @@ export class ReportCrudService {
     aiProcessingMs?: number | null;
     aiGeminiMs?: number | null;
   }) {
+    const isYolo = data.aiModel === "yolo" || data.aiModel === "yolo-tflite";
+    const yoloSeverity = isYolo ? parseYoloSeverity(data.severity) : undefined;
+    if (isYolo && !yoloSeverity) throw new Error("Invalid YOLO report severity.");
+
     if (!(await ReportingZoneService.isInsideActiveZone(data.latitude, data.longitude))) {
       throw new Error(OUTSIDE_ZONE_MESSAGE);
     }
@@ -93,20 +97,21 @@ export class ReportCrudService {
     await ReportSpamService.purgeExpiredSpamIfDue();
 
     const clientSpamFlagged = data.isSpamFlagged === true;
+    const category = yoloSeverity ? (yoloSeverity === "SPAM" ? "no_waste" : "with_waste") : data.category;
     const resolvedSpamReason = clientSpamFlagged
       ? (data.spamReason ?? "No waste detected in the submitted photo")
-      : data.category === "no_waste"
+      : category === "no_waste"
         ? "No visible waste or pollution detected in the submitted image."
         : null;
-    const isSpam = clientSpamFlagged || data.category === "no_waste";
-    const wasteCount = data.analysisWasteCount;
+    const isSpam = clientSpamFlagged || category === "no_waste";
+    const wasteCount = yoloSeverity === "SPAM" ? 0 : data.analysisWasteCount;
     const hasWasteCount = typeof wasteCount === "number" && wasteCount >= 0;
     const resolvedSeverity = isSpam
       ? "SPAM"
-      : hasWasteCount
+      : yoloSeverity ?? (hasWasteCount
         ? severityFromWasteCount(wasteCount)
-        : data.severity === "CRITICAL" ? "HIGH" : data.severity;
-    const aiReason = isSpam || hasWasteCount
+        : data.severity === "CRITICAL" ? "HIGH" : data.severity);
+    const aiReason = isSpam || yoloSeverity || hasWasteCount
       ? formatWasteAnalysis(resolvedSeverity ?? null)
       : data.aiReason;
 
@@ -136,7 +141,7 @@ export class ReportCrudService {
         data: {
           title: data.title,
           description: data.description?.trim() ?? "",
-          category: data.category,
+          category,
           latitude: data.latitude,
           longitude: data.longitude,
           address: resolvedAddress,
@@ -146,12 +151,12 @@ export class ReportCrudService {
           spamReason: resolvedSpamReason,
           ...((hasWasteCount || resolvedSeverity != null || data.aiModel != null || data.aiCategories != null) && {
             severity: resolvedSeverity ?? null,
-            analysisStatus: (data.analysisStatus as AnalysisStatus) ?? null,
-            analysisWasteCount: data.analysisWasteCount ?? null,
+            analysisStatus: yoloSeverity ? (yoloSeverity === "SPAM" ? "CLEAN" : "DIRTY") : (data.analysisStatus as AnalysisStatus) ?? null,
+            analysisWasteCount: wasteCount ?? null,
             analyzedAt: new Date(),
           }),
           ...(data.aiModel != null && { aiModel: data.aiModel }),
-          ...(data.aiCategories != null && { aiCategories: data.aiCategories }),
+          ...(data.aiCategories != null && { aiCategories: yoloSeverity === "SPAM" ? [] : data.aiCategories }),
           ...(aiReason != null && { aiReason }),
           ...(data.aiProcessingMs != null && { aiProcessingMs: data.aiProcessingMs }),
           ...(data.aiGeminiMs != null && { aiGeminiMs: data.aiGeminiMs }),
@@ -178,7 +183,7 @@ export class ReportCrudService {
 
       // ── Same-waste incident deduplication ─────────────────────────────────
       // Only run for genuine waste reports (not spam / no_waste)
-      if (!isSpam && data.category !== "no_waste") {
+      if (!isSpam) {
         try {
           await ReportDedupService.assignOrCreateIncident(
             tx,

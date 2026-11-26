@@ -3,7 +3,7 @@ import { WasteCategory, AnalysisStatus } from "@prisma/client";
 import { NotificationService } from "./notification.service";
 import { env } from "../config/env";
 import { requestYolo } from "../utils/yolo-client";
-import { formatWasteAnalysis, severityFromWasteCount } from "../utils/severity";
+import { formatWasteAnalysis, parseYoloSeverity, severityFromWasteCount } from "../utils/severity";
 
 interface YoloLabel {
   label: string;
@@ -15,7 +15,6 @@ interface YoloApiResponse {
   message?: string;
   error?: string;
   severity?: string;
-  has_waste?: boolean;
   waste_count?: number;
   count?: number;
   layer1_passed?: boolean;
@@ -74,7 +73,7 @@ export class ReportAnalysisService {
       wasteCount,
       confidence: null as number | null,
       labels: data.hasWaste ? ["with_waste", ...data.categories] : ["no_waste"],
-      severity: severityFromWasteCount(wasteCount) as string | null,
+      severity: severityFromWasteCount(wasteCount),
       spamReason: data.hasWaste ? null : data.reason,
       reason: data.reason,
       model: data.model,
@@ -96,11 +95,12 @@ export class ReportAnalysisService {
       { bytes: imageBuffer, mimeType: contentType, filename: "image" },
       process.env.HF_TOKEN,
     );
-    if (!raw || typeof raw !== "object" || Array.isArray(raw) ||
-        typeof (raw as YoloApiResponse).has_waste !== "boolean") {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
       throw new Error("YOLO returned an invalid response");
     }
     const yoloJson = raw as YoloApiResponse;
+    const severity = parseYoloSeverity(yoloJson.severity);
+    if (!severity) throw new Error("YOLO returned an invalid severity");
 
     // ── 5. Parse response ───────────────────────────────────────────────────
     const rawLabels = Array.isArray(yoloJson?.labels) ? yoloJson!.labels : [];
@@ -118,11 +118,9 @@ export class ReportAnalysisService {
       labelItemTotal += typeof l === "object" ? Math.max(1, toNonNegativeInt(l.count, 1)) : 1;
     }
 
-    // Severity is derived from the total number of waste items detected.
     const reportedCount = toNonNegativeInt(yoloJson.waste_count ?? yoloJson.count, labelItemTotal);
-    const hasWaste: boolean = yoloJson.has_waste === true && (reportedCount > 0 || labels.length > 0);
-    const wasteCount = hasWaste ? Math.max(reportedCount, 1) : 0;
-    const severity = severityFromWasteCount(wasteCount);
+    const hasWaste = severity !== "SPAM";
+    const wasteCount = hasWaste ? reportedCount : 0;
     const layer1Passed: boolean = yoloJson?.layer1_passed !== false;
     const spamReason: string | null =
       typeof yoloJson?.spam_reason === "string" ? yoloJson.spam_reason : null;
@@ -139,7 +137,7 @@ export class ReportAnalysisService {
       inferenceMs: null,
       annotatedImageUrl: null,
       annotatedImagePublicId: null,
-      severity: severity as string | null,
+      severity,
       layer1Passed,
       spamReason,
       reason: typeof yoloJson.message === "string" ? yoloJson.message : null,
@@ -178,20 +176,9 @@ export class ReportAnalysisService {
     const labels = Array.isArray(analysis.labels) ? analysis.labels : [];
 
     // Decide category / spam based on analysis result
-    const hasWaste =
-      labels.includes("with_waste") ||
-      (analysis.wasteCount || 0) > 0 ||
-      analysis.status === "DIRTY";
-
-    const newCategory: WasteCategory = hasWaste ? "with_waste" : "no_waste";
-
-    // Severity is based on the total number of waste items detected.
-    const resolvedSeverity = hasWaste
-      ? severityFromWasteCount(Math.max(analysis.wasteCount ?? 0, 1))
-      : "SPAM";
-
-    const shouldMarkSpam =
-      resolvedSeverity === "SPAM" || newCategory === "no_waste";
+    const resolvedSeverity = analysis.severity;
+    const shouldMarkSpam = resolvedSeverity === "SPAM";
+    const newCategory: WasteCategory = shouldMarkSpam ? "no_waste" : "with_waste";
 
     const spamReason = shouldMarkSpam
       ? analysis.spamReason ??

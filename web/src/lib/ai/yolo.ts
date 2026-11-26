@@ -1,17 +1,16 @@
 import "server-only";
 
-import { requestYolo } from "../../../../backend/src/utils/yolo-client";
-export { YoloRequestError } from "../../../../backend/src/utils/yolo-client";
+import { requestYolo, YoloRequestError } from "../../../../backend/src/utils/yolo-client";
+export { YoloRequestError };
 
-import { aiSeverityFromWasteCount, formatWasteAnalysis, type AiSeverityLabel } from "@/lib/severity";
+import { dbSeverityToAiLabel, formatWasteAnalysis, parseYoloSeverity, type YoloSeverity } from "@/lib/severity";
 
 export interface YoloAnalysis {
   hasWaste: boolean;
   categories: string[];
   /** Total number of waste items detected in the image. */
   wasteCount: number;
-  /** Derived from wasteCount. */
-  severity: AiSeverityLabel;
+  severity: YoloSeverity;
   reason: string;
 }
 
@@ -23,15 +22,16 @@ function toCount(value: unknown): number | null {
 }
 
 /**
- * Normalises a raw YOLO payload. Severity is based on the total number of
- * detected waste items (`waste_count`, falling back to the label counts).
+ * Normalises a raw YOLO payload. The returned severity determines the verdict.
  */
 export function normalizeYoloResult(rawPayload: unknown): YoloAnalysis {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     throw new Error("YOLO returned an invalid response.");
   }
   const result = rawPayload as Record<string, unknown>;
-  if (typeof result.has_waste !== "boolean" || !Array.isArray(result.labels)) {
+  const severity = parseYoloSeverity(result.severity);
+  if (!severity) throw new YoloRequestError("invalid-severity");
+  if (!Array.isArray(result.labels)) {
     throw new Error("YOLO response is missing valid detection fields.");
   }
 
@@ -50,16 +50,15 @@ export function normalizeYoloResult(rawPayload: unknown): YoloAnalysis {
   }).filter((label) => label !== "with_waste" && label !== "no_waste");
 
   const reportedCount = toCount(result.waste_count) ?? toCount(result.count) ?? labelItemTotal;
-  const hasWaste = result.has_waste && reportedCount > 0;
+  const hasWaste = severity !== "SPAM";
   const wasteCount = hasWaste ? reportedCount : 0;
-  const severity = aiSeverityFromWasteCount(wasteCount);
 
   return {
     hasWaste,
-    categories: [...new Set(categories)],
+    categories: hasWaste ? [...new Set(categories)] : [],
     wasteCount,
     severity,
-    reason: formatWasteAnalysis(hasWaste, severity),
+    reason: formatWasteAnalysis(hasWaste, dbSeverityToAiLabel(severity)),
   };
 }
 

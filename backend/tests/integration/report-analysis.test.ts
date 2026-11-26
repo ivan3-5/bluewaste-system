@@ -26,7 +26,7 @@ describe("background report analysis", () => {
       .mockResolvedValueOnce(new Response("image", { headers: { "content-type": "image/png" } }))
       .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
       .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([{
-        has_waste: true, waste_count: 4, labels: [{ label: "plastic", count: 4 }],
+        has_waste: true, severity: "LOW", waste_count: 4, labels: [{ label: "plastic", count: 4 }],
       }])}\n\n`));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -44,8 +44,8 @@ describe("background report analysis", () => {
   });
 
   it.each([
-    [1, null], [3, null], [4, "LOW"], [13, "LOW"], [14, "MODERATE"], [25, "MODERATE"], [26, "HIGH"],
-  ])("derives YOLO severity from %i detected items", async (count, severity) => {
+    [0, "HIGH"], [3, "LOW"], [26, "MODERATE"],
+  ])("preserves the YOLO grade with %i detected items", async (count, severity) => {
     prismaMock.report.findUnique.mockResolvedValue({
       id: "report-1", images: [{ imageUrl: "https://example.com/image.png" }],
       analyzedAt: null, severity: null, reporterId: null,
@@ -55,7 +55,7 @@ describe("background report analysis", () => {
       .mockResolvedValueOnce(new Response("image", { headers: { "content-type": "image/png" } }))
       .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
       .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([{
-        has_waste: true, severity: "SPAM", waste_count: count, labels: [{ label: "plastic", count }],
+        has_waste: false, severity, waste_count: count, labels: [{ label: "plastic", count }],
       }])}\n\n`)));
 
     await ReportAnalysisService.analyzeReport("report-1");
@@ -65,7 +65,7 @@ describe("background report analysis", () => {
     }));
   });
 
-  it("marks a YOLO result with no detected items as spam", async () => {
+  it("stores explicit YOLO spam with two detections", async () => {
     prismaMock.report.findUnique.mockResolvedValue({
       id: "report-1", images: [{ imageUrl: "https://example.com/image.png" }],
       analyzedAt: null, severity: null, reporterId: null,
@@ -75,16 +75,31 @@ describe("background report analysis", () => {
       .mockResolvedValueOnce(new Response("image", { headers: { "content-type": "image/png" } }))
       .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
       .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([{
-        has_waste: false, severity: "SPAM", waste_count: 0, labels: [],
+        has_waste: true, severity: "SPAM", waste_count: 2, labels: [{ label: "others", count: 2 }],
       }])}\n\n`)));
 
     await ReportAnalysisService.analyzeReport("report-1");
 
     expect(prismaMock.report.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        isSpam: true, severity: "SPAM", analysisStatus: "CLEAN", category: "no_waste",
+        isSpam: true, severity: "SPAM", analysisStatus: "CLEAN", category: "no_waste", analysisWasteCount: 0,
       }),
     }));
+  });
+
+  it("leaves the report unanalyzed when YOLO returns no grade", async () => {
+    prismaMock.report.findUnique.mockResolvedValue({
+      id: "report-1", images: [{ imageUrl: "https://example.com/image.png" }],
+      analyzedAt: null, severity: null, reporterId: null,
+    } as never);
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response("image"))
+      .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
+      .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([{
+        has_waste: true, severity: null, waste_count: 2, labels: ["others"],
+      }])}\n\n`)));
+    await ReportAnalysisService.analyzeReport("report-1");
+    expect(prismaMock.report.update).not.toHaveBeenCalled();
   });
 
   it("does not replace an existing web analysis", async () => {
