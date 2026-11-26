@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { analyzeImageWithGemini, GeminiError } from "@/lib/ai/gemini";
-import { validateGeminiResult } from "@/lib/ai/validator";
+import { validateGeminiResult, type GeminiWasteResult } from "@/lib/ai/validator";
 import { analyzeImageWithYolo, YoloRequestError, type YoloAnalysis } from "@/lib/ai/yolo";
-import { aiSeverityFromWasteCount, dbSeverityToAiLabel, formatWasteAnalysis, type DbSeverity } from "@/lib/severity";
+import { aiSeverityFromWasteCount, dbSeverityToAiLabel, formatWasteAnalysis, parseYoloSeverity, type AiSeverityLabel, type DbSeverity } from "@/lib/severity";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import prisma from "@/lib/prisma";
 
@@ -30,7 +30,7 @@ function hashBuffer(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
 }
 
-function normalizeCachedSeverity(severity: string | null): YoloAnalysis["severity"] {
+function normalizeCachedSeverity(severity: string | null): AiSeverityLabel {
   switch (severity?.toUpperCase()) {
     case "CRITICAL":
     case "HIGH":
@@ -159,14 +159,13 @@ export async function POST(request: NextRequest) {
     );
 
     // ── 5. Deduplication check ────────────────────────────────────────────
-    const existingRows = await prisma.$queryRaw<{ id: string; hasWaste: boolean; categories: string[]; severity: string; wasteCount: number | null; aiReason: string; aiModel: string; status: string }[]>`
+    const existingRows = await prisma.$queryRaw<{ id: string; hasWaste: boolean; categories: string[]; severity: string | null; wasteCount: number | null; aiModel: string; status: string }[]>`
       SELECT
         id,
         "analysisStatus" != 'CLEAN' AS "hasWaste",
         "aiCategories" AS categories,
         severity,
         "analysisWasteCount" AS "wasteCount",
-        "aiReason",
         "aiModel",
         status
       FROM "Report"
@@ -176,25 +175,27 @@ export async function POST(request: NextRequest) {
       LIMIT 1
     `;
 
-    if (existingRows.length > 0) {
-      const cached = existingRows[0];
+    const cached = existingRows[0];
+    const yoloSeverity = cached && !useGemini ? parseYoloSeverity(cached.severity) : undefined;
+    if (cached && (useGemini || yoloSeverity)) {
       console.info(`[AI] Duplicate image detected — returning cached result for report ${cached.id}`);
 
-      const severity = !cached.hasWaste ? "None" : cached.wasteCount != null
+      const hasWaste = yoloSeverity ? yoloSeverity !== "SPAM" : cached.hasWaste;
+      const severityLabel = yoloSeverity ? dbSeverityToAiLabel(yoloSeverity) : !hasWaste ? "None" : cached.wasteCount != null
         ? aiSeverityFromWasteCount(Math.max(cached.wasteCount, 1))
         : normalizeCachedSeverity(cached.severity);
       return NextResponse.json({
-        hasWaste: cached.hasWaste,
-        categories: cached.categories ?? [],
-        severity,
-        wasteCount: Number(cached.wasteCount ?? 0),
-        reason: formatWasteAnalysis(cached.hasWaste, severity),
+        hasWaste,
+        categories: yoloSeverity === "SPAM" ? [] : cached.categories ?? [],
+        severity: yoloSeverity ?? severityLabel,
+        wasteCount: yoloSeverity === "SPAM" ? 0 : Number(cached.wasteCount ?? 0),
+        reason: formatWasteAnalysis(hasWaste, severityLabel),
         model: cached.aiModel,
         provider: useGemini ? "gemini" : "yolo",
         reportId: null,
-        status: cached.status,
+        status: yoloSeverity ? (hasWaste ? "PENDING" : "REJECTED") : cached.status,
         cached: true,
-        message: cached.hasWaste ? undefined : formatWasteAnalysis(false, "None"),
+        message: hasWaste ? undefined : formatWasteAnalysis(false, "None"),
       });
     }
 
@@ -210,7 +211,7 @@ export async function POST(request: NextRequest) {
       console.error("[AI] Cloudinary upload failed — continuing without stored image:", err);
     }
 
-    let aiResult: YoloAnalysis;
+    let aiResult: YoloAnalysis | GeminiWasteResult;
     let modelName: string;
     if (useGemini) {
       const { buffer: geminiBuffer, mimeType: geminiMime } = await compressIfNeeded(

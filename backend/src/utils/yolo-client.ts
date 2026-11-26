@@ -2,13 +2,14 @@ import { setTimeout as wait } from "node:timers/promises";
 
 const REQUEST_TIMEOUT_MS = 120_000;
 
-type YoloFailure = "queue-full" | "quota" | "timeout" | "unavailable";
+type YoloFailure = "queue-full" | "quota" | "timeout" | "unavailable" | "invalid-severity";
 
 const failures = {
   "queue-full": { status: 503, message: "The photo analysis queue is full. Try this photo again shortly." },
   quota: { status: 429, message: "The photo analysis service has reached its GPU quota. Try again later." },
   timeout: { status: 504, message: "Photo analysis timed out while waiting for the service. Try this photo again." },
   unavailable: { status: 503, message: "The YOLO service could not analyze this photo. Try again shortly." },
+  "invalid-severity": { status: 502, message: "YOLO returned an invalid severity. Try this photo again." },
 };
 
 export class YoloRequestError extends Error {

@@ -1,5 +1,11 @@
 export type WasteSeverityLevel = "HIGH" | "MODERATE" | "LOW" | "SPAM";
 
+export function parseYoloSeverity(value: unknown): WasteSeverityLevel | undefined {
+  if (value === "SPAM" || value === "LOW" || value === "MODERATE" || value === "HIGH") {
+    return value;
+  }
+}
+
 export function severityFromWasteCount(wasteCount: number): WasteSeverityLevel | null {
   if (wasteCount >= 26) return "HIGH";
   if (wasteCount >= 14) return "MODERATE";

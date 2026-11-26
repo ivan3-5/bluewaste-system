@@ -69,8 +69,8 @@ describe("web image analysis", () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      hasWaste: true, categories: ["plastic", "glass"], severity: "Low",
-      wasteCount: 4, reason: "Waste detected. Severity: Low.", model: "yolo",
+      hasWaste: true, categories: ["plastic", "glass"], severity: "HIGH",
+      wasteCount: 4, reason: "Waste detected. Severity: High.", model: "yolo",
     });
     expect(mocks.gemini).not.toHaveBeenCalled();
     expect(fetchMock.mock.calls[0][0]).toBe("https://example.hf.space/gradio_api/call/analyze");
@@ -178,7 +178,7 @@ describe("web image analysis", () => {
     vi.stubGlobal("fetch", fetchMock);
     const response = await POST(request());
     expect(await response.json()).toMatchObject({
-      severity: "None", reason: "Waste detected. Severity: None.", model: "yolo", cached: true,
+      severity: "MODERATE", reason: "Waste detected. Severity: Medium.", model: "yolo", cached: true,
     });
     expect(mocks.query.mock.calls.at(-1)?.at(-1)).toBe("yolo");
     expect(fetchMock).not.toHaveBeenCalled();
@@ -193,7 +193,7 @@ describe("web image analysis", () => {
     vi.stubGlobal("fetch", fetchMock);
     const response = await POST(request());
     expect(await response.json()).toMatchObject({
-      hasWaste: false, categories: [], severity: "None", wasteCount: 0,
+      hasWaste: false, categories: [], severity: "SPAM", wasteCount: 0,
       reason: "No waste detected. Severity: None.", model: "yolo",
     });
     expect(fetchMock.mock.calls[0][1].body).toBeInstanceOf(FormData);
@@ -202,22 +202,17 @@ describe("web image analysis", () => {
   it.each([
     [0, "None"], [1, "None"], [3, "None"], [4, "Low"], [13, "Low"],
     [14, "Medium"], [25, "Medium"], [26, "High"],
-  ])("uses the same severity and summary for %i detected items in both providers", (count, label) => {
+  ])("preserves Gemini grading for %i detected items", (count, label) => {
     const hasWaste = count > 0;
     const categories = hasWaste ? ["plastic_bottle"] : [];
-    const yolo = normalizeYoloResult({
-      has_waste: hasWaste, severity: "SPAM", waste_count: count, labels: categories,
-      message: `Found ${count} bottles.`,
-    });
     const gemini = validateGeminiResult({
       hasWaste, severity: "None", wasteCount: count, categories,
       reason: `There are ${count} bottles.`,
     });
-    expect(yolo).toMatchObject({
+    expect(gemini).toMatchObject({ valid: true, data: {
       hasWaste, severity: label, wasteCount: count,
       reason: `${hasWaste ? "Waste detected" : "No waste detected"}. Severity: ${label}.`,
-    });
-    expect(gemini).toEqual({ valid: true, data: yolo });
+    } });
   });
 
   it("shows None for missing comments and legacy analysis stored as a comment", () => {
@@ -227,22 +222,57 @@ describe("web image analysis", () => {
     expect(citizenComment("Waste detected. Severity: Low.", "Waste detected. Severity: Low.")).toBe("Waste detected. Severity: Low.");
   });
 
-  it("treats a YOLO result with no detected items as spam in both endpoints", async () => {
-    const emptyPayload = { has_waste: true, severity: "HIGH", waste_count: 0, labels: [] };
-    const stubEmpty = () => vi.stubGlobal("fetch", vi.fn()
+  it("uses explicit YOLO spam despite two reported items in both endpoints", async () => {
+    const emptyPayload = { has_waste: true, severity: "SPAM", waste_count: 2, labels: [{ label: "others", count: 2 }] };
+    const stubAnalysis = () => vi.stubGlobal("fetch", vi.fn()
       .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
       .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([emptyPayload])}\n\n`)));
 
-    stubEmpty();
+    stubAnalysis();
     const response = await POST(request());
     expect(await response.json()).toMatchObject({
-      hasWaste: false, severity: "None", wasteCount: 0, status: "REJECTED",
+      hasWaste: false, severity: "SPAM", wasteCount: 0, status: "REJECTED",
       message: "No waste detected. Severity: None.",
     });
 
-    stubEmpty();
+    stubAnalysis();
     const legacy = await legacyPOST(legacyRequest());
-    expect(await legacy.json()).toMatchObject({ has_waste: false, status: "CLEAN", severity: "SPAM" });
+    expect(await legacy.json()).toMatchObject({ has_waste: false, status: "CLEAN", severity: "SPAM", labels: [], waste_count: 0 });
+  });
+
+  it("accepts a graded YOLO result with zero items and a conflicting waste flag", () => {
+    expect(normalizeYoloResult({ has_waste: false, severity: "LOW", waste_count: 0, labels: [] }))
+      .toMatchObject({ hasWaste: true, severity: "LOW", wasteCount: 0 });
+  });
+
+  it.each([undefined, null, "None", "MEDIUM", "CRITICAL", "low"])(
+    "returns an analysis error for unsupported YOLO severity %s in both endpoints",
+    async (severity) => {
+      for (const analyze of [() => POST(request()), () => legacyPOST(legacyRequest())]) {
+        vi.stubGlobal("fetch", vi.fn()
+          .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
+          .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([{ ...yoloPayload, severity }])}\n\n`)));
+        const response = await analyze();
+        expect(response.status).toBe(502);
+        expect(await response.json()).toMatchObject({ error: expect.stringContaining("invalid severity") });
+      }
+    },
+  );
+
+  it("reanalyzes legacy cached YOLO results with no explicit grade", async () => {
+    mocks.query.mockResolvedValue([{
+      id: "report-1", hasWaste: true, categories: ["others"],
+      severity: null, wasteCount: 2, aiModel: "yolo", status: "PENDING",
+    }]);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ event_id: "event-1" }))
+      .mockResolvedValueOnce(new Response(`event: complete\ndata: ${JSON.stringify([yoloPayload])}\n\n`));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await POST(request());
+    const body = await response.json();
+    expect(body).toMatchObject({ hasWaste: true, severity: "HIGH" });
+    expect(body).not.toHaveProperty("cached");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("derives Gemini severity from the counted items, not the model's own severity", async () => {

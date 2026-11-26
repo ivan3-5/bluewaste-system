@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import { useCreateReport, useUploadReportImages } from "@/hooks/useReports";
-import { dbSeverityToAiLabel, formatWasteAnalysis, severityFromWasteCount, type DbSeverity } from "@/lib/severity";
+import { dbSeverityToAiLabel, formatWasteAnalysis, isStrongerPhoto, parseYoloSeverity, severityFromWasteCount, type DbSeverity } from "@/lib/severity";
 import { useReportingZones, isPointInAnyZone } from "@/hooks/useReportingZones";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { useReportPhotoAnalysis } from "@/hooks/useReportPhotoAnalysis";
@@ -237,10 +237,10 @@ export default function SubmitReportPage() {
   const { photoAnalysis, retryPhoto, clearPhotoAnalysis } = useReportPhotoAnalysis(photos, !!token && !savedReportId, analyzeWasteImage);
   const isAnalyzing = photos.some((photo) => !photoAnalysis.has(photo));
   const analysisReady = photos.length > 0 && photos.every((photo) => !!photoAnalysis.get(photo)?.result);
-  // Use the strongest single view; summing different angles would count waste twice.
+  // Use the strongest single view because different angles can show the same waste.
   const analysisResult = photos.reduce<AnalyzeWasteResult | null>((best, photo) => {
     const result = photoAnalysis.get(photo)?.result;
-    return result && (!best || result.wasteCount > best.wasteCount) ? result : best;
+    return result && (!best || isStrongerPhoto(result, best)) ? result : best;
   }, null);
   const analysisError = photos.map((photo) => photoAnalysis.get(photo)?.error).filter(Boolean).join(" ");
   const decisionMessage = photos.some((photo) => photoAnalysis.get(photo)?.result?.decision.retakeRecommended)
@@ -396,13 +396,14 @@ export default function SubmitReportPage() {
     const payload = await requestAnalyzeWaste(formData, token);
     console.log("🔍 Waste Analysis API JSON Output:", payload);
 
+    const model = typeof payload?.model === "string" ? payload.model : "demo";
+    const isYolo = payload?.provider === "yolo" || model === "yolo";
+    const yoloSeverity = isYolo ? parseYoloSeverity(payload.severity) : undefined;
+    if (isYolo && !yoloSeverity) {
+      throw new Error("YOLO returned an invalid severity. Retry this photo.");
+    }
     const hasWasteRaw = payload?.hasWaste ?? payload?.has_waste;
-    const hasWaste: boolean =
-      typeof hasWasteRaw === "boolean"
-        ? hasWasteRaw
-        : typeof hasWasteRaw === "string"
-          ? hasWasteRaw === "true"
-          : true;
+    const hasWaste = yoloSeverity ? yoloSeverity !== "SPAM" : toBoolean(hasWasteRaw, true);
 
     const status: "DIRTY" | "CLEAN" = hasWaste ? "DIRTY" : "CLEAN";
 
@@ -421,22 +422,22 @@ export default function SubmitReportPage() {
     const reportedCount = Number(payload?.wasteCount ?? payload?.waste_count ?? payload?.count);
     const wasteCount = hasWaste
       ? Math.max(
-          1,
+          isYolo ? 0 : 1,
           Number.isFinite(reportedCount) && reportedCount >= 0
             ? Math.trunc(reportedCount)
             : categoriesList.length,
         )
       : 0;
-    const severityVal = severityFromWasteCount(wasteCount);
+    const severityVal = yoloSeverity ?? severityFromWasteCount(wasteCount);
 
     return {
-      model: typeof payload?.model === "string" ? payload.model : "demo",
+      model: isYolo ? "yolo" : model,
       severity: severityVal,
       has_waste: hasWaste,
       status,
       wasteCount,
       decision: { retakeRecommended },
-      labels: categoriesList,
+      labels: yoloSeverity === "SPAM" ? [] : categoriesList,
       detections: Array.isArray(payload?.detections) ? payload.detections : [],
     };
   }

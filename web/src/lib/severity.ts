@@ -1,3 +1,6 @@
+export { parseYoloSeverity } from "../../../backend/src/utils/severity";
+export type { WasteSeverityLevel as YoloSeverity } from "../../../backend/src/utils/severity";
+
 export type DbSeverity = "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "SPAM";
 export type AiSeverityLabel = "Low" | "Medium" | "High" | "None";
 
@@ -20,6 +23,19 @@ export function dbSeverityToAiLabel(severity: DbSeverity | null | undefined): Ai
 
 export function aiSeverityFromWasteCount(wasteCount: number): AiSeverityLabel {
   return dbSeverityToAiLabel(severityFromWasteCount(wasteCount));
+}
+
+const severityRank = { SPAM: 0, LOW: 2, MODERATE: 3, HIGH: 4, CRITICAL: 5 };
+
+export function isStrongerPhoto(
+  candidate: { model: string; severity: DbSeverity | null; wasteCount: number },
+  current: { model: string; severity: DbSeverity | null; wasteCount: number },
+): boolean {
+  if (candidate.model === "yolo" || current.model === "yolo") {
+    return (candidate.severity ? severityRank[candidate.severity] : 1) >
+      (current.severity ? severityRank[current.severity] : 1);
+  }
+  return candidate.wasteCount > current.wasteCount;
 }
 
 export function formatWasteAnalysis(hasWaste: boolean, severity: AiSeverityLabel): string {

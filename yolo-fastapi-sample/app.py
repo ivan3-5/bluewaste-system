@@ -46,20 +46,20 @@ CUSTOM_CONF_THRESHOLD      = float(os.getenv("CUSTOM_CONF",           "0.30"))
 DETECT_CONF_THRESHOLD      = float(os.getenv("DETECT_CONF",           "0.30"))
 
 # Severity is based on the total number of waste items detected in the photo.
-def severity_from_count(waste_count: int) -> Optional[str]:
+def severity_from_count(waste_count: int) -> str:
     if waste_count >= 26:
         return "HIGH"
     if waste_count >= 14:
         return "MODERATE"
     if waste_count >= 4:
         return "LOW"
-    return "SPAM" if waste_count <= 0 else None
+    return "SPAM"
 
 
-def analysis_summary(severity: Optional[str]) -> str:
+def analysis_summary(severity: str) -> str:
     if severity == "SPAM":
         return "No waste detected. Severity: None."
-    label = "Medium" if severity == "MODERATE" else severity.title() if severity else "None"
+    label = "Medium" if severity == "MODERATE" else severity.title()
     return f"Waste detected. Severity: {label}."
 
 
@@ -69,7 +69,6 @@ WASTE_FALLBACK_CONFIDENCE_THRESHOLD = 0.08
 LOW_CONFIDENCE_FALLBACK_THRESHOLD  = 0.18
 WASTE_NMS_IOU_THRESHOLD            = 0.55
 MIN_NORMALIZED_BOX_AREA            = 0.0015
-DIRTY_MIN_WASTE_COUNT              = 1
 
 _DEFAULT_WASTE_CLASSES = {
     "bottle", "cup", "wine glass", "bowl",
@@ -239,24 +238,17 @@ def _analyze_gpu(image: Image.Image) -> dict:
         for name, count in sorted(class_counts.items(), key=lambda kv: kv[1], reverse=True)
     ]
 
-    if waste_count == 0:
-        return {
-            "severity": "SPAM", "has_waste": False, "waste_count": 0, "count": 0,
-            "labels": [], "all_labels": [], "layer1_passed": True,
-            "spam_reason": "No waste-related objects were detected by the waste model.",
-            "message": analysis_summary("SPAM"),
-        }
-
     severity = severity_from_count(waste_count)
+    has_waste = severity != "SPAM"
     return {
         "severity":      severity,
-        "has_waste":     True,
+        "has_waste":     has_waste,
         "waste_count":   waste_count,
         "count":         waste_count,
         "labels":        labels,
         "all_labels":    labels,
         "layer1_passed": True,
-        "spam_reason":   None,
+        "spam_reason":   None if has_waste else "Photo did not meet the minimum waste severity.",
         "message":       analysis_summary(severity),
     }
 
@@ -286,7 +278,8 @@ def _predict_gpu(image: Image.Image, include_annotated: bool = False) -> dict:
 
     top_conf  = max((d["confidence"] for d in detections), default=None)  # internal: retake hint only
     waste_cnt = len(detections)
-    status    = "DIRTY" if waste_cnt >= DIRTY_MIN_WASTE_COUNT else "CLEAN"
+    severity  = severity_from_count(waste_cnt)
+    status    = "DIRTY" if severity != "SPAM" else "CLEAN"
     labels    = list(dict.fromkeys(d["class"].lower() for d in detections))
     is_uncertain = top_conf is None or top_conf < LOW_CONFIDENCE_FALLBACK_THRESHOLD
 
@@ -298,7 +291,7 @@ def _predict_gpu(image: Image.Image, include_annotated: bool = False) -> dict:
         "count":      len(detections),
         "waste_count": waste_cnt,
         "status":     status,
-        "severity":   severity_from_count(waste_cnt),
+        "severity":   severity,
         "annotated_image_base64": annotated_b64,
         "annotated_image_mime": "image/jpeg" if annotated_b64 else None,
         "decision": {
@@ -316,10 +309,9 @@ def _detect_gpu(image: Image.Image) -> dict:
     custom = _get_custom_model()
     results = custom.predict(source=frame, conf=DETECT_CONF_THRESHOLD, iou=0.45, verbose=False)
     waste_count = len(results[0].boxes) if results else 0
-    has_waste = waste_count > 0
     severity = severity_from_count(waste_count)
     return {
-        "has_waste":   has_waste,
+        "has_waste":   severity != "SPAM",
         "waste_count": waste_count,
         "severity":    severity,
         "message":     analysis_summary(severity),

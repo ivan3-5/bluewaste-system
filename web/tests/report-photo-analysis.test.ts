@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { analyzePendingPhotos } from "@/lib/report-photo-analysis";
+import { isStrongerPhoto } from "@/lib/severity";
+
+it("selects the highest YOLO severity regardless of item count", () => {
+  const high = { model: "yolo", severity: "HIGH", wasteCount: 1 } as const;
+  const low = { model: "yolo", severity: "LOW", wasteCount: 20 } as const;
+  expect(isStrongerPhoto(high, low)).toBe(true);
+  expect(isStrongerPhoto(low, high)).toBe(false);
+});
 
 for (const provider of ["gemini", "yolo"]) {
   describe(`${provider} multi-photo analysis`, () => {
