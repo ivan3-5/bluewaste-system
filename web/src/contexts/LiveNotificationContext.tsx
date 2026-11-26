@@ -10,7 +10,7 @@ import {
   ReactNode,
 } from "react";
 import { Notification } from "@/types";
-import { AUTH_KEYS } from "@/lib/api";
+import { readWebSession } from "@/lib/web-session";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -143,8 +143,7 @@ function InternalPoller({
       }
       try {
         // Only poll if a user session is active
-        const token = localStorage.getItem(AUTH_KEYS.TOKEN);
-        if (!token) return;
+        if (!readWebSession()) return;
 
         const { default: api } = await import("@/lib/api");
         const res = await api.get<{ data: Notification[] }>(

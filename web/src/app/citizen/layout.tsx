@@ -13,6 +13,7 @@ import { CitizenLayoutSkeleton } from "@/components/skeletons/page-skeletons";
 import { NotificationBell } from "@/components/NotificationBell";
 
 const citizenLinks = [
+  { href: "/", label: "Home", icon: "🏠" },
   { href: "/citizen/report", label: "Submit Report", icon: "📝" },
   { href: "/citizen/my-reports", label: "My Reports", icon: "📋" },
   { href: "/citizen/map", label: "Map View", icon: "🗺️" },
@@ -33,7 +34,7 @@ export default function CitizenLayout({
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push("/login");
+      router.replace("/login");
     }
   }, [user, isLoading, router]);
 
@@ -109,6 +110,8 @@ export default function CitizenLayout({
               />
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
+                aria-label="Account menu"
+                aria-expanded={profileOpen}
                 className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors focus:outline-none"
                 onMouseDown={(e) => e.preventDefault()}
               >
@@ -144,7 +147,6 @@ export default function CitizenLayout({
                       onClick={() => {
                         setProfileOpen(false);
                         logout();
-                        router.push("/");
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50 transition-colors text-left"
                     >
@@ -221,7 +223,6 @@ export default function CitizenLayout({
                   onClick={() => {
                     setMobileMenuOpen(false);
                     logout();
-                    router.push("/");
                   }}
                   className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
                 >

@@ -1,12 +1,14 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import prisma from "../config/database";
 import { sendError } from "../utils/http";
 import { Redis } from "@upstash/redis";
 import { logger } from "../utils/logger";
+import { AuthClaims, verifyToken } from "../utils/jwt";
+import { getActiveWebSession } from "../services/web-session.service";
 
 export interface AuthRequest extends Request {
+  webSession?: { id: string; expiresAt: Date };
   user?: {
     id: string;
     email: string;
@@ -117,15 +119,20 @@ export const authenticate = async (
   }
 
   const token = authHeader.split(" ")[1];
-  let decoded: { userId: string };
+  let decoded: AuthClaims;
 
   try {
-    decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string };
+    decoded = verifyToken(token);
   } catch {
     return sendError(res, 401, "Invalid or expired token.", "UNAUTHORIZED");
   }
 
   try {
+    if (decoded.sessionId) {
+      const session = await getActiveWebSession(decoded);
+      if (!session) return sendError(res, 401, "Web session ended.", "WEB_SESSION_ENDED");
+      req.webSession = session;
+    }
     let user = await AuthCache.get(decoded.userId);
     
     if (!user) {
@@ -178,7 +185,8 @@ export const optionalAuth = async (
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string };
+    const decoded = verifyToken(token);
+    if (decoded.sessionId && !(await getActiveWebSession(decoded))) return next();
 
     let user = await AuthCache.get(decoded.userId);
     

@@ -46,7 +46,7 @@ export default function FieldWorkerLayout({
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push("/login");
+      router.replace("/login");
     }
     if (!isLoading && user && user.role !== "FIELD_WORKER") {
       router.push("/citizen/report");
@@ -205,10 +205,7 @@ export default function FieldWorkerLayout({
                   </Link>
                 )}
                 <button
-                  onClick={() => {
-                    logout();
-                    router.push("/");
-                  }}
+                  onClick={logout}
                   className={`text-gray-400 dark:text-slate-400 transition-colors hover:text-red-500 dark:hover:text-red-400 ${
                     isCollapsed ? "mx-auto" : ""
                   }`}
@@ -319,7 +316,6 @@ export default function FieldWorkerLayout({
                             onClick={() => {
                               setProfileMenuOpen(false);
                               logout();
-                              router.push("/");
                             }}
                             className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors text-left"
                           >
@@ -383,7 +379,6 @@ export default function FieldWorkerLayout({
                       onClick={() => {
                         setMobileMenuOpen(false);
                         logout();
-                        router.push("/");
                       }}
                       className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
                     >

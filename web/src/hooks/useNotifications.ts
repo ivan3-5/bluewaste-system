@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { useAuth } from "@/providers/AuthProvider";
 import { PaginatedResponse, Notification } from "@/types";
 
 export function useNotifications(page: number = 1, limit: number = 10) {
@@ -19,8 +20,10 @@ export function useNotifications(page: number = 1, limit: number = 10) {
 }
 
 export function useUnreadCount() {
+  const { user } = useAuth();
   return useQuery<{ count: number }>({
     queryKey: ["notifications", "unread-count"],
+    enabled: Boolean(user),
     queryFn: async () => {
       const { data } = await api.get("/notifications/unread-count");
       return data;

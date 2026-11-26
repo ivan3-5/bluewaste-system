@@ -7,6 +7,7 @@ import {
 } from "../utils/jwt";
 import { Role } from "@prisma/client";
 import { EmailVerificationError, EmailVerificationService } from "./email-verification.service";
+import { createWebSession } from "./web-session.service";
 
 export class AuthService {
   static async register(data: {
@@ -62,7 +63,7 @@ export class AuthService {
     return { user, verificationRequired: true };
   }
 
-  static async login(email: string, password: string) {
+  static async login(email: string, password: string, web = false) {
     const user = await prisma.user.findFirst({
       where: { email: { equals: email, mode: "insensitive" } },
     });
@@ -81,8 +82,6 @@ export class AuthService {
       );
     }
 
-    const token = generateToken(user.id);
-    const refreshToken = generateRefreshToken(user.id);
     return {
       user: {
         id: user.id,
@@ -95,34 +94,36 @@ export class AuthService {
         address: user.address,
         createdAt: user.createdAt,
       },
-      token,
-      refreshToken,
+      ...(web ? await createWebSession(user.id) : {
+        token: generateToken(user.id),
+        refreshToken: generateRefreshToken(user.id),
+      }),
     };
   }
 
-  static async verifyEmail(email: string, code: string) {
+  static async verifyEmail(email: string, code: string, web = false) {
     const user = await EmailVerificationService.verify(email, code);
-    const token = generateToken(user.id);
-    const refreshToken = generateRefreshToken(user.id);
-    return { user, token, refreshToken };
+    return {
+      user,
+      ...(web ? await createWebSession(user.id) : {
+        token: generateToken(user.id),
+        refreshToken: generateRefreshToken(user.id),
+      }),
+    };
   }
 
   static async resendVerification(email: string) {
     return EmailVerificationService.resend(email);
   }
 
-  /**
-   * Verify a refresh token and issue a new short-lived access token.
-   * The refresh token itself is not rotated here — rotation can be added
-   * later when a `RefreshToken` table is introduced.
-   */
   static async refreshAccessToken(refreshToken: string) {
-    let payload: { userId: string };
+    let payload;
     try {
       payload = verifyRefreshToken(refreshToken);
     } catch {
       throw new Error("Invalid or expired refresh token");
     }
+    if (payload.sessionId) throw new Error("Invalid refresh token");
 
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
