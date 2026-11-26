@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { analyzeImageWithGemini, GeminiError } from "@/lib/ai/gemini";
 import { validateGeminiResult } from "@/lib/ai/validator";
-import { analyzeImageWithYolo, type YoloAnalysis } from "@/lib/ai/yolo";
+import { analyzeImageWithYolo, YoloRequestError, type YoloAnalysis } from "@/lib/ai/yolo";
 import { aiSeverityFromWasteCount, dbSeverityToAiLabel, formatWasteAnalysis, type DbSeverity } from "@/lib/severity";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import prisma from "@/lib/prisma";
 
 export const runtime = "nodejs";
+export const maxDuration = 180;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -203,7 +204,7 @@ export async function POST(request: NextRequest) {
     let imageUrl: string | null = null;
 
     try {
-      const uploaded = await uploadToCloudinary(imageBuffer, "bluewaste/ai-reports");
+      const uploaded = await uploadToCloudinary(imageBuffer, "bluewaste/ai-reports", 20_000);
       imageUrl = uploaded.secureUrl;
     } catch (err) {
       console.error("[AI] Cloudinary upload failed — continuing without stored image:", err);
@@ -276,6 +277,7 @@ export async function POST(request: NextRequest) {
         aiResult = await analyzeImageWithYolo(imageBuffer, image.type, image.name);
       } catch (error) {
         console.error("[AI] YOLO analysis failed:", error);
+        if (error instanceof YoloRequestError) return jsonError(error.status, error.message);
         return jsonError(503, "YOLO analysis failed. Please try again or contact the administrator.");
       }
       modelName = "yolo";

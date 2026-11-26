@@ -37,6 +37,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
 
   final List<XFile> _images = <XFile>[];
   final ImagePicker _picker = ImagePicker();
+  bool _isPickingPhotos = false;
 
   String _category = "with_waste";
   bool _isAnonymous = false;
@@ -105,6 +106,11 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
       _refreshDetection();
     });
 
+    await _photoAnalysis.enqueue(pickedFile, () => _analyzePhoto(pickedFile));
+  }
+
+  Future<void> _analyzePhoto(XFile pickedFile) async {
+    if (!mounted || !_images.contains(pickedFile)) return;
     DetectResult? result;
     String? errorMessage;
 
@@ -161,46 +167,41 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
     });
   }
 
-  Future<void> _pickFromCamera() async {
-    if (_images.length >= 5) return;
+  Future<void> _pickFromCamera() => _pickPhotos(ImageSource.camera);
 
-    final picked = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 75,
-    );
-    if (!mounted || picked == null || _images.length >= 5 || _isSubmitting) {
+  Future<void> _pickFromGallery() => _pickPhotos(ImageSource.gallery);
+
+  Future<void> _pickPhotos(ImageSource source) async {
+    final remaining = 5 - _images.length;
+    if (_isPickingPhotos || _isSubmitting || remaining <= 0) return;
+
+    List<XFile> picked;
+    _isPickingPhotos = true;
+    try {
+      if (source == ImageSource.gallery && remaining > 1) {
+        picked = await _picker.pickMultiImage(
+          imageQuality: 75,
+          limit: remaining,
+        );
+      } else {
+        final photo = await _picker.pickImage(source: source, imageQuality: 75);
+        picked = [if (photo != null) photo];
+      }
+    } finally {
+      _isPickingPhotos = false;
+    }
+
+    if (!mounted || picked.isEmpty || _images.length >= 5 || _isSubmitting) {
       return;
     }
 
+    final photos = picked.take(5 - _images.length).toList();
     setState(() {
-      _images.add(picked);
-      if (_images.length == 1) {
-        _resetDetection();
-      }
+      if (_images.isEmpty) _resetDetection();
+      _images.addAll(photos);
     });
 
-    await _runDetection(picked);
-  }
-
-  Future<void> _pickFromGallery() async {
-    if (_images.length >= 5) return;
-
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 75,
-    );
-    if (!mounted || picked == null || _images.length >= 5 || _isSubmitting) {
-      return;
-    }
-
-    setState(() {
-      _images.add(picked);
-      if (_images.length == 1) {
-        _resetDetection();
-      }
-    });
-
-    await _runDetection(picked);
+    await Future.wait(photos.map(_runDetection));
   }
 
   Future<void> _getCurrentLocation() async {
@@ -645,9 +646,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   width: double.infinity,
                   height: 52,
                   child: FilledButton.icon(
-                    onPressed: (_isDetecting || _isSubmitting)
-                        ? null
-                        : _pickFromCamera,
+                    onPressed: _isSubmitting ? null : _pickFromCamera,
                     icon: const Icon(Icons.photo_camera_rounded, size: 22),
                     label: const Text(
                       "Take a Photo",
@@ -663,9 +662,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton.icon(
-                    onPressed: (_isDetecting || _isSubmitting)
-                        ? null
-                        : _pickFromGallery,
+                    onPressed: _isSubmitting ? null : _pickFromGallery,
                     icon: const Icon(Icons.photo_library_rounded, size: 22),
                     label: const Text(
                       "Choose from Gallery",
@@ -1012,9 +1009,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: (_isDetecting || _isSubmitting)
-                            ? null
-                            : _pickFromCamera,
+                        onPressed: _isSubmitting ? null : _pickFromCamera,
                         icon: const Icon(Icons.add_a_photo_outlined, size: 18),
                         label: const Text("Angle (Camera)"),
                       ),
@@ -1022,9 +1017,7 @@ class _ReportCreateScreenState extends ConsumerState<ReportCreateScreen> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: (_isDetecting || _isSubmitting)
-                            ? null
-                            : _pickFromGallery,
+                        onPressed: _isSubmitting ? null : _pickFromGallery,
                         icon: const Icon(
                           Icons.add_photo_alternate_outlined,
                           size: 18,

@@ -2,6 +2,7 @@ import prisma from "../config/database";
 import { WasteCategory, AnalysisStatus } from "@prisma/client";
 import { NotificationService } from "./notification.service";
 import { env } from "../config/env";
+import { requestYolo } from "../utils/yolo-client";
 import { formatWasteAnalysis, severityFromWasteCount } from "../utils/severity";
 
 interface YoloLabel {
@@ -33,15 +34,6 @@ function toNonNegativeInt(value: unknown, fallback = 0) {
     }
   }
   return fallback;
-}
-
-function toSafeJson(text: string): unknown {
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
 }
 
 function normalizeImageContentType(value: string | null) {
@@ -91,7 +83,7 @@ export class ReportAnalysisService {
 
   private static async requestYoloAnalysis(imageUrl: string) {
     // ── 1. Fetch the image ──────────────────────────────────────────────────
-    const imageResponse = await fetch(imageUrl);
+    const imageResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(15_000) });
     if (!imageResponse.ok) {
       throw new Error("Failed to fetch report image for analysis");
     }
@@ -99,39 +91,11 @@ export class ReportAnalysisService {
       imageResponse.headers.get("content-type"),
     );
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    const url = new URL(env.YOLO_API_URL);
-    const signal = AbortSignal.timeout(120_000);
-    let raw: unknown;
-    if (url.hostname.endsWith(".hf.space")) {
-      const base = `${url.origin}${url.pathname.replace(/\/(?:gradio_api\/)?(?:call\/)?analyze\/?$/, "").replace(/\/+$/, "")}`;
-      const endpoint = `${base}/gradio_api/call/analyze`;
-      const dataUrl = `data:${contentType};base64,${imageBuffer.toString("base64")}`;
-      const submitRes = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: [{ url: dataUrl, mime_type: contentType, meta: { _type: "gradio.FileData" } }] }),
-        signal,
-      });
-      if (!submitRes.ok) {
-        throw new Error(`Gradio submit error ${submitRes.status}`);
-      }
-      const submitJson = await submitRes.json() as { event_id?: unknown };
-      if (typeof submitJson.event_id !== "string" || !submitJson.event_id) throw new Error("Gradio returned no event_id");
-      const sseRes = await fetch(`${endpoint}/${encodeURIComponent(submitJson.event_id)}`, { signal });
-      if (!sseRes.ok) throw new Error(`Gradio SSE stream error ${sseRes.status}`);
-      const completed = (await sseRes.text()).split(/\r?\n\r?\n/)
-        .find((event) => /^event:\s*complete\s*$/m.test(event));
-      const data = completed?.match(/^data:\s*(.+)$/m)?.[1];
-      const parsed = data ? toSafeJson(data) : null;
-      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("Gradio inference did not complete successfully");
-      raw = parsed[0];
-    } else {
-      const form = new FormData();
-      form.append("image", new Blob([new Uint8Array(imageBuffer)], { type: contentType }), "image");
-      const response = await fetch(url, { method: "POST", body: form, signal });
-      if (!response.ok) throw new Error(`YOLO inference failed (${response.status})`);
-      raw = await response.json();
-    }
+    const raw = await requestYolo(
+      env.YOLO_API_URL,
+      { bytes: imageBuffer, mimeType: contentType, filename: "image" },
+      process.env.HF_TOKEN,
+    );
     if (!raw || typeof raw !== "object" || Array.isArray(raw) ||
         typeof (raw as YoloApiResponse).has_waste !== "boolean") {
       throw new Error("YOLO returned an invalid response");

@@ -6,7 +6,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { analyzePendingPhotos } from "@/lib/report-photo-analysis";
+import { useReportPhotoAnalysis } from "@/hooks/useReportPhotoAnalysis";
 import { MAX_REPORT_PHOTOS, REPORT_PHOTO_ACCEPT, selectReportPhotos } from "@/lib/report-photos";
 import { AnalysisSummary } from "@/components/AnalysisSummary";
 import { ReportPhotoThumbnails, usePhotoUrl } from "@/components/reports/ReportPhotoThumbnails";
@@ -73,12 +73,12 @@ export default function ReportWastePage() {
   const [outsideZone, setOutsideZone] = useState(false);
 
   const [photos, setPhotos] = useState<File[]>([]);
-  const [photoAnalysis, setPhotoAnalysis] = useState<Map<File, { result?: PhotoResult; error?: string }>>(new Map());
+  const [savedReport, setSavedReport] = useState<GeminiAnalysisResult | null>(null);
+  const { photoAnalysis, retryPhoto, clearPhotoAnalysis } = useReportPhotoAnalysis(photos, !!token && !savedReport, analyzePhoto);
   const analysisReady = photos.length > 0 && photos.every((photo) => !!photoAnalysis.get(photo)?.result);
   const photosPending = photos.some((photo) => !photoAnalysis.has(photo));
   const imageFile = photos[0] ?? null;
   const previewUrl = usePhotoUrl(imageFile);
-  const [savedReport, setSavedReport] = useState<GeminiAnalysisResult | null>(null);
   const [uploadedCount, setUploadedCount] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<GeminiAnalysisResult | null>(null);
@@ -136,26 +136,21 @@ export default function ReportWastePage() {
     setPhotos((current) => [...current, ...selection.photos].slice(0, MAX_REPORT_PHOTOS));
   };
 
-  useEffect(() => {
-    if (!token || savedReport) return;
-    let cancelled = false;
-    void analyzePendingPhotos(photos, photoAnalysis, async (photo): Promise<PhotoResult> => {
-      const formData = new FormData();
-      formData.append("image", photo);
-      formData.append("latitude", String(latitude ?? 0));
-      formData.append("longitude", String(longitude ?? 0));
-      if (user?.id) formData.append("citizenId", user.id);
-      const response = await fetch("/api/ai/analyze-report", {
-        method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || data.error || "Failed to analyze image");
-      return data;
-    }, (photo, entry) => setPhotoAnalysis((current) => new Map(current).set(photo, entry)), () => cancelled);
-    return () => { cancelled = true; };
-    // Cache results by file; retry and selection changes only process missing results.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photos, token, savedReport]);
+  async function analyzePhoto(photo: File): Promise<PhotoResult> {
+    const formData = new FormData();
+    formData.append("image", photo);
+    formData.append("latitude", String(latitude ?? 0));
+    formData.append("longitude", String(longitude ?? 0));
+    if (user?.id) formData.append("citizenId", user.id);
+    const response = await fetch("/api/ai/analyze-report", {
+      method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData,
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || data.error || "Failed to analyze image");
+    }
+    return response.json();
+  }
 
   const finishPhotoUpload = async (report: GeminiAnalysisResult) => {
     await uploadImages.mutateAsync({
@@ -173,7 +168,7 @@ export default function ReportWastePage() {
     setSavedReport(null);
     setUploadedCount(0);
     setPhotos([]);
-    setPhotoAnalysis(new Map());
+    clearPhotoAnalysis();
     setError("");
     setDescription("");
   };
@@ -462,10 +457,7 @@ JPG, PNG or WEBP · 4 MB each
                   : entry.error ? { status: "error" as const, message: entry.error }
                   : { status: entry.result?.hasWaste ? "complete" as const : "spam" as const };
               })}
-              onRetry={isAnalyzing || savedReport ? undefined : (index) => {
-                setPhotoAnalysis((current) => { const next = new Map(current); next.delete(photos[index]); return next; });
-                setPhotos((current) => [...current]);
-              }}
+              onRetry={isAnalyzing || savedReport ? undefined : (index) => retryPhoto(photos[index])}
               onRemove={isAnalyzing || savedReport ? undefined : (index) => {
                 setPhotos((current) => current.filter((_, photoIndex) => photoIndex !== index));
                 setError("");

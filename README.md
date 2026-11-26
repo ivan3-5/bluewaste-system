@@ -96,6 +96,19 @@ images to the web analysis service at `WEB_URL`; set `WEB_URL` to the web
 deployment's origin and configure Gemini on the web deployment. Existing
 analyzed reports are not reanalyzed.
 
+When `YOLO_API_URL` points to a Hugging Face Space, set `HF_TOKEN` on the web
+and backend servers to use the token owner's ZeroGPU quota. Use a token with
+read access to the Space and store it as a server-side secret. Cloud-mode
+mobile requests use the web server's credentials.
+
+The Space runs one YOLO request at a time across its three endpoints. Its
+optional Space variables are `YOLO_QUEUE_MAX_SIZE` (10 waiting requests by
+default) and `YOLO_GPU_DURATION_SECONDS` (25 seconds per GPU call by default).
+The application allows up to 120 seconds per photo for submission, queueing,
+and inference. The web analysis routes request a 180-second function duration,
+so the deployment must support that limit. Mobile cloud analysis waits up to
+190 seconds for a response.
+
 ### Mobile runtime config (Flutter)
 
 Use `--dart-define` when launching the mobile app:

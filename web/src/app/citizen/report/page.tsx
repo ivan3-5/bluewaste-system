@@ -8,7 +8,7 @@ import { useCreateReport, useUploadReportImages } from "@/hooks/useReports";
 import { dbSeverityToAiLabel, formatWasteAnalysis, severityFromWasteCount, type DbSeverity } from "@/lib/severity";
 import { useReportingZones, isPointInAnyZone } from "@/hooks/useReportingZones";
 import { getApiErrorMessage } from "@/lib/apiError";
-import { analyzePendingPhotos } from "@/lib/report-photo-analysis";
+import { useReportPhotoAnalysis } from "@/hooks/useReportPhotoAnalysis";
 import { MAX_REPORT_PHOTOS, REPORT_PHOTO_ACCEPT, selectReportPhotos } from "@/lib/report-photos";
 import { ReportPhotoThumbnails, usePhotoUrl } from "@/components/reports/ReportPhotoThumbnails";
 import { DetectionBox } from "@/lib/waste-classification";
@@ -185,11 +185,8 @@ async function requestAnalyzeWaste(
         body: formData,
       });
 
+      if (response.ok) return await response.json();
       const payload = await response.json().catch(() => ({}));
-      if (response.ok) {
-        return payload;
-      }
-
       lastErrorMessage =
         payload?.message || payload?.error || "Failed to analyze image.";
 
@@ -221,7 +218,6 @@ export default function SubmitReportPage() {
   const [photos, setPhotos] = useState<File[]>([]);
   const imageFile = photos[0] ?? null;
   const imagePreview = usePhotoUrl(imageFile);
-  const [photoAnalysis, setPhotoAnalysis] = useState<Map<File, { result?: AnalyzeWasteResult; error?: string }>>(new Map());
   const [savedReportId, setSavedReportId] = useState<string | null>(null);
   const [uploadedCount, setUploadedCount] = useState(0);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
@@ -238,6 +234,7 @@ export default function SubmitReportPage() {
   const [locationError, setLocationError] = useState("");
   const [locationStatus, setLocationStatus] = useState("");
 
+  const { photoAnalysis, retryPhoto, clearPhotoAnalysis } = useReportPhotoAnalysis(photos, !!token && !savedReportId, analyzeWasteImage);
   const isAnalyzing = photos.some((photo) => !photoAnalysis.has(photo));
   const analysisReady = photos.length > 0 && photos.every((photo) => !!photoAnalysis.get(photo)?.result);
   // Use the strongest single view; summing different angles would count waste twice.
@@ -306,21 +303,6 @@ export default function SubmitReportPage() {
     ],
   );
 
-  // Run sequentially to respect provider limits. Cleanup discards removed photos
-  // and stale responses when the selection or authenticated session changes.
-  useEffect(() => {
-    if (!token || savedReportId) return;
-    let cancelled = false;
-    void analyzePendingPhotos(
-      photos, photoAnalysis, analyzeWasteImage,
-      (photo, entry) => setPhotoAnalysis((current) => new Map(current).set(photo, entry)),
-      () => cancelled,
-    );
-    return () => { cancelled = true; };
-    // Results are cached by File identity; selection changes restart only pending work.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photos, token, savedReportId]);
-
   useEffect(() => {
     setSelectedCategory(analysisReady && analysisResult ? mapAnalysisToBucket(analysisResult) : "");
   }, [analysisReady, analysisResult]);
@@ -364,7 +346,7 @@ export default function SubmitReportPage() {
   };
 
   const resetPrimaryAnalysis = () => {
-    setPhotoAnalysis(new Map());
+    clearPhotoAnalysis();
     setSelectedCategory("");
   };
 
@@ -396,7 +378,7 @@ export default function SubmitReportPage() {
     cameraInputRef.current.click();
   };
 
-  const analyzeWasteImage = async (imageFile: File): Promise<AnalyzeWasteResult> => {
+  async function analyzeWasteImage(imageFile: File): Promise<AnalyzeWasteResult> {
     if (!imageFile) {
       throw new Error("Select an image first.");
     }
@@ -457,7 +439,7 @@ export default function SubmitReportPage() {
       labels: categoriesList,
       detections: Array.isArray(payload?.detections) ? payload.detections : [],
     };
-  };
+  }
 
   const finishPhotoUpload = async (reportId: string) => {
     await uploadImages.mutateAsync({
@@ -823,10 +805,7 @@ export default function SubmitReportPage() {
                         : entry.error ? { status: "error" as const, message: entry.error }
                         : { status: entry.result && (!entry.result.has_waste || entry.result.severity === "SPAM") ? "spam" as const : "complete" as const };
                     })}
-                    onRetry={isSubmitting ? undefined : (index) => {
-                      setPhotoAnalysis((current) => { const next = new Map(current); next.delete(photos[index]); return next; });
-                      setPhotos((current) => [...current]);
-                    }}
+                    onRetry={isSubmitting ? undefined : (index) => retryPhoto(photos[index])}
                     onRemove={isSubmitting ? undefined : removePhoto}
                   />
                   {hasSpamPhotos && <p role="alert" className="text-xs text-red-700">Keeping a spam photo will flag this report as spam. We suggest removing it.</p>}

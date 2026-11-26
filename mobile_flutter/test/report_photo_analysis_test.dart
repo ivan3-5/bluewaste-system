@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bluewaste_mobile_flutter/src/features/reports/data/detect_service.dart';
 import 'package:bluewaste_mobile_flutter/src/features/reports/data/report_photo_analysis.dart';
@@ -12,6 +14,50 @@ DetectResult result(String model, int count) => DetectResult(
 );
 
 void main() {
+  test(
+    'serializes five photos, skips a removed photo, and retries a failure',
+    () async {
+      final state = ReportPhotoAnalysis<int>();
+      final holdFirstPhoto = Completer<void>();
+      final started = <int>[];
+
+      Future<void> analyze(int photo, {bool fail = false}) {
+        state.pending.add(photo);
+        return state.enqueue(photo, () async {
+          started.add(photo);
+          if (photo == 1) await holdFirstPhoto.future;
+          state.pending.remove(photo);
+          if (fail) {
+            state.errors[photo] = 'Temporary error';
+            return;
+          }
+          state.errors.remove(photo);
+          state.results[photo] = result('yolo-tflite', 4);
+        });
+      }
+
+      final initial = [
+        analyze(1),
+        analyze(2),
+        analyze(3, fail: true),
+        analyze(4),
+        analyze(5),
+      ];
+      await Future<void>.delayed(Duration.zero);
+      expect(started, [1]);
+      state.remove(2);
+      holdFirstPhoto.complete();
+
+      await Future.wait(initial);
+      expect(started, [1, 3, 4, 5]);
+      expect(state.results.keys, [1, 4, 5]);
+      expect(state.errors.keys, [3]);
+      await analyze(3);
+      expect(started, [1, 3, 4, 5, 3]);
+      expect(state.ready([1, 3, 4, 5]), isTrue);
+    },
+  );
+
   for (final model in ['gemini', 'yolo-tflite']) {
     group('$model report photos', () {
       test('requires successful analysis for all five photos', () {

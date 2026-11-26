@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { classifyYoloPayload, inferWasteCategory } from "@/lib/waste-classification";
-import { requestYoloPayload } from "@/lib/ai/yolo";
+import { requestYoloPayload, YoloRequestError } from "@/lib/ai/yolo";
 import { dbSeverityToAiLabel, formatWasteAnalysis, severityFromWasteCount } from "@/lib/severity";
 import { analyzeImageWithGemini } from "@/lib/ai/gemini";
 import { validateGeminiResult } from "@/lib/ai/validator";
 
 export const runtime = "nodejs";
+export const maxDuration = 180;
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
@@ -349,6 +350,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("[AI] Legacy analysis failed:", error);
+    if (error instanceof YoloRequestError) return toJsonError(error.status, error.message);
     const errMsg =
       error instanceof Error ? error.message : String(error || "Unknown error");
     const isNetworkError =

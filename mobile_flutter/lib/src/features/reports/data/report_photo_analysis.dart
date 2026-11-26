@@ -5,6 +5,15 @@ class ReportPhotoAnalysis<Photo> {
   final Map<Photo, DetectResult> results = {};
   final Map<Photo, String> errors = {};
   final Set<Photo> pending = {};
+  Future<void> _queue = Future<void>.value();
+
+  Future<void> enqueue(Photo photo, Future<void> Function() analyze) {
+    final task = _queue.then((_) async {
+      if (pending.contains(photo)) await analyze();
+    });
+    _queue = task.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return task;
+  }
 
   bool ready(Iterable<Photo> photos) =>
       photos.isNotEmpty && photos.every(results.containsKey);
